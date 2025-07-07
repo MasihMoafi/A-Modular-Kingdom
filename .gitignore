@@ -1,0 +1,5 @@
+__pycache__/
+agent_chroma_db/
+rag_db/
+rag_db_v2/
+*.log
