@@ -31,7 +31,6 @@ async def main():
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
-            # Wait for the host to initialize
             await session.initialize()
             print("\n✅ Agent is ready. Type 'exit' to quit.")
             
@@ -58,51 +57,65 @@ async def main():
                         except (json.JSONDecodeError, IndexError, TypeError) as e:
                             print(f"Could not parse memory response: {e}")
                         continue
-                    
-                    # 1. SEARCH: Get relevant memories.
+
+                    # --- Step 1: Search Internal Memory ---
                     print("🧠 Searching memories...")
                     search_result = await session.call_tool('search_memories', {'query': user_input, 'k': 3})
-                    
                     try:
                         memories = json.loads(search_result.content[0].text)
                     except (json.JSONDecodeError, IndexError, TypeError):
                         memories = []
-
-                    # Build the context for the LLM
+                    
                     memory_context = "--- Relevant Memories ---\n"
                     if memories and isinstance(memories, list):
-                        # Filter out potential errors and format valid memories
                         valid_mems = [mem.get('content') for mem in memories if mem and 'content' in mem]
-                        if valid_mems:
-                            memory_context += "\n".join([f"- {mem}" for mem in valid_mems])
-                        else:
-                            memory_context += "No relevant memories found."
+                        memory_context += "\n".join([f"- {mem}" for mem in valid_mems]) if valid_mems else "No relevant memories found."
                     else:
                         memory_context += "No relevant memories found."
 
-                    # 2. CHAT: Formulate the prompt and get the assistant's response.
-                    prompt = f"""You are a hyper-intelligent assistant with a perfect, persistent memory. Your single most important duty is to maintain factual accuracy based on your memory.
-
-Below is a list of facts you know to be true. This is your source of truth.
-
---- MEMORY ---
-{memory_context}
----
-
-A user is interacting with you. Your task is to respond to them, following these strict rules:
-1.  If the user's message contradicts a fact in your memory, you MUST correct them. State the fact from your memory clearly.
-2.  If the user's message asks a question, answer it using the facts from your memory.
-3.  NEVER, under any circumstances, repeat or validate information from the user that you know to be false based on your memory.
-
-User: {user_input}
-Assistant:"""
+                    # --- Step 2: Decide if RAG is needed ---
+                    print("🤔 Analyzing query for knowledge base...")
+                    decision_prompt = f"""You are a topic classifier. Your only job is to determine if the user's query is related to "organic chemistry".
+                    Respond with a single JSON object with a boolean key "use_rag".
                     
-                    print("🤔 Thinking...")
-                    response = ollama.chat(model=LLM_MODEL, messages=[{'role': 'user', 'content': prompt}])
+                    User Query: "{user_input}"
+                    
+                    JSON Response:"""
+                    
+                    decision_response = ollama.chat(model=LLM_MODEL, messages=[{'role': 'user', 'content': decision_prompt}], format='json')
+                    knowledge_context = ""
+                    try:
+                        decision = json.loads(decision_response['message']['content'])
+                        if decision.get("use_rag", False):
+                            print(f"📚 Querying knowledge base for: '{user_input}'...")
+                            rag_result = await session.call_tool('query_knowledge_base', {'query': user_input})
+                            knowledge = json.loads(rag_result.content[0].text)
+                            knowledge_context = f"\n--- External Knowledge ---\n{knowledge.get('result', 'No result found.')}"
+                    except (json.JSONDecodeError, IndexError, TypeError) as e:
+                        print(f"Could not parse RAG decision response: {e}")
+
+                    # --- Step 3: Synthesize and Respond ---
+                    final_prompt = f"""You are a hyper-intelligent assistant. Your single most important duty is to maintain factual accuracy.
+                    You have two sources of information: your own memory and an external knowledge base for specific topics.
+
+                    Your primary source of truth is your memory. If the user contradicts it, you MUST correct them.
+                    If the user asks about a topic you have external knowledge on, use that to answer.
+
+                    --- MEMORY ---
+                    {memory_context}
+                    ---
+                    {knowledge_context}
+                    ---
+
+                    User: {user_input}
+                    Assistant:"""
+                    
+                    print("💡 Synthesizing final response...")
+                    response = ollama.chat(model=LLM_MODEL, messages=[{'role': 'user', 'content': final_prompt}])
                     assistant_output = response['message']['content']
                     print(f"\nAssistant: {assistant_output}")
 
-                    # 3. SAVE: Save the conversation turn to be processed by the memory system.
+                    # --- Step 4: Save to Memory ---
                     print("📝 Saving conversation to memory...")
                     conversation_turn = f"User: {user_input}\nAssistant: {assistant_output}"
                     await session.call_tool(
@@ -113,6 +126,7 @@ Assistant:"""
                 except Exception as e:
                     print(f"\n--- An Error Occurred in the Loop ---", file=sys.stderr)
                     print(traceback.format_exc(), file=sys.stderr)
+
 
 if __name__ == "__main__":
     try:

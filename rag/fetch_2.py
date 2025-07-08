@@ -1,5 +1,5 @@
 import os
-from core_2 import RAGPipeline
+from .core_2 import RAGPipeline
 
 RAG_CONFIG = {
     "persist_dir": "./rag_db_v2",

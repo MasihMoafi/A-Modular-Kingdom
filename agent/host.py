@@ -24,9 +24,10 @@ import json
 from typing import Dict
 
 # --- DIAGNOSTIC PRINT ---
-print("[HOST] Importing local modules (mcp, memory.core)...")
+print("[HOST] Importing local modules (mcp, memory.core, rag)...")
 from mcp.server.fastmcp import FastMCP
 from memory.core import Mem0
+from rag.fetch_2 import fetchExternalKnowledge
 print("[HOST] Local modules imported.")
 
 # --- DIAGNOSTIC PRINT ---
@@ -71,7 +72,16 @@ def search_memories(query: str, top_k: int = 3) -> str:
 
 @mcp.tool()
 def query_knowledge_base(query: str) -> str:
-    return json.dumps({"result": "Knowledge base query for organic chemistry is not fully implemented."})
+    """A tool to query the external knowledge base (RAG system)."""
+    try:
+        # --- DIAGNOSTIC PRINT ---
+        print(f"[HOST] Querying RAG with: '{query}'")
+        results = fetchExternalKnowledge(query)
+        print(f"[HOST] RAG results received.")
+        return json.dumps({"result": results})
+    except Exception as e:
+        sys.stderr.write(f"[HOST] ❌ CRITICAL: RAG query failed: {e}\n")
+        return json.dumps({"error": f"Error querying knowledge base on host: {str(e)}"})
 
 @mcp.tool()
 def list_all_memories() -> str:
