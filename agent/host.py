@@ -24,10 +24,11 @@ import json
 from typing import Dict
 
 # --- DIAGNOSTIC PRINT ---
-print("[HOST] Importing local modules (mcp, memory.core, rag)...")
+print("[HOST] Importing local modules (mcp, memory.core, rag, tools)...")
 from mcp.server.fastmcp import FastMCP
 from memory.core import Mem0
 from rag.fetch_2 import fetchExternalKnowledge
+from tools.web_search import perform_web_search
 print("[HOST] Local modules imported.")
 
 # --- DIAGNOSTIC PRINT ---
@@ -93,6 +94,19 @@ def list_all_memories() -> str:
         return json.dumps(all_mems)
     except Exception as e:
         return json.dumps([{"error": f"Error listing memories on host: {str(e)}"}])
+
+@mcp.tool()
+def web_search(query: str) -> str:
+    """A tool to perform a web search using the Google Search API."""
+    try:
+        print(f"[HOST] Performing web search for: '{query}'")
+        results = perform_web_search(query)
+        print(f"[HOST] Web search raw result: {results}") # <-- ADDED LOGGING
+        print(f"[HOST] Web search results received.")
+        return results # The result is already a JSON string
+    except Exception as e:
+        sys.stderr.write(f"[HOST] ❌ CRITICAL: Web search failed: {e}\n")
+        return json.dumps({"error": f"Error performing web search on host: {str(e)}"})
 
 # --- DIAGNOSTIC PRINT ---
 print("[HOST] Tools defined. Starting MCP run loop...")

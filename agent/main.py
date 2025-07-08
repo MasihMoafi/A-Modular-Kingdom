@@ -73,38 +73,51 @@ async def main():
                     else:
                         memory_context += "No relevant memories found."
 
-                    # --- Step 2: Decide if RAG is needed ---
-                    print("🤔 Analyzing query for knowledge base...")
-                    decision_prompt = f"""You are a topic classifier. Your only job is to determine if the user's query is related to "organic chemistry".
-                    Respond with a single JSON object with a boolean key "use_rag".
-                    
-                    User Query: "{user_input}"
-                    
-                    JSON Response:"""
+                    # --- Step 2: Decide which tool to use (if any) ---
+                    print("🤔 Analyzing query for tool use...")
+                    decision_prompt = f"""You are a tool-use decision engine. Your job is to decide which tool, if any, is appropriate for the user's query. You have three choices:
+1.  `rag`: If the query is about "organic chemistry".
+2.  `web_search`: If the query requires up-to-date information, current events, or general knowledge outside of organic chemistry.
+3.  `none`: If the query is personal, conversational, or can be answered from memory.
+
+Respond with a single JSON object with one key: "tool", and the value as one of ["rag", "web_search", "none"].
+
+User Query: "{user_input}"
+
+JSON Response:"""
                     
                     decision_response = ollama.chat(model=LLM_MODEL, messages=[{'role': 'user', 'content': decision_prompt}], format='json')
-                    knowledge_context = ""
+                    external_context = ""
                     try:
                         decision = json.loads(decision_response['message']['content'])
-                        if decision.get("use_rag", False):
+                        tool_to_use = decision.get("tool")
+
+                        if tool_to_use == "rag":
                             print(f"📚 Querying knowledge base for: '{user_input}'...")
                             rag_result = await session.call_tool('query_knowledge_base', {'query': user_input})
                             knowledge = json.loads(rag_result.content[0].text)
-                            knowledge_context = f"\n--- External Knowledge ---\n{knowledge.get('result', 'No result found.')}"
+                            external_context = f"\n--- External Knowledge (Books) ---\n{knowledge.get('result', 'No result found.')}"
+                        
+                        elif tool_to_use == "web_search":
+                            print(f"🌐 Performing web search for: '{user_input}'...")
+                            search_result = await session.call_tool('web_search', {'query': user_input})
+                            results = json.loads(search_result.content[0].text)
+                            external_context = f"\n--- External Knowledge (Web) ---\n{results.get('results', 'No results found.')}"
+
                     except (json.JSONDecodeError, IndexError, TypeError) as e:
-                        print(f"Could not parse RAG decision response: {e}")
+                        print(f"Could not parse tool decision response: {e}")
 
                     # --- Step 3: Synthesize and Respond ---
                     final_prompt = f"""You are a hyper-intelligent assistant. Your single most important duty is to maintain factual accuracy.
-                    You have two sources of information: your own memory and an external knowledge base for specific topics.
+                    You have three sources of information: your personal memory, an external knowledge base for organic chemistry, and a web search tool for current events.
 
                     Your primary source of truth is your memory. If the user contradicts it, you MUST correct them.
-                    If the user asks about a topic you have external knowledge on, use that to answer.
+                    Use the external knowledge sources to answer questions when appropriate.
 
                     --- MEMORY ---
                     {memory_context}
                     ---
-                    {knowledge_context}
+                    {external_context}
                     ---
 
                     User: {user_input}
