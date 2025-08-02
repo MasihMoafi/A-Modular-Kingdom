@@ -1,31 +1,70 @@
 # Agent Module
 
-This module contains the core client-server logic for the agent, following the Model Context Protocol (MCP).
+A unified MCP-based agent system that provides access to memory, knowledge base (RAG), and web search capabilities through the Model Context Protocol.
 
 ## Architecture
 
-The agent operates on a client-server model to separate the interactive frontend from the tool-hosting backend.
+The agent uses a client-server architecture where `main.py` (client) communicates with `host.py` (MCP server) to access various tools and resources.
 
-### `host.py` - The MCP Server
+### `host.py` - MCP Server
 
--   **Purpose**: Acts as a stable, background process that hosts the agent's tools. It initializes and manages the Memory System (`Mem0`) and the RAG pipeline, exposing their functionalities through the MCP.
--   **Execution**: This script is not run directly. It is started as a subprocess by `main.py`.
--   **Tools Exposed**:
-    -   `save_fact`: Saves a conversation turn to the memory system.
-    -   `search_memories`: Searches the memory system for relevant facts.
-    -   `list_all_memories`: Retrieves all facts currently stored in memory.
-    -   `query_knowledge_base`: Queries the RAG system for information from external documents.
+**Purpose**: Hosts all agent capabilities as MCP tools and resources.
 
-### `main.py` - The MCP Client
+**Key Components**:
+- **Memory System**: Mem0-based persistent memory with ChromaDB
+- **RAG System**: Document knowledge base using advanced retrieval (V3)
+- **Web Search**: DuckDuckGo or Google Search API integration 
+- **Document Resources**: File access via @ mentions
 
--   **Purpose**: This is the interactive agent that the user communicates with. It acts as the "brain," handling user interaction, decision-making, and calling tools on the `host.py` server.
--   **Execution**: This is the main entry point to start the agent. Run `python3 main.py` from this directory.
--   **Core Logic**:
-    1.  Starts `host.py` as a background server process.
-    2.  Enters a loop to accept user input.
-    3.  **Autonomous Decision-Making**:
-        -   First, it searches its internal memory for context relevant to the user's query.
-        -   It then uses an LLM to classify the query. If the query is determined to be about "organic chemistry," it autonomously calls the `query_knowledge_base` tool.
-    4.  **Response Synthesis**: It combines the context from its internal memory and any information retrieved from the knowledge base to form a comprehensive prompt for the LLM.
-    5.  **Interaction**: It presents the LLM's final response to the user.
-    6.  **Learning**: It saves the full conversation turn to its memory via the `save_fact` tool.
+**MCP Tools**:
+- `save_memory` - Save content directly to memory system
+- `save_fact` - Save structured facts with automatic processing
+- `search_memories` - Semantic search through saved memories
+- `delete_memory` - Remove specific memories by ID
+- `list_all_memories` - View all stored memories
+- `query_knowledge_base` - Search documents using RAG system
+- `web_search` - Perform web searches for current information
+
+**MCP Resources**:
+- `docs://documents` - List available documents for @ mentions
+- `docs://documents/{doc_id}` - Access specific document content
+
+### `main.py` - MCP Client
+
+**Purpose**: Interactive chat interface with intelligent tool selection.
+
+**Key Features**:
+- **Auto-completion**: @ mentions for documents, / commands
+- **Memory Management**: Direct memory saving with # prefix
+- **Tool Selection**: Automatic choice between memory, RAG, and web search
+- **Document Integration**: @ mentions automatically fetch document content
+- **Command Interface**: /memory, /tools, /files, /help commands
+
+**Workflow**:
+1. Process @ mentions to fetch document content
+2. Search internal memories for relevant context
+3. Decide on external tool usage (RAG vs web search)
+4. Synthesize response with all available context
+5. Optionally save important information to memory
+
+## Usage
+
+```bash
+# Start the agent
+python agent/main.py
+uv run agent/main.py
+# Commands
+#message          - Save directly to memory
+@filename        - Reference documents
+/memory          - Manage memories. 
+/tools           - List available tools
+/files           - Show available documents
+/help            - Show help information
+```
+
+## Configuration
+
+- **LLM Model**: `qwen3:8b` (configurable in main.py)
+- **Memory Storage**: `agent_chroma_db/`
+- **Documents**: `rag/files/`
+- **Knowledge Base**: Configurable to use all three versions.

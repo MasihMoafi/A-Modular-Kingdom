@@ -10,8 +10,9 @@ sys.path.insert(0, project_root)
 import json
 from typing import Dict, List
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 from memory.core import Mem0
-from rag.fetch import fetchExternalKnowledge
+from rag.fetch_3 import fetchExternalKnowledge
 from tools.web_search import perform_web_search
 import glob
 
@@ -25,8 +26,13 @@ except Exception as e:
     sys.stderr.write(f"[HOST] Could not initialize MemoryDB: {e}\n")
     sys.exit(1)
 
-@mcp.tool()
-def save_fact(fact_data: Dict) -> str:
+@mcp.tool(
+    name="save_fact",
+    description="Save structured facts to the memory system with automatic processing and fact extraction from the provided content"
+)
+def save_fact(
+    fact_data: Dict = Field(description="Dictionary containing 'content' key with the fact to save")
+) -> str:
     if memory_database is None:
         return json.dumps({"error": "MemoryDB is not initialized on the host."})
     try:
@@ -38,8 +44,13 @@ def save_fact(fact_data: Dict) -> str:
     except Exception as e:
         return json.dumps({"error": f"Error saving fact on host: {str(e)}"})
 
-@mcp.tool()
-def save_direct_memory(content: str) -> str:
+@mcp.tool(
+    name="save_memory",
+    description="Save content directly to the personal memory system for future reference and retrieval"
+)
+def save_direct_memory(
+    content: str = Field(description="The text content to save to memory")
+) -> str:
     """Save content directly to memory without fact extraction."""
     if memory_database is None:
         return json.dumps({"error": "MemoryDB is not initialized on the host."})
@@ -53,8 +64,12 @@ def save_direct_memory(content: str) -> str:
         return json.dumps({"error": f"Error saving direct memory on host: {str(e)}"})
 
 @mcp.tool(
+    name="delete_memory",
+    description="Delete a specific memory from the memory system using its unique identifier"
 )
-def delete_memory(memory_id: str) -> str:
+def delete_memory(
+    memory_id: str = Field(description="The unique ID of the memory to delete")
+) -> str:
     """Delete a memory by its ID."""
     if memory_database is None:
         return json.dumps({"error": "MemoryDB is not initialized on the host."})
@@ -65,8 +80,14 @@ def delete_memory(memory_id: str) -> str:
     except Exception as e:
         return json.dumps({"error": f"Error deleting memory on host: {str(e)}"})
 
-@mcp.tool()
-def search_memories(query: str, top_k: int = 3) -> str:
+@mcp.tool(
+    name="search_memories",
+    description="Search through saved memories using semantic similarity to find relevant stored information"
+)
+def search_memories(
+    query: str = Field(description="The search query to find relevant memories"),
+    top_k: int = Field(default=3, description="Number of top matching memories to return")
+) -> str:
     if memory_database is None:
         return json.dumps([{"error": "MemoryDB not initialized on the host."}] )
     try:
@@ -75,8 +96,13 @@ def search_memories(query: str, top_k: int = 3) -> str:
     except Exception as e:
         return json.dumps([{"error": f"Error searching memories on host: {str(e)}"}])
 
-@mcp.tool()
-def query_knowledge_base(query: str) -> str:
+@mcp.tool(
+    name="query_knowledge_base",
+    description="Search external documents and knowledge base using the RAG system to find relevant information from stored documents"
+)
+def query_knowledge_base(
+    query: str = Field(description="The search query to find relevant information in the knowledge base")
+) -> str:
     """A tool to query the external knowledge base (RAG system)."""
     import sys
     sys.stderr.write(f"[HOST] RAG tool called with: {query[:20]}...\n")
@@ -93,7 +119,10 @@ def query_knowledge_base(query: str) -> str:
         sys.stderr.flush()
         return json.dumps({"error": f"Error querying knowledge base on host: {str(e)}"})
 
-@mcp.tool()
+@mcp.tool(
+    name="list_all_memories",
+    description="Retrieve and list all saved memories from the memory system for review and management"
+)
 def list_all_memories() -> str:
     """A tool to inspect the contents of the memory database."""
     if memory_database is None:
@@ -104,8 +133,13 @@ def list_all_memories() -> str:
     except Exception as e:
         return json.dumps([{"error": f"Error listing memories on host: {str(e)}"}])
 
-@mcp.tool()
-def web_search(query: str) -> str:
+@mcp.tool(
+    name="web_search",
+    description="Perform a web search to find current information that may not be available in local memory or knowledge base"
+)
+def web_search(
+    query: str = Field(description="The search query to look up on the web")
+) -> str:
     """A tool to perform a web search using the Google Search API."""
     try:
         results = perform_web_search(query)
@@ -114,7 +148,7 @@ def web_search(query: str) -> str:
         return json.dumps({"error": f"Error performing web search on host: {str(e)}"})
 
 # --- RESOURCES for @ functionality ---
-@mcp.resource("docs://documents")  
+@mcp.resource("docs://documents", mime_type="application/json")  
 def list_documents() -> str:
     """Returns list of available document IDs for @ mentions."""
     try:
@@ -130,7 +164,7 @@ def list_documents() -> str:
     except Exception as e:
         return json.dumps([])
 
-@mcp.resource("docs://documents/{doc_id}")
+@mcp.resource("docs://documents/{doc_id}", mime_type="text/plain")
 def get_document_content(doc_id: str) -> str:
     """Returns the content of a specific document."""
     try:

@@ -13,3 +13,6 @@ rag_db_v2/
 *.pdf
 *.lock
 *.txt
+**/temp/
+**/temp*/
+**/*temp*/
