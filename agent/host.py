@@ -14,6 +14,7 @@ from pydantic import Field
 from memory.core import Mem0
 from rag.fetch_3 import fetchExternalKnowledge
 from tools.web_search import perform_web_search
+from tools.browser_agent import browse_web
 import glob
 
 mcp = FastMCP("unified_knowledge_agent_host")
@@ -55,11 +56,8 @@ def save_direct_memory(
     if memory_database is None:
         return json.dumps({"error": "MemoryDB is not initialized on the host."})
     try:
-        client, collection = memory_database._get_client_and_collection()
-        import uuid
-        new_id = str(uuid.uuid4())
-        collection.add(ids=[new_id], documents=[content])
-        return json.dumps({"status": "success", "message": f"Content saved directly to memory: '{content[:50]}...'"})
+        new_id = memory_database.direct_add(content)
+        return json.dumps({"status": "success", "message": f"Content saved directly to memory: '{content[:50]}...'", "id": new_id})
     except Exception as e:
         return json.dumps({"error": f"Error saving direct memory on host: {str(e)}"})
 
@@ -74,8 +72,7 @@ def delete_memory(
     if memory_database is None:
         return json.dumps({"error": "MemoryDB is not initialized on the host."})
     try:
-        client, collection = memory_database._get_client_and_collection()
-        collection.delete(ids=[memory_id])
+        memory_database.direct_delete(memory_id)
         return json.dumps({"status": "success", "message": f"Memory {memory_id} deleted successfully"})
     except Exception as e:
         return json.dumps({"error": f"Error deleting memory on host: {str(e)}"})
@@ -146,6 +143,22 @@ def web_search(
         return results
     except Exception as e:
         return json.dumps({"error": f"Error performing web search on host: {str(e)}"})
+
+ 
+
+@mcp.tool(
+    name="browser_automation",
+    description="Perform automated browser tasks using natural language instructions."
+)
+def browser_automation(
+    task: str = Field(description="Natural language description of the browser task to perform"),
+    headless: bool = Field(default=True, description="Whether to run browser in headless mode (default: True)")
+) -> str:
+    try:
+        import asyncio as _asyncio
+        return _asyncio.run(browse_web(task, headless))
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
 
 # --- RESOURCES for @ functionality ---
 @mcp.resource("docs://documents", mime_type="application/json")  

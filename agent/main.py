@@ -21,6 +21,7 @@ def clear_proxy_settings():
 clear_proxy_settings()
 
 import ollama
+from langchain.memory import ConversationBufferWindowMemory
 from mcp import ClientSession, stdio_client, StdioServerParameters
 
 # --- Get the absolute path to the host.py script ---
@@ -28,12 +29,12 @@ AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOST_PATH = os.path.join(AGENT_DIR, "host.py")
 
 nest_asyncio.apply()
-LLM_MODEL = 'qwen3:8b'
+LLM_MODEL = 'gpt-oss:20b'
 
 class DocumentCompleter(Completer):
     def __init__(self):
         self.resources = []
-        self.commands = ['/memory', '/help', '/tools', '/files']
+        self.commands = ['/memory', '/help', '/tools', '/files', '/browser_automation']
     
     def update_resources(self, resources: List[str]):
         self.resources = resources
@@ -95,6 +96,19 @@ async def main():
                     buffer.start_completion(select_first=False)
                 else:
                     buffer.insert_text("/")
+
+
+            # Enter: if line ends with '\\', insert newline instead of sending
+            @kb.add("enter")
+            def _(event):
+                buf = event.app.current_buffer
+                text = buf.text
+                if text.endswith("\\") and buf.document.is_cursor_at_the_end:
+                    # replace trailing backslash with newline
+                    buf.delete_before_cursor(count=1)
+                    buf.insert_text("\n")
+                else:
+                    buf.validate_and_handle()
             
             prompt_session = PromptSession(
                 completer=completer,
@@ -107,6 +121,8 @@ async def main():
                 complete_while_typing=True,
                 complete_in_thread=True,
             )
+            # Short-term memory (windowed) with fixed k=50
+            stm = ConversationBufferWindowMemory(k=50, return_messages=False)
             
             # Load available documents for dropdown
             try:
@@ -118,7 +134,7 @@ async def main():
                 print(f"Could not load document list: {e}")
             
             print("\nAgent is ready. Type 'exit' to quit. Use @ to see document dropdown.")
-            
+
             while True:
                 try:
                     user_input = await prompt_session.prompt_async("\n> ")
@@ -132,7 +148,7 @@ async def main():
                         content_to_save = user_input[1:].strip()
                         if content_to_save:
                             print("📝 Saving directly to memory...")
-                            await session.call_tool('save_direct_memory', {'content': content_to_save})
+                            await session.call_tool('save_memory', {'content': content_to_save})
                             print("✅ Saved to memory!")
                         continue
 
@@ -142,12 +158,13 @@ async def main():
                         
                         if command == 'help':
                             print("""Available commands:
-- /help - Show this help
-- /tools - List all available tools  
-- /memory - List and manage memories
-- /files - List available files
-- @filename - Access file content (e.g., @Napoleon.pdf)
-- #message - Save message directly to memory""")
+ - /help - Show this help
+ - /tools - List all available tools  
+ - /memory - List and manage memories
+ - /files - List available files
+ - /browser_automation - Run a browser task interactively
+ - @filename - Access file content (e.g., @Napoleon.pdf)
+ - #message - Save message directly to memory""")
                             continue
                             
                         elif command == 'tools':
@@ -157,7 +174,25 @@ async def main():
 3. save_direct_memory(content: str) - Save content directly to memory
 4. delete_memory(memory_id: str) - Delete memory by ID
 5. list_all_memories() - List all memories in database
-6. web_search(query: str) - Perform web search""")
+6. web_search(query: str) - Perform web search
+7. browser_automation(goal: str, prompt: str, timeout_s: int) - Automate the browser""")
+                            continue
+                        elif command == 'browser_automation':
+                            try:
+                                task = await prompt_session.prompt_async("Task: ")
+                                if not task.strip():
+                                    print("Aborted: empty task.")
+                                    continue
+                                headless_ans = await prompt_session.prompt_async("Headless? (Y/n): ")
+                                headless = not (headless_ans.strip().lower() == 'n')
+                                print("🚀 Starting browser automation...")
+                                res = await session.call_tool('browser_automation', {'task': task, 'headless': headless})
+                                try:
+                                    print(res.content[0].text)
+                                except Exception:
+                                    print(res)
+                            except Exception as e:
+                                print(f"Browser automation error: {e}")
                             continue
                             
                         elif command == 'memory':
@@ -212,9 +247,16 @@ async def main():
                             except Exception as e:
                                 print(f"Error listing files: {e}")
                             continue
+
                         else:
                             print(f"Unknown command: /{command}. Type /help for available commands.")
                             continue
+
+                    # Save user turn into short-term memory
+                    try:
+                        stm.chat_memory.add_user_message(user_input)
+                    except Exception:
+                        pass
 
                     # --- Step 1: Process @ mentions for document references ---
                     document_context = ""
@@ -290,12 +332,16 @@ JSON Response:"""
                         print("Using document context from @ mentions, skipping tool selection.")
 
                     # --- Step 4: Synthesize and Respond ---
+                    short_term_context = stm.buffer
                     final_prompt = f"""You are a hyper-intelligent assistant. Your single most important duty is to maintain factual accuracy.
                     You have access to your personal memory, external knowledge base, web search, and can reference specific documents.
 
                     Your primary source of truth is your memory. If the user contradicts it, you MUST correct them.
                     Use the provided information sources to answer questions when appropriate.
 
+                    --- SHORT_TERM_HISTORY ---
+                    {short_term_context}
+                    ---
                     --- MEMORY ---
                     {memory_context}
                     ---
@@ -312,6 +358,10 @@ JSON Response:"""
                     response = ollama.chat(model=LLM_MODEL, messages=[{'role': 'user', 'content': final_prompt}])
                     assistant_output = response['message']['content']
                     print(f"\nAssistant: {assistant_output}")
+                    try:
+                        stm.chat_memory.add_ai_message(assistant_output)
+                    except Exception:
+                        pass
                     
 
                 except Exception as e:

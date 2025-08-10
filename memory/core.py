@@ -5,8 +5,10 @@ import ollama
 import chromadb
 import uuid
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
 import datetime
+import re
+from rank_bm25 import BM25Okapi
 
 LLM_MODEL = 'qwen3:8b'
 COLLECTION_NAME = "agent_memories"
@@ -22,6 +24,11 @@ class Mem0:
         self.chroma_path = chroma_path
         if not os.path.exists(self.chroma_path):
             os.makedirs(self.chroma_path)
+        # In-memory BM25 index state
+        self._bm25_docs: List[List[str]] = []
+        self._bm25_ids: List[str] = []
+        self._bm25: Optional[BM25Okapi] = None
+        self._bm25_dirty: bool = True
 
     def _get_client_and_collection(self):
         client = chromadb.PersistentClient(path=self.chroma_path)
@@ -36,10 +43,12 @@ class Mem0:
                 new_id = str(uuid.uuid4())
                 collection.add(ids=[new_id], documents=[fact])
                 log_message(f"[Mem0] HOST ACTION: ADDED new memory. ID: {new_id[:8]}")
+                self._bm25_dirty = True
             elif operation == 'UPDATE' and memory_id:
                 log_message(f"DEBUG: Calling ChromaDB update with ID: {memory_id} and Document: {fact}")
                 collection.update(ids=[memory_id], documents=[fact])
                 log_message(f"[Mem0] HOST ACTION: UPDATED memory. ID: {memory_id[:8]}")
+                self._bm25_dirty = True
             elif operation == 'UPDATE' and not memory_id:
                 log_message(f"[Mem0] HOST ERROR: UPDATE operation called but memory_id is None.")
         except Exception as e:
@@ -122,6 +131,41 @@ JSON Output:"""
             log_message(f"HOST ERROR: Could not extract facts from LLM: {e}")
             return []
 
+    # --- BM25 helpers and direct operations ---
+    def _tokenize(self, text: str) -> List[str]:
+        text = (text or "").lower()
+        return [tok for tok in re.split(r"[^a-z0-9]+", text) if tok]
+
+    def _rebuild_bm25(self):
+        try:
+            client, collection = self._get_client_and_collection()
+            results = collection.get(include=['documents'])
+            ids = results.get('ids') or []
+            docs = results.get('documents') or []
+            tokenized = [self._tokenize(d or "") for d in docs]
+            self._bm25_ids = ids
+            self._bm25_docs = tokenized
+            self._bm25 = BM25Okapi(tokenized) if tokenized else None
+            self._bm25_dirty = False
+        except Exception as e:
+            log_message(f"[Mem0] ERROR rebuilding BM25: {e}")
+            self._bm25 = None
+            self._bm25_docs = []
+            self._bm25_ids = []
+            self._bm25_dirty = True
+
+    def direct_add(self, content: str, metadata: Optional[Dict] = None) -> str:
+        client, collection = self._get_client_and_collection()
+        new_id = str(uuid.uuid4())
+        collection.add(ids=[new_id], documents=[content], metadatas=[metadata] if metadata else None)
+        self._bm25_dirty = True
+        return new_id
+
+    def direct_delete(self, memory_id: str) -> None:
+        client, collection = self._get_client_and_collection()
+        collection.delete(ids=[memory_id])
+        self._bm25_dirty = True
+
     def add(self, conversation: str):
         log_message(f"Processing conversation: '{conversation}'")
         
@@ -149,6 +193,31 @@ JSON Output:"""
                 log_message(f"HOST ACTION: NOOP for fact '{fact}'. Reason: {decision.get('reason')}")
 
     def search(self, query: str, k: int = 3) -> List[Dict]:
+        # Try BM25 first for speed and lexical robustness
+        try:
+            if self._bm25_dirty or self._bm25 is None:
+                self._rebuild_bm25()
+            if self._bm25 is not None and self._bm25_docs:
+                q_tokens = self._tokenize(query)
+                scores = self._bm25.get_scores(q_tokens)
+                ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+                top = ranked[:k]
+                client, collection = self._get_client_and_collection()
+                formatted_results: List[Dict] = []
+                for idx, _ in top:
+                    doc_id = self._bm25_ids[idx]
+                    got = collection.get(ids=[doc_id], include=['documents', 'metadatas'])
+                    if got.get('documents'):
+                        formatted_results.append({
+                            "id": doc_id,
+                            "content": got['documents'][0],
+                            "metadata": got.get('metadatas', [None])[0] or {}
+                        })
+                return formatted_results
+        except Exception as e:
+            log_message(f"HOST ERROR during BM25 search: {e}")
+
+        # Fallback to vector similarity via Chroma
         try:
             client, collection = self._get_client_and_collection()
             results = collection.query(query_texts=[query], n_results=k, include=['documents', 'metadatas'])
@@ -162,7 +231,7 @@ JSON Output:"""
                     })
             return formatted_results
         except Exception as e:
-            log_message(f"HOST ERROR during search: {e}")
+            log_message(f"HOST ERROR during vector search: {e}")
             return []
 
     def get_all_memories(self) -> List[Dict]:
