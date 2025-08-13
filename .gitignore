@@ -1,18 +1,121 @@
+# Python
 __pycache__/
+*.pyc
+.venv/
+
+# Logs and caches
+*.log
+*.sqlite3
+agent_chain.log
+teacher_agent_chain.log
+
+# Chroma/Vector DBs
+agent_chroma_db/
+rag/rag_db/
+rag/rag_db_v2/
+rag/rag_db_v3/
+
+# Temp
+temp/
+
+# OS
+.DS_Store
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Claude Code
+.claude/
+
+# Databases and storage
 agent_chroma_db/
 rag_db/
 rag_db_v2/
-*.log
-*pyd
-*pyo
-*pyc
-.Python
+rag_db_v3/
 *.db
-.env
-*.json
-*.pdf
-*.lock
-*.txt
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Temporary files and folders
+temp/
 **/temp/
 **/temp*/
 **/*temp*/
+.tmp/
+*.tmp
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node modules (if any JS components)
+node_modules/
+
+# Lock files (keep requirements.txt but ignore lock files)
+*.lock
+uv.lock
+package-lock.json
+
+# Global rules (sensitive)
+GLOBAL_RULES.md
+
+# Proprietary code
+wiseapp/
+
+# Large files and documents
+*.pdf
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.mp3
+*.wav
+
+# Generated files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
