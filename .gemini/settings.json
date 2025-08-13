@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "unified_knowledge_agent_host": {
+      "command": "python",
+      "args": [
+        "agent/main.py"
+      ]
+    }
+  }
+}

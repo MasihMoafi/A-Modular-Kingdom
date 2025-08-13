@@ -15,6 +15,8 @@ from memory.core import Mem0
 from rag.fetch_3 import fetchExternalKnowledge
 from tools.web_search import perform_web_search
 from tools.browser_agent import browse_web
+from tools.code_exec import run_code
+from tools.vision import analyze_media_with_ollama
 import glob
 
 mcp = FastMCP("unified_knowledge_agent_host")
@@ -24,8 +26,8 @@ try:
     chroma_path = os.path.join(project_root, "agent_chroma_db")
     memory_database = Mem0(chroma_path=chroma_path)
 except Exception as e:
-    sys.stderr.write(f"[HOST] Could not initialize MemoryDB: {e}\n")
-    sys.exit(1)
+    sys.stderr.write(f"[HOST] WARNING: MemoryDB disabled: {e}\n")
+    memory_database = None
 
 @mcp.tool(
     name="save_fact",
@@ -98,7 +100,8 @@ def search_memories(
     description="Search external documents and knowledge base using the RAG system to find relevant information from stored documents"
 )
 def query_knowledge_base(
-    query: str = Field(description="The search query to find relevant information in the knowledge base")
+    query: str = Field(description="The search query to find relevant information in the knowledge base"),
+    doc_path: str = Field(default="", description="Optional absolute or relative path to a project-specific documents directory")
 ) -> str:
     """A tool to query the external knowledge base (RAG system)."""
     import sys
@@ -107,7 +110,11 @@ def query_knowledge_base(
     try:
         sys.stderr.write("[HOST] About to call fetchExternalKnowledge\n")
         sys.stderr.flush()
-        results = fetchExternalKnowledge(query)
+        # Allow optional project-specific document scoping
+        if doc_path and isinstance(doc_path, str):
+            results = fetchExternalKnowledge(query, doc_path=doc_path)
+        else:
+            results = fetchExternalKnowledge(query)
         sys.stderr.write(f"[HOST] RAG returned {len(results)} chars\n")
         sys.stderr.flush()
         return json.dumps({"result": results})
@@ -157,6 +164,32 @@ def browser_automation(
     try:
         import asyncio as _asyncio
         return _asyncio.run(browse_web(task, headless))
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
+
+@mcp.tool(
+    name="code_execute",
+    description="Execute Python code in a sandboxed subprocess and return stdout/stderr"
+)
+def code_execute(
+    code: str = Field(description="Python code to execute"),
+    timeout_seconds: int = Field(default=15, description="Execution timeout in seconds")
+) -> str:
+    try:
+        return run_code(code=code, timeout_seconds=timeout_seconds)
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
+
+@mcp.tool(
+    name="analyze_media",
+    description="Analyze image/video files with a local multimodal model via Ollama (e.g., gemma3:4b)"
+)
+def analyze_media(
+    model: str = Field(default="gemma3:4b", description="Ollama model id to use"),
+    paths: list[str] = Field(description="List of absolute file paths to media files")
+) -> str:
+    try:
+        return analyze_media_with_ollama(model=model, paths=paths)
     except Exception as e:
         return json.dumps({"status": "error", "error": str(e)})
 
