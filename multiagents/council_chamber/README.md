@@ -1,5 +1,7 @@
 # 👑 Council Chamber - The Royal AI Court
 
+<img width="1408" height="768" alt="3" src="https://github.com/user-attachments/assets/b1578075-9c34-4c09-a3dc-a50f1d127a1e" />
+
 Welcome to the most sophisticated hierarchical multi-agent system in A-Modular-Kingdom! This isn't just another chatbot - it's a **royal court** where each agent has a specific role, personality, and responsibility in serving the King (you, the user).
 
 <img width="338" height="402" alt="architecture_2" src="https://github.com/user-attachments/assets/7fe8ceb2-26de-44ba-b2aa-880c2a7c34ec" />
