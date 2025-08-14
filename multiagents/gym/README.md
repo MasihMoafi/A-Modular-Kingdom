@@ -66,8 +66,6 @@ gym/
 
 1. **Interview Phase**: AI interviews user about fitness level, goals, equipment, and limitations
 2. **Plan Generation**: Creates personalized workout and nutrition plans
-3. **Progress Tracking**: Monitors completion and adjusts difficulty
-4. **Motivation**: Provides encouragement and celebrates achievements
 
 ## Future Enhancements
 
