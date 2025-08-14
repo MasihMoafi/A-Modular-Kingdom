@@ -123,8 +123,8 @@ A-Modular-Kingdom grows through experimentation and iteration. Each multi-agent 
 
 ## 🔗 External Resources
 
-- **[ACP Tutorial]([https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/])**  
-- **[Smolagents Paper]([https://arxiv.org/pdf/2402.01030])**  
+- **[ACP Tutorial](https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/)**  
+- **[Smolagents Paper](https://arxiv.org/pdf/2402.01030)**  
 - **[MCP Documentation](https://modelcontextprotocol.io/)**
 
 ---
