@@ -1,162 +1,169 @@
 # 🏰 A-Modular-Kingdom
 
-**The Ultimate AI Multi-Agent Foundation**
+**The Foundation for AI-Powered Multi-Agent Systems**
 
-A comprehensive monorepo that provides the infrastructure for sophisticated multi-agent AI systems. Built with modularity at its core, A-Modular-Kingdom enables both hierarchical and sequential agent workflows through a unified foundation.
-
-![Architecture](A-Modular-Kingdom/architecture.png)
+A-Modular-Kingdom is a comprehensive AI infrastructure that provides the building blocks for sophisticated multi-agent workflows. Built with modularity and standardization at its core, it seamlessly connects different multi-agent architectures through a unified foundation.
 
 ## 🎯 What Makes This Special
 
-- **🏗️ Unified Foundation**: Single MCP host provides RAG, memory, vision, code execution, browser automation, and web search to all agents
-- **🔄 Multiple Paradigms**: Support both hierarchical (Council Chamber) and sequential (Gym) multi-agent workflows  
-- **🛠️ Rich Toolset**: Production-ready tools that agents can seamlessly access
-- **📚 Persistent Memory**: Cross-session memory and knowledge retention
-- **🌐 ACP Communication**: Reliable agent-to-agent communication protocol
+This isn't just another AI project - it's a **foundation** that enables:
 
----
+- **🔗 Seamless Integration**: Multi-agent systems connect to `host.py` for instant access to long-term memory, RAG, and powerful tools
+- **🏗️ Modular Architecture**: Build hierarchical (Council Chamber) or sequential (Gym) workflows on the same foundation  
+- **🛠️ Rich Toolset**: Vision, code execution, browser automation, web search, and more - all standardized and ready to use
+- **📚 Smart Memory**: Persistent memory and RAG systems that work across all your agents
+- **🌐 ACP Communication**: Agents communicate through ACP servers for reliable, structured interactions
 
 ## 🏛️ Multi-Agent Systems
 
-### 👑 Council Chamber - Hierarchical Intelligence
+### 👑 Council Chamber (Hierarchical)
+A sophisticated royal court where agents have defined roles and hierarchy:
 
-A sophisticated royal court where agents have defined roles and hierarchy, each validating and enhancing the work of their subordinates.
+<img width="800" height="800" alt="2" src="https://github.com/user-attachments/assets/4cf13c5c-c66a-4e5d-b585-35d37312765a" />
 
-![Council Chamber](multiagents/council_chamber/2.png)
+```
+👑 King (User) → 👸 Queen Juliette → 🔥 Sexy Teacher → 🤖 Code Agent
+```
 
-**Hierarchy:** King (User) → Queen Juliette → Sexy Teacher → Code Agent
+**Features:**
+- **Hierarchical validation**: Each level validates the work of subordinates
+- **Smart delegation**: Intelligent routing based on task complexity  
+- **MCP tool integration**: Sexy Teacher uses all foundation tools
+- **Code-first approach**: Code Agent writes solutions as executable code using smolagents
 
-**Key Features:**
-- **Smart Delegation**: Intelligent task routing based on complexity
-- **Validation Loops**: Each level validates subordinate work
-- **MCP Integration**: Sexy Teacher accesses all foundation tools
-- **Code-First Solutions**: Code Agent writes executable solutions using smolagents
+[**📖 Learn more about Council Chamber →**](../multiagents/council_chamber/)
 
-**Location:** `multiagents/council_chamber/`
+### 🏋️ Gym (Sequential) 
+A fitness-focused multi-agent system with specialized roles:
 
-### 🏋️ Gym - Sequential Specialization  
+<img width="400" height="600" alt="3" src="https://github.com/user-attachments/assets/19f8d576-4267-428a-a3ff-2bcb7dab7c85" />
 
-A fitness-focused multi-agent system where specialized agents work in sequence to provide comprehensive health and fitness guidance.
+```
+Interviewer → Plan Generator → Progress Tracker → Motivator → Nutrition Agent
+```
 
-![Gym](multiagents/gym/3.png)
+**Features:**
+- **CrewAI powered**: Built on the CrewAI framework for sequential workflows
+- **Specialized agents**: Each agent has a specific fitness domain expertise
+- **Web interface**: Modern chat interface for user interaction
+- **Flexible LLM support**: Works with local Ollama or cloud providers
 
-**Flow:** Interviewer → Plan Generator → Progress Tracker → Motivator → Nutrition Agent
+[**📖 Learn more about Gym →**](../multiagents/gym/)
 
-**Key Features:**
-- **CrewAI Powered**: Built on the CrewAI framework
-- **Domain Expertise**: Each agent specializes in specific fitness areas
-- **Web Interface**: Modern, responsive chat interface
-- **Flexible LLM**: Works with local Ollama or cloud providers
+## 🧠 Core Infrastructure
 
-**Location:** `multiagents/gym/`
+### 🖥️ Host.py - The Central Hub
+The heart of A-Modular-Kingdom, providing MCP (Model Context Protocol) access to:
 
----
+- **📚 RAG System**: Advanced document retrieval with multiple strategies (V1, V2, V3)
+- **🧠 Memory Core**: Persistent conversation and context memory
+- **👁️ Vision Tools**: Image analysis and processing capabilities  
+- **⚡ Code Execution**: Safe Python code execution environment
+- **🌐 Browser Automation**: Web interaction through Playwright
+- **🔍 Web Search**: Intelligent web search capabilities
 
-## 🧠 Foundation - The Core Infrastructure
-
-The heart of A-Modular-Kingdom lives in `A-Modular-Kingdom/` and provides:
-
-### 🖥️ MCP Host (`agent/host.py`)
-Central hub exposing all tools through Model Context Protocol:
+### 🔧 Tool Ecosystem
 
 | Tool | Purpose | Status |
 |------|---------|--------|
-| **RAG** | Document retrieval & knowledge base | ✅ V3 Ready |
-| **Memory** | Persistent conversation storage | ✅ ChromaDB |  
-| **Vision** | Image analysis & processing | ✅ Multimodal |
+| **RAG** | Document retrieval & knowledge | ✅ Multiple versions |
+| **Memory** | Long-term conversation storage | ✅ Fully integrated |  
+| **Vision** | Image analysis | ✅ Ready to use |
 | **Code Exec** | Safe Python execution | ✅ Sandboxed |
-| **Browser** | Web automation via Playwright | ✅ Full Control |
-| **Web Search** | Intelligent information retrieval | ✅ Integrated |
-
-### 📚 Knowledge Systems
-- **RAG V3**: Advanced retrieval with multiple strategies
-- **Memory Core**: Long-term conversation and context storage
-- **GLOBAL_RULES**: Standardized agent behavior guidelines
-
----
+| **Browser** | Web automation | ✅ Playwright powered |
+| **Web Search** | Information retrieval | ✅ Integrated |
+| **Structured Output** | Formatted responses | 🔄 Coming soon |
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- Python 3.8+
+- Ollama (for local LLM)
+- UV package manager (recommended)
+
+### Installation
+
 ```bash
-# Required
-Python 3.8+
-Ollama (for local LLM)
-uv (package manager)
+# Clone the repository
+git clone [repository-url]
+cd A-Modular-Kingdom
+
+# Install dependencies
+uv sync
+
+# Start the foundation
+python agent/host.py
 ```
 
-### 1. Foundation Setup
+### Launch Multi-Agent Systems
+
+**Council Chamber:**
 ```bash
-# Start the MCP host (provides tools to all agents)
-python A-Modular-Kingdom/agent/host.py
+# Terminal 1: Start Code Agent
+python council_chamber/code_agent_server.py
+
+# Terminal 2: Start Sexy Teacher  
+python council_chamber/enhanced_sexy_teacher_server.py
+
+# Terminal 3: Start Queen Juliette
+python council_chamber/queen_juliette.py
 ```
 
-### 2. Launch Council Chamber
+**Gym:**
 ```bash
-# Terminal 1: Code Agent (port 8000)
-python multiagents/council_chamber/code_agent_server.py
-
-# Terminal 2: Sexy Teacher (port 8001)  
-python multiagents/council_chamber/enhanced_sexy_teacher_server.py
-
-# Terminal 3: Queen Juliette (main interface)
-python multiagents/council_chamber/queen_juliette.py
+cd gym/
+python setup.py
+python main.py
 ```
 
-### 3. Launch Gym
-```bash
-cd multiagents/gym/
-python setup.py  # First time only
-python main.py   # Visit http://localhost:8000
-```
-
----
-
-## 🏗️ Architecture Philosophy
+## 🏗️ Architecture
 
 A-Modular-Kingdom follows a **modular foundation** approach:
 
+<img width="3000" height="2000" alt="architecture" src="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb" />
+
 ```
-┌─────────────────────────────────────────────┐
-│              Multi-Agent Layer              │
-│  ┌─────────────────┐  ┌─────────────────┐   │
-│  │ Council Chamber │  │      Gym        │   │
-│  │  (Hierarchical) │  │  (Sequential)   │   │
-│  └─────────────────┘  └─────────────────┘   │
-└─────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────┐
-│              Foundation Layer               │
-│  ┌─────────┐ ┌─────────┐ ┌─────────────┐   │
-│  │   RAG   │ │ Memory  │ │    Tools    │   │
-│  └─────────┘ └─────────┘ └─────────────┘   │
-│                host.py                      │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────┐
+│          Multi-Agent Layer          │
+│  ┌─────────────┐  ┌─────────────┐   │
+│  │   Council   │  │     Gym     │   │
+│  │   Chamber   │  │             │   │
+│  └─────────────┘  └─────────────┘   │
+└─────────────────────────────────────┘
+           │                │
+           ▼                ▼
+┌─────────────────────────────────────┐
+│         Foundation Layer            │
+│  ┌─────────┐ ┌─────────┐ ┌────────┐ │
+│  │   RAG   │ │ Memory  │ │ Tools  │ │
+│  └─────────┘ └─────────┘ └────────┘ │
+│              host.py                │
+└─────────────────────────────────────┘
 ```
 
-**Core Principles:**
-- **Standardized Interface**: All systems use the same foundation
-- **Tool Sharing**: Common capabilities across all agents
-- **Memory Persistence**: Shared context and knowledge
-- **Communication Protocol**: ACP for reliable agent interaction
-
----
+**Key Principles:**
+- **Standard Interface**: All multi-agent systems use the same foundation
+- **ACP Communication**: Reliable agent-to-agent communication  
+- **Tool Sharing**: Common tools available to all agents
+- **Memory Persistence**: Shared memory across sessions
 
 ## 📖 Documentation
 
-- **[Council Chamber Guide](multiagents/council_chamber/)**: Hierarchical multi-agent setup
-- **[Gym Guide](multiagents/gym/)**: Sequential fitness agent system  
-- **[RAG Documentation](A-Modular-Kingdom/rag/)**: Knowledge retrieval systems
-- **[Memory System](A-Modular-Kingdom/memory/)**: Conversation persistence
-- **[Tools Overview](A-Modular-Kingdom/tools/)**: Available agent capabilities
-
----
+- **[RAG Documentation](rag/)**: Multiple RAG implementations and evaluations
+- **[Memory System](memory/)**: Conversation and context persistence
+- **[Tool Documentation](tools/)**: Individual tool guides
 
 ## 🤝 Contributing
 
-A-Modular-Kingdom grows through experimentation and real-world testing. Each multi-agent system teaches us more about effective AI coordination and collaboration patterns.
+A-Modular-Kingdom grows through experimentation and iteration. Each multi-agent system teaches us more about effective AI coordination.
+
+## 🔗 External Resources
+
+- **[ACP Tutorial]([https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/])**  
+- **[Smolagents Paper]([https://arxiv.org/pdf/2402.01030])**  
+- **[MCP Documentation](https://modelcontextprotocol.io/)**
 
 ---
 
-*A-Modular-Kingdom: Where AI agents unite under one foundation* 🏰✨
+*A-Modular-Kingdom: Where AI agents come together in harmony* 🏰✨
+
