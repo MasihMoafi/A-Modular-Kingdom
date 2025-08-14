@@ -1,0 +1,18 @@
+# Python/venv
+__pycache__/
+*.pyc
+.venv/
+
+# Databases and indices
+agent_chroma_db/
+rag/rag_db/
+rag/rag_db_v2/
+rag/rag_db_v3/
+
+# Logs/temp
+*.log
+temp/
+
+# OS noise
+.DS_Store
+
