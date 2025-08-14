@@ -149,7 +149,7 @@ A-Modular-Kingdom follows a **modular foundation** approach:
 
 ## 📖 Documentation
 
-- **[ACP Tutorial](temp/ACP/)**: Learn about Agent Communication Protocol
+- **[ACP Tutorial](https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/)**: Learn about Agent Communication Protocol
 - **[RAG Documentation](rag/)**: Multiple RAG implementations and evaluations
 - **[Memory System](memory/)**: Conversation and context persistence
 - **[Tool Documentation](tools/)**: Individual tool guides
