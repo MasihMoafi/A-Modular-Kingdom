@@ -4,7 +4,7 @@
 
 A-Modular-Kingdom is a comprehensive AI infrastructure that provides the building blocks for sophisticated multi-agent workflows. Built with modularity and standardization at its core, it seamlessly connects different multi-agent architectures through a unified foundation.
 
-![Architecture](architecture.png)
+<img width="2275" height="1183" alt="architecture" src="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb" />
 
 ## 🎯 What Makes This Special
 
@@ -21,6 +21,8 @@ This isn't just another AI project - it's a **foundation** that enables:
 ### 👑 Council Chamber (Hierarchical)
 A sophisticated royal court where agents have defined roles and hierarchy:
 
+<img width="1024" height="1024" alt="2" src="https://github.com/user-attachments/assets/4cf13c5c-c66a-4e5d-b585-35d37312765a" />
+
 ```
 👑 King (User) → 👸 Queen Juliette → 🔥 Sexy Teacher → 🤖 Code Agent
 ```
@@ -35,6 +37,8 @@ A sophisticated royal court where agents have defined roles and hierarchy:
 
 ### 🏋️ Gym (Sequential) 
 A fitness-focused multi-agent system with specialized roles:
+
+<img width="896" height="1280" alt="3" src="https://github.com/user-attachments/assets/19f8d576-4267-428a-a3ff-2bcb7dab7c85" />
 
 ```
 Interviewer → Plan Generator → Progress Tracker → Motivator → Nutrition Agent
