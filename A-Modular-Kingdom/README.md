@@ -14,42 +14,6 @@ This isn't just another AI project - it's a **foundation** that enables:
 - **📚 Smart Memory**: Persistent memory and RAG systems that work across all your agents
 - **🌐 ACP Communication**: Agents communicate through ACP servers for reliable, structured interactions
 
-## 🏛️ Multi-Agent Systems
-
-### 👑 Council Chamber (Hierarchical)
-A sophisticated royal court where agents have defined roles and hierarchy:
-
-<img width="800" height="800" alt="2" src="https://github.com/user-attachments/assets/4cf13c5c-c66a-4e5d-b585-35d37312765a" />
-
-```
-👑 King (User) → 👸 Queen Juliette → 🔥 Sexy Teacher → 🤖 Code Agent
-```
-
-**Features:**
-- **Hierarchical validation**: Each level validates the work of subordinates
-- **Smart delegation**: Intelligent routing based on task complexity  
-- **MCP tool integration**: Sexy Teacher uses all foundation tools
-- **Code-first approach**: Code Agent writes solutions as executable code using smolagents
-
-[**📖 Learn more about Council Chamber →**](../multiagents/council_chamber/)
-
-### 🏋️ Gym (Sequential) 
-A fitness-focused multi-agent system with specialized roles:
-
-<img width="400" height="600" alt="3" src="https://github.com/user-attachments/assets/19f8d576-4267-428a-a3ff-2bcb7dab7c85" />
-
-```
-Interviewer → Plan Generator →  → Nutrition Agent
-```
-
-**Features:**
-- **CrewAI powered**: Built on the CrewAI framework for sequential workflows
-- **Specialized agents**: Each agent has a specific fitness domain expertise
-- **Web interface**: Modern chat interface for user interaction
-- **Flexible LLM support**: Works with local Ollama or cloud providers
-
-[**📖 Learn more about Gym →**](../multiagents/gym/)
-
 ## 🧠 Core Infrastructure
 
 ### 🖥️ Host.py - The Central Hub
