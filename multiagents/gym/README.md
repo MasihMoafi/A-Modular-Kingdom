@@ -7,8 +7,6 @@ Multi-agentic AI fitness system built with CrewAI
 - **5 Specialized AI Agents:**
   - Interviewer: Conducts fitness assessments
   - Plan Generator: Creates personalized workout plans
-  - Progress Tracker: Monitors and adjusts difficulty
-  - Motivator: Provides encouragement and celebrates milestones
   - Nutrition Agent: Offers dietary guidance
 
 - **LLM Support:**
