@@ -2,6 +2,8 @@
 
 Multi-agentic AI fitness system built with CrewAI
 
+<img width="2556" height="1375" alt="Screenshot from 2025-07-14 17-57-15" src="https://github.com/user-attachments/assets/1ce0f691-ed4d-41e4-b81b-c3aaa139bd69" />
+
 ## Features
 
 - **5 Specialized AI Agents:**
@@ -42,8 +44,9 @@ export LLM_MODEL=qwen3:8b
 
 # For Google AI
 export LLM_PROVIDER=google
-export LLM_MODEL=gemini-1.5-flash
+export LLM_MODEL=gemini-2.5-flash
 export GOOGLE_API_KEY=your_key_here
+
 ```
 
 ## Project Structure
