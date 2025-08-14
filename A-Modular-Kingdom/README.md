@@ -19,7 +19,7 @@ This isn't just another AI project - it's a **foundation** that enables:
 ### 👑 Council Chamber (Hierarchical)
 A sophisticated royal court where agents have defined roles and hierarchy:
 
-<img width="1024" height="1024" alt="2" src="https://github.com/user-attachments/assets/4cf13c5c-c66a-4e5d-b585-35d37312765a" />
+<img width="800" height="800" alt="2" src="https://github.com/user-attachments/assets/4cf13c5c-c66a-4e5d-b585-35d37312765a" />
 
 ```
 👑 King (User) → 👸 Queen Juliette → 🔥 Sexy Teacher → 🤖 Code Agent
@@ -36,7 +36,7 @@ A sophisticated royal court where agents have defined roles and hierarchy:
 ### 🏋️ Gym (Sequential) 
 A fitness-focused multi-agent system with specialized roles:
 
-<img width="896" height="1280" alt="3" src="https://github.com/user-attachments/assets/19f8d576-4267-428a-a3ff-2bcb7dab7c85" />
+<img width="400" height="600" alt="3" src="https://github.com/user-attachments/assets/19f8d576-4267-428a-a3ff-2bcb7dab7c85" />
 
 ```
 Interviewer → Plan Generator → Progress Tracker → Motivator → Nutrition Agent
