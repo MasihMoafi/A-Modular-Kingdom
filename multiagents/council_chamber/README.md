@@ -101,9 +101,9 @@ python multiagents/council_chamber/queen_juliette.py
 
 ## 🏗️ Architecture Deep Dive
 
-<img width="1672" height="1426" alt="architecture" src="https://github.com/user-attachments/assets/aace5af7-f819-496f-a170-183d1d0d54c7" />
-
 <img width="338" height="402" alt="architecture_2" src="https://github.com/user-attachments/assets/7fe8ceb2-26de-44ba-b2aa-880c2a7c34ec" />
+
+<img width="1672" height="1426" alt="architecture" src="https://github.com/user-attachments/assets/aace5af7-f819-496f-a170-183d1d0d54c7" />
 
 ### Communication Flow
 1. **King → Queen**: Initial request with context
