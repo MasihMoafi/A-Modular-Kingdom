@@ -39,7 +39,7 @@ A fitness-focused multi-agent system with specialized roles:
 <img width="400" height="600" alt="3" src="https://github.com/user-attachments/assets/19f8d576-4267-428a-a3ff-2bcb7dab7c85" />
 
 ```
-Interviewer → Plan Generator → Progress Tracker → Motivator → Nutrition Agent
+Interviewer → Plan Generator →  → Nutrition Agent
 ```
 
 **Features:**
