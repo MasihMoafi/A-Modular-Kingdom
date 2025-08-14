@@ -4,7 +4,7 @@
 
 A-Modular-Kingdom is a comprehensive AI infrastructure that provides the building blocks for sophisticated multi-agent workflows. Built with modularity and standardization at its core, it seamlessly connects different multi-agent architectures through a unified foundation.
 
-![Architecture](https://github.com/user-attachments/assets/b21bb544-111a-4a1a-abf7-32cd5ffabb07)
+![Architecture](architecture.png)
 
 ## 🎯 What Makes This Special
 
@@ -31,7 +31,7 @@ A sophisticated royal court where agents have defined roles and hierarchy:
 - **MCP tool integration**: Sexy Teacher uses all foundation tools
 - **Code-first approach**: Code Agent writes solutions as executable code using smolagents
 
-[**📖 Learn more about Council Chamber →**](council_chamber/)
+[**📖 Learn more about Council Chamber →**](../multiagents/council_chamber/)
 
 ### 🏋️ Gym (Sequential) 
 A fitness-focused multi-agent system with specialized roles:
@@ -46,7 +46,7 @@ Interviewer → Plan Generator → Progress Tracker → Motivator → Nutrition 
 - **Web interface**: Modern chat interface for user interaction
 - **Flexible LLM support**: Works with local Ollama or cloud providers
 
-[**📖 Learn more about Gym →**](gym/)
+[**📖 Learn more about Gym →**](../multiagents/gym/)
 
 ## 🧠 Core Infrastructure
 
@@ -118,7 +118,7 @@ python main.py
 
 A-Modular-Kingdom follows a **modular foundation** approach:
 
-![Architecture Diagram](https://github.com/user-attachments/assets/804a6b66-3703-425d-86ff-d93480e60919)
+![Architecture Diagram](architecture.png)
 
 ```
 ┌─────────────────────────────────────┐
