@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A modular agentic kingdom with memory, RAG, and web search"
 dependencies = [
     "mcp",
-    "fastmcp",
+    "fastmcp", 
     "ollama",
     "mem0ai",
     "chromadb",
@@ -19,6 +19,15 @@ dependencies = [
     "rank-bm25",
     "prompt-toolkit",
     "langchain-huggingface",
+    # TTS/STT dependencies
+    "pyttsx3>=2.90",
+    "gtts>=2.2.0",
+    "openai-whisper>=20231117",
+    "speechrecognition>=3.10.0",
+    "pygame>=2.0.0",
+    # Browser automation
+    "browser-use>=0.1.0",
+    "playwright>=1.40.0",
 ]
 
 [build-system]
