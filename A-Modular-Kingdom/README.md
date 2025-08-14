@@ -4,7 +4,7 @@
 
 A-Modular-Kingdom is a comprehensive AI infrastructure that provides the building blocks for sophisticated multi-agent workflows. Built with modularity and standardization at its core, it seamlessly connects different multi-agent architectures through a unified foundation.
 
-![Architecture](../architecture.png)
+![Architecture](architecture.png)
 
 ## 🎯 What Makes This Special
 
@@ -118,7 +118,7 @@ python main.py
 
 A-Modular-Kingdom follows a **modular foundation** approach:
 
-![Architecture Diagram](../architecture.png)
+![Architecture Diagram](architecture.png)
 
 ```
 ┌─────────────────────────────────────┐
