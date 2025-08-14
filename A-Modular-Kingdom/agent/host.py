@@ -17,6 +17,8 @@ from tools.web_search import perform_web_search
 from tools.browser_agent import browse_web
 from tools.code_exec import run_code
 from tools.vision import analyze_media_with_ollama
+from tools.tts import text_to_speech, list_tts_voices
+from tools.stt import speech_to_text, list_stt_models
 import glob
 
 mcp = FastMCP("unified_knowledge_agent_host")
@@ -231,5 +233,81 @@ def get_document_content(doc_id: str) -> str:
                 return f.read()
     except Exception as e:
         return f"Error: Could not retrieve content for {doc_id}: {str(e)}"
+
+@mcp.tool(
+    name="text_to_speech",
+    description="Convert text to speech using various TTS engines. Can play audio directly or save to file."
+)
+def tts_tool(
+    text: str = Field(description="Text to convert to speech"),
+    engine: str = Field(default="pyttsx3", description="TTS engine to use: pyttsx3, gtts, or kokoro"),
+    voice: str = Field(default="", description="Voice name/ID to use (engine-specific)"),
+    speed: float = Field(default=200, description="Speech rate for pyttsx3"),
+    play_audio: bool = Field(default=True, description="Whether to play audio immediately")
+) -> str:
+    """Convert text to speech and optionally play it."""
+    try:
+        kwargs = {
+            "engine": engine,
+            "speed": speed,
+            "play_audio": play_audio
+        }
+        if voice:
+            kwargs["voice"] = voice
+            
+        return text_to_speech(text, **kwargs)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+@mcp.tool(
+    name="speech_to_text", 
+    description="Convert speech to text using microphone recording or existing audio file"
+)
+def stt_tool(
+    duration: int = Field(default=5, description="Recording duration in seconds (ignored if file_path provided)"),
+    engine: str = Field(default="whisper", description="STT engine: whisper or speech_recognition"),
+    model: str = Field(default="base", description="Model size for Whisper: tiny, base, small, medium, large"),
+    language: str = Field(default="", description="Language code (e.g., en, es, fr)"),
+    file_path: str = Field(default="", description="Path to existing audio file to transcribe")
+) -> str:
+    """Record audio and convert it to text, or transcribe an existing audio file."""
+    try:
+        kwargs = {
+            "duration": duration,
+            "engine": engine,
+            "model": model
+        }
+        if language:
+            kwargs["language"] = language
+        if file_path:
+            kwargs["file_path"] = file_path
+            
+        return speech_to_text(**kwargs)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+@mcp.tool(
+    name="list_tts_voices",
+    description="List available voices for text-to-speech engines"
+)
+def list_voices_tool(
+    engine: str = Field(default="pyttsx3", description="TTS engine to query for available voices")
+) -> str:
+    """List available voices for the specified TTS engine."""
+    try:
+        return list_tts_voices(engine)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+@mcp.tool(
+    name="list_stt_models",
+    description="List available models and languages for speech-to-text engines"
+)
+def list_models_tool() -> str:
+    """List available STT models and supported languages."""
+    try:
+        return list_stt_models()
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 mcp.run(transport='stdio')
