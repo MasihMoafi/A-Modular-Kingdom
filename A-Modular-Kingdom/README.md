@@ -149,7 +149,6 @@ A-Modular-Kingdom follows a **modular foundation** approach:
 
 ## 📖 Documentation
 
-- **[ACP Tutorial](https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/)**: Learn about Agent Communication Protocol
 - **[RAG Documentation](rag/)**: Multiple RAG implementations and evaluations
 - **[Memory System](memory/)**: Conversation and context persistence
 - **[Tool Documentation](tools/)**: Individual tool guides
@@ -160,8 +159,8 @@ A-Modular-Kingdom grows through experimentation and iteration. Each multi-agent 
 
 ## 🔗 External Resources
 
-- **[ACP Tutorial]([])**  
-- **[Smolagents Paper]([])**  
+- **[ACP Tutorial]([https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/])**  
+- **[Smolagents Paper]([https://arxiv.org/pdf/2402.01030])**  
 - **[MCP Documentation](https://modelcontextprotocol.io/)**
 
 ---
