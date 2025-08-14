@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "unified_knowledge_agent_host": {
-      "command": "python",
+      "command": ".venv/bin/python",
       "args": [
-        "agent/main.py"
+        "agent/host.py"
       ]
     }
   }
