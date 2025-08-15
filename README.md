@@ -120,7 +120,7 @@ python main.py
 
 A-Modular-Kingdom follows a **modular foundation** approach:
 
-<img width="100%" alt="architecture" src="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb" />
+<img width="175%" alt="architecture" src="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb" />
 ```
 ┌─────────────────────────────────────┐
 │          Multi-Agent Layer          │
