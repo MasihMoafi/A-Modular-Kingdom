@@ -120,9 +120,7 @@ python main.py
 
 A-Modular-Kingdom follows a **modular foundation** approach:
 
-<a href="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb">
-  <img width="500" alt="architecture" src="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb" />
-</a>
+<img width="500" alt="architecture" src="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb" />
 
 ```
 ┌─────────────────────────────────────┐
