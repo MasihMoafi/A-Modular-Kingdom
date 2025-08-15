@@ -11,7 +11,7 @@ This isn't just another AI project - it's a **foundation** that enables:
 - **🔗 Seamless Integration**: Multi-agent systems connect to `host.py` for instant access to long-term memory, RAG, and powerful tools
 - **🏗️ Modular Architecture**: Build hierarchical (Council Chamber) or sequential (Gym) workflows on the same foundation  
 - **🛠️ Rich Toolset**: Vision, code execution, browser automation, web search, and more - all standardized and ready to use
-- **📚 Smart Memory**: Persistent memory and RAG systems that work across all your agents
+- **📚 Smart Memory**: Persistent memory and SOTA RAG systems that work across all your agents
 - **🌐 ACP Communication**: Agents communicate through ACP servers for reliable, structured interactions
 
 ## 🏛️ Multi-Agent Systems
