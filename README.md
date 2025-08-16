@@ -216,11 +216,14 @@ Interviewer → Plan Generator → Nutrition Agent
 - `@` - Trigger document completion dropdown
 - `/` - Trigger command completion dropdown
 - `\` at line end - Continue to next line
-- `Enter` - Send message
 
 ## 🎯 CLI Integration
 
+**Claude code and Gemini-cli both connect to host.py as clients. 
+
 ### Gemini CLI Extension
+
+<img width="1785" height="1287" alt="Screenshot from 2025-08-16 01-10-56" src="https://github.com/user-attachments/assets/edfc887b-9f33-4b84-89e2-1113881b38f4" />
 
 Create `gemini-extension.json`:
 
