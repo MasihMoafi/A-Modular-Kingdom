@@ -39,6 +39,12 @@ A-Modular-Kingdom follows a **modular foundation** approach:
 └─────────────────────────────────────┘
 ```
 
+## Connecting to Claude Code and Gemini Cli
+
+<img width="1785" height="1287" alt="Screenshot from 2025-08-16 01-10-56" src="https://github.com/user-attachments/assets/25a74390-faef-4184-9e64-22e390d0d891" />
+
+
+
 ## 🏛️ Multi-Agent Systems
 
 ### 👑 Council Chamber (Hierarchical)
