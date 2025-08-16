@@ -158,6 +158,8 @@ Hierarchical multi-agent system with defined roles:
 
 ### 💪 Gym
 
+<img width="2556" height="1375" alt="Screenshot from 2025-07-14 17-57-24" src="https://github.com/user-attachments/assets/32e9a3c8-3553-49e4-b106-5fc26d2d946d" />
+
 Sequential fitness-focused multi-agent system:
 
 ```
