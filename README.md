@@ -135,6 +135,8 @@ Mem0-based persistent memory with ChromaDB:
 - Semantic search capabilities
 - BM25 fallback for robustness
 - Memory management commands
+  
+---
 
 ## 🤖 Multi-Agent Systems
 
@@ -155,6 +157,8 @@ Hierarchical multi-agent system with defined roles:
 - Smart task delegation
 - MCP tool integration
 - Code-first solutions with smolagents
+  
+---
 
 ### 💪 Gym
 
@@ -174,15 +178,15 @@ Interviewer → Plan Generator → Nutrition Agent
 
 ## 🔧 Tools & Extensions
 
-| Tool | Description | Status |
+| Tool | Description | Note |
 |------|-------------|--------|
 | **RAG** | Document retrieval | ✅ 3 versions |
 | **Memory** | Long-term storage | ✅ Integrated |
 | **Vision** | Image analysis | ✅ Ready |
 | **Code Exec** | Python sandbox | ✅ Secure |
 | **Browser** | Web automation | ✅ Playwright |
-| **Web Search** | Info retrieval | ✅ Active |
-| **TTS** | Text-to-speech | ✅ Multiple engines |
+| **Web Search** | Info retrieval | ✅ Duckduckgo |
+| **TTS** | Text-to-speech | ✅ Kokoro |
 | **STT** | Speech-to-text | ✅ Whisper |
 
 ## 📝 Commands Reference
