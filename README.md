@@ -291,6 +291,11 @@ git commit -m "feat: add new capability"
 git push origin feature/your-feature
 ```
 
+## Links
+
+https://www.youtube.com/watch?v=hWoQnAr6R_E
+https://medium.com/@masihmoafi12/a-modular-kingdom-fcaa69a6c1f0
+
 ## 📜 License
 
 MIT License - See [LICENSE](LICENSE) for details
