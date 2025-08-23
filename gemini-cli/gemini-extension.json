@@ -1,0 +1,12 @@
+{
+  "name": "RAG",
+  "version": "1.0.0",
+  "description": "AI-Powered Multi-Agent System with transferable RAG, memory, vision, and advanced tools for any document directory",
+  "mcpServers": {
+    "unified_knowledge_agent": {
+      "command": "python",
+      "args": ["/home/masih/Desktop/migrate/Projects/A-Modular-Kingdom/A-Modular-Kingdom/agent/host.py"]
+    }
+  },
+  "contextFileName": "KINGDOM.md"
+}
