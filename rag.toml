@@ -1,0 +1,15 @@
+name = "rag"
+description = "/rag <path> <query>"
+prompt = "Use query_knowledge_base tool to search for the query. If doc_path is provided, include it as a parameter. Synthesize the answer based on the information from the chunks that best answer the user's query."
+
+[args.query]
+description = "What to search for in the knowledge base"
+required = true
+
+[args.doc_path]
+description = "Optional path to specific document directory for transferable RAG"
+required = false
+
+[args.rag_version]
+description = "RAG version to use (v1, v2, v3). Defaults to v3"
+required = false
