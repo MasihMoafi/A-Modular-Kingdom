@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-Modular-Kingdom - AI Multi-Agent System Foundation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        :root {
+            --primary: #0f172a;
+            --secondary: #1e293b;
+            --accent: #0ea5e9;
+            --accent-dark: #0284c7;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --author-color: #6366f1;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --bg-nav: #f8fafc;
+            --border: #e2e8f0;
+            --border-light: #f1f5f9;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+            font-size: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .content {
+            padding: 3rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .header h1 {
+            font-size: clamp(2.5rem, 5vw, 3.5rem);
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-image {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            margin: 2rem 0;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            transition: transform 0.2s ease;
+            cursor: zoom-in;
+        }
+
+        .header-image:hover {
+            transform: translateY(-2px);
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.4;
+        }
+
+        .author {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--author-color);
+            margin-bottom: 2rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 0.25rem;
+        }
+
+        .emoji {
+            font-size: 1.2em;
+            margin-right: 0.5rem;
+        }
+
+        /* Navigation */
+        .navigation {
+            background: var(--bg-nav);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 2rem;
+            z-index: 100;
+        }
+
+        .navigation h3 {
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+            font-size: 1.3rem;
+        }
+
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .nav-item {
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border-left: 3px solid var(--accent);
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .nav-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+            border-left-color: var(--accent-dark);
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-tertiary));
+        }
+
+        .nav-item-title {
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .nav-item-desc {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .section {
+            margin: 3rem 0;
+            scroll-margin-top: 100px;
+        }
+
+        .section h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .section h3 {
+            color: var(--secondary);
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem 0;
+        }
+
+        .section h4 {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            border: 2px solid var(--border-light);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .architecture-section {
+            background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 3rem 0;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .architecture-diagram {
+            background: var(--primary);
+            color: #e5e7eb;
+            padding: 2rem;
+            border-radius: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .component-section {
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2.5rem 0;
+            box-shadow: var(--shadow-lg);
+            border-top: 4px solid var(--accent);
+            scroll-margin-top: 100px;
+            transition: all 0.3s ease;
+        }
+
+        .component-section:hover {
+            box-shadow: var(--shadow-xl);
+            transform: translateY(-2px);
+        }
+
+        .component-title {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .component-subtitle {
+            font-style: italic;
+            color: var(--text-muted);
+            font-size: 1rem;
+            font-weight: 400;
+            margin-bottom: 1.5rem;
+        }
+
+        .figure {
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .figure img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease;
+            cursor: zoom-in;
+            background: var(--bg-primary);
+        }
+
+        .figure img:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .figure-caption {
+            font-style: italic;
+            color: var(--text-muted);
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            text-align: left;
+            line-height: 1.4;
+        }
+
+        .table-container {
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-primary);
+        }
+
+        th, td {
+            border-bottom: 1px solid var(--border-light);
+            padding: 0.75rem;
+            text-align: left;
+        }
+
+        th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
+        .code-block {
+            background: var(--primary);
+            color: #e5e7eb;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            border-left: 4px solid var(--success);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 10px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, var(--bg-tertiary), #e0f2fe);
+            border-left: 4px solid var(--accent);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            font-weight: 500;
+            border-radius: 10px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .warning-box {
+            background: linear-gradient(135deg, #fef3c7, #fed7aa);
+            border: 1px solid var(--warning);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            color: #92400e;
+            font-weight: 500;
+            box-shadow: var(--shadow);
+        }
+
+        .links-section {
+            background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 3rem 0;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .links-section h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+        }
+
+        .link-item {
+            display: inline-block;
+            margin: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .link-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        /* Image Zoom Modal */
+        .zoom-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            z-index: 10000;
+            cursor: zoom-out;
+            backdrop-filter: blur(2px);
+        }
+
+        .zoom-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .zoom-image {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: var(--shadow-xl);
+            transition: transform 0.1s ease;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+
+        .zoom-close {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .zoom-close:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.1);
+        }
+
+        /* Back to top button */
+        .nav-hint {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--accent);
+            color: white;
+            padding: 0.75rem;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            transition: all 0.2s ease;
+            z-index: 1000;
+            font-weight: bold;
+        }
+
+        .nav-hint:hover {
+            transform: scale(1.1);
+            background: var(--accent-dark);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                margin: 1rem;
+            }
+            
+            .content {
+                padding: 2rem 1.5rem;
+            }
+            
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1.1rem;
+            }
+
+            .component-section {
+                padding: 1.5rem;
+            }
+
+            .zoom-container {
+                padding: 1rem;
+            }
+
+            .zoom-close {
+                top: 1rem;
+                right: 1rem;
+                width: 36px;
+                height: 36px;
+                font-size: 1.25rem;
+            }
+
+            .nav-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Smooth animations */
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .emoji-large {
+            font-size: 3rem;
+            margin: 1rem 0;
+        }
+
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <div class="header">
+                <div class="emoji-large">🏰</div>
+                <h1>A-Modular-Kingdom</h1>
+                
+                <div class="figure">
+                    <img src="https://github.com/user-attachments/assets/6e4eaca7-0cae-43b8-a60d-fc8bdfe8c77e" alt="A-Modular-Kingdom Architecture" class="header-image zoomable" data-loading="true">
+                </div>
+                
+                <div class="subtitle">The Foundation for AI-Powered Multi-Agent Systems</div>
+                <div class="author">Masih Moafi</div>
+                
+                <div>
+                    <span class="badge">🔗 Seamless Integration</span>
+                    <span class="badge">🏗️ Modular Architecture</span>
+                    <span class="badge">🛠️ Rich Toolset</span>
+                    <span class="badge">📚 Smart Memory</span>
+                    <span class="badge">🌐 MCP Protocol</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <strong>Project Overview:</strong> A comprehensive AI infrastructure providing building blocks for sophisticated multi-agent workflows. Built with modularity and standardization at its core, seamlessly connecting different multi-agent architectures through a unified foundation.
+            </div>
+
+            <div class="navigation">
+                <h3>Quick Navigation:</h3>
+                <div class="nav-grid">
+                    <a href="#features" class="nav-item">
+                        <div class="nav-item-title">✨ Features</div>
+                        <div class="nav-item-desc">Core capabilities and integration features</div>
+                    </a>
+                    <a href="#architecture" class="nav-item">
+                        <div class="nav-item-title">🏗️ Architecture</div>
+                        <div class="nav-item-desc">System design and component relationships</div>
+                    </a>
+                    <a href="#components" class="nav-item">
+                        <div class="nav-item-title">🛠️ Core Components</div>
+                        <div class="nav-item-desc">MCP Server, Interactive Client, RAG & Memory</div>
+                    </a>
+                    <a href="#multi-agents" class="nav-item">
+                        <div class="nav-item-title">🤖 Multi-Agent Systems</div>
+                        <div class="nav-item-desc">Council Chamber and Gym implementations</div>
+                    </a>
+                    <a href="#tools" class="nav-item">
+                        <div class="nav-item-title">🔧 Tools & Extensions</div>
+                        <div class="nav-item-desc">Available tools and capabilities matrix</div>
+                    </a>
+                    <a href="#cli-integration" class="nav-item">
+                        <div class="nav-item-title">🎯 CLI Integration</div>
+                        <div class="nav-item-desc">Claude Code and Gemini CLI setup</div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="section" id="features">
+                <h2><span class="emoji">✨</span>Features</h2>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🔗</div>
+                        <div class="feature-title">Seamless Integration</div>
+                        <div class="feature-desc">Multi-agent systems connect to host.py for instant access to long-term memory, RAG, and powerful tools</div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">🏗️</div>
+                        <div class="feature-title">Modular Architecture</div>
+                        <div class="feature-desc">Build hierarchical or sequential workflows on the same foundation</div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">🛠️</div>
+                        <div class="feature-title">Rich Toolset</div>
+                        <div class="feature-desc">Vision, code execution, browser automation, web search, and more</div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">📚</div>
+                        <div class="feature-title">Smart Memory</div>
+                        <div class="feature-desc">Persistent memory and RAG systems working across all agents</div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">🌐</div>
+                        <div class="feature-title">MCP Protocol</div>
+                        <div class="feature-desc">Model Context Protocol for reliable, structured interactions</div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">🎤</div>
+                        <div class="feature-title">Voice Control</div>
+                        <div class="feature-desc">Speech-to-text and text-to-speech capabilities</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="architecture-section" id="architecture">
+                <h2><span class="emoji">🏗️</span>Architecture</h2>
+                
+                <div class="architecture-diagram">
+┌─────────────────────────────────────┐
+│       Multi-Agent Layer             │
+│  ┌─────────────┐  ┌─────────────┐   │
+│  │   Council   │  │     Gym     │   │
+│  │   Chamber   │  │             │   │
+│  └─────────────┘  └─────────────┘   │
+└─────────────────────────────────────┘
+           │                │
+           ▼                ▼
+┌─────────────────────────────────────┐
+│        Foundation Layer             │
+│  ┌─────────┐ ┌─────────┐ ┌────────┐ │
+│  │   RAG   │ │ Memory  │ │ Tools  │ │
+│  └─────────┘ └─────────┘ └────────┘ │
+│              host.py                │
+└─────────────────────────────────────┘
+                </div>
+                
+                <div class="highlight-box">
+                    <strong>Key Insight:</strong> The foundation layer (host.py) provides unified access to all capabilities, allowing different multi-agent architectures to share the same powerful toolset and knowledge base.
+                </div>
+            </div>
+
+            <div class="section" id="components">
+                <h2><span class="emoji">🛠️</span>Core Components</h2>
+            </div>
+
+            <div class="component-section" id="host-py">
+                <div class="component-title">📡 Host.py - MCP Server</div>
+                <div class="component-subtitle">The central hub providing MCP (Model Context Protocol) access to all capabilities</div>
+                
+                <h4>Available Tools:</h4>
+                <ul>
+                    <li><code>save_memory</code> - Direct memory storage</li>
+                    <li><code>search_memories</code> - Semantic memory search</li>
+                    <li><code>query_knowledge_base</code> - RAG document search</li>
+                    <li><code>web_search</code> - Current information retrieval</li>
+                    <li><code>browser_automation</code> - Web interaction</li>
+                    <li><code>code_execute</code> - Safe Python execution</li>
+                    <li><code>analyze_media</code> - Image/video analysis</li>
+                    <li><code>text_to_speech</code> - TTS with multiple engines</li>
+                    <li><code>speech_to_text</code> - STT with Whisper</li>
+                </ul>
+            </div>
+
+            <div class="component-section" id="main-py">
+                <div class="component-title">💬 Main.py - Interactive Client</div>
+                <div class="component-subtitle">Feature-rich chat interface with intelligent tool selection</div>
+                
+                <h4>Key Features:</h4>
+                <ul>
+                    <li>Auto-completion for @ mentions and / commands</li>
+                    <li>Direct memory saving with # prefix</li>
+                    <li>Automatic tool selection (memory vs RAG vs web)</li>
+                    <li>Document integration via @ mentions</li>
+                    <li>Interactive command interface</li>
+                </ul>
+            </div>
+
+            <div class="component-section" id="rag-system">
+                <div class="component-title">📚 RAG System</div>
+                <div class="component-subtitle">Three versions of RAG implementation with different strategies</div>
+                
+                <ul>
+                    <li><strong>V1</strong> - Basic Chroma + BM25 ensemble</li>
+                    <li><strong>V2</strong> - FAISS + CrossEncoder reranking</li>
+                    <li><strong>V3</strong> - Custom indexes + RRF fusion + LLM reranking</li>
+                </ul>
+            </div>
+
+            <div class="component-section" id="memory-system">
+                <div class="component-title">🧠 Memory System</div>
+                <div class="component-subtitle">Mem0-based persistent memory with ChromaDB</div>
+                
+                <ul>
+                    <li>Automatic fact extraction</li>
+                    <li>Semantic search capabilities</li>
+                    <li>BM25 fallback for robustness</li>
+                    <li>Memory management commands</li>
+                </ul>
+            </div>
+
+            <div class="section" id="multi-agents">
+                <h2><span class="emoji">🤖</span>Multi-Agent Systems</h2>
+            </div>
+
+            <div class="component-section" id="council-chamber">
+                <div class="component-title">👑 Council Chamber</div>
+                <div class="component-subtitle">Hierarchical multi-agent system with defined roles</div>
+                
+                <div class="figure">
+                    <img src="https://github.com/user-attachments/assets/35ed7188-6d55-4ed1-9298-cbb5ac20bbb5" alt="Council Chamber Architecture 1" class="zoomable" data-loading="true">
+                </div>
+
+                <div class="figure">
+                    <img src="https://github.com/user-attachments/assets/52aa3fe6-22a8-4e96-ada1-0d206a7619ee" alt="Council Chamber Architecture 2" class="zoomable" data-loading="true">
+                </div>
+                
+                <div class="code-block">
+👑 King (User) → 👸 Queen Juliette → 🔥 Sexy Teacher → 🤖 Code Agent
+                </div>
+                
+                <h4>Features:</h4>
+                <ul>
+                    <li>Hierarchical validation</li>
+                    <li>Smart task delegation</li>
+                    <li>MCP tool integration</li>
+                    <li>Code-first solutions with smolagents</li>
+                </ul>
+            </div>
+
+            <div class="component-section" id="gym">
+                <div class="component-title">💪 Gym</div>
+                <div class="component-subtitle">Sequential fitness-focused multi-agent system</div>
+                
+                <div class="figure">
+                    <img src="https://github.com/user-attachments/assets/32e9a3c8-3553-49e4-b106-5fc26d2d946d" alt="Gym System Architecture" class="zoomable" data-loading="true">
+                </div>
+                
+                <div class="code-block">
+Interviewer → Plan Generator → Nutrition Agent
+                </div>
+                
+                <h4>Features:</h4>
+                <ul>
+                    <li>CrewAI powered workflows</li>
+                    <li>Specialized fitness agents</li>
+                    <li>Web interface</li>
+                    <li>Flexible LLM support</li>
+                </ul>
+            </div>
+
+            <div class="section" id="tools">
+                <h2><span class="emoji">🔧</span>Tools & Extensions</h2>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tool</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>RAG</strong></td>
+                                <td>Document retrieval</td>
+                                <td>✅ 3 versions</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Memory</strong></td>
+                                <td>Long-term storage</td>
+                                <td>✅ Integrated</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Vision</strong></td>
+                                <td>Image analysis</td>
+                                <td>✅ Ready</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Code Exec</strong></td>
+                                <td>Python sandbox</td>
+                                <td>✅ Secure</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Browser</strong></td>
+                                <td>Web automation</td>
+                                <td>✅ Playwright</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Web Search</strong></td>
+                                <td>Info retrieval</td>
+                                <td>✅ DuckDuckGo</td>
+                            </tr>
+                            <tr>
+                                <td><strong>TTS</strong></td>
+                                <td>Text-to-speech</td>
+                                <td>✅ Kokoro</td>
+                            </tr>
+                            <tr>
+                                <td><strong>STT</strong></td>
+                                <td>Speech-to-text</td>
+                                <td>✅ Whisper</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="quick-start">
+                <h2><span class="emoji">🚀</span>Quick Start</h2>
+                
+                <h3>Prerequisites</h3>
+                <ul>
+                    <li>Python 3.8+</li>
+                    <li>Ollama (for local LLM)</li>
+                    <li>UV package manager (recommended)</li>
+                </ul>
+                
+                <h3>Installation</h3>
+                <div class="code-block">
+# Clone the repository
+git clone https://github.com/yourusername/A-Modular-Kingdom.git
+cd A-Modular-Kingdom
+
+# Install dependencies with UV
+uv sync
+
+# Or with pip
+pip install -r requirements.txt
+                </div>
+                
+                <h3>Basic Usage</h3>
+                <div class="code-block">
+# Start the MCP server
+python agent/host.py
+
+# In another terminal, start the interactive client
+python agent/main.py
+
+# Or use UV
+uv run agent/main.py
+                </div>
+            </div>
+
+            <div class="section" id="commands">
+                <h2><span class="emoji">📝</span>Commands Reference</h2>
+                
+                <h3>Interactive Commands</h3>
+                <div class="code-block">
+# Memory Management
+#message          - Save directly to memory
+/memory           - List and manage memories
+
+# Document Access  
+@filename         - Reference documents
+/files            - Show available documents
+
+# RAG Search
+/rag &lt;query&gt; [version] [path]  - Search documents
+  Examples:
+    /rag "machine learning"           # Search current dir with v2
+    /rag "AI research" v3            # Use v3 in current dir
+    /rag "python" v1 /docs           # Use v1 in /docs
+
+# Tools & Help
+/tools            - List available tools
+/browser_automation - Run browser tasks
+/help             - Show help information
+                </div>
+                
+                <h3>Keyboard Shortcuts</h3>
+                <ul>
+                    <li><code>@</code> - Trigger document completion dropdown</li>
+                    <li><code>/</code> - Trigger command completion dropdown</li>
+                    <li><code>\</code> at line end - Continue to next line</li>
+                </ul>
+            </div>
+
+            <div class="section" id="cli-integration">
+                <h2><span class="emoji">🎯</span>CLI Integration</h2>
+                
+                <div class="info-box">
+                    <strong>Claude Code and Gemini-cli both connect to host.py as clients.</strong>
+                </div>
+                
+                <h3>Gemini CLI Extension</h3>
+                
+                <div class="figure">
+                    <img src="https://github.com/user-attachments/assets/edfc887b-9f33-4b84-89e2-1113881b38f4" alt="Gemini CLI Integration" class="zoomable" data-loading="true">
+                </div>
+                
+                <div class="code-block">
+{
+  "name": "a-modular-kingdom",
+  "version": "1.0.0",
+  "description": "AI Multi-Agent System with transferable RAG",
+  "mcpServers": {
+    "unified_knowledge_agent": {
+      "command": "python",
+      "args": ["path/to/agent/host.py"]
+    }
+  },
+  "contextFileName": "KINGDOM.md"
+}
+                </div>
+                
+                <h3>RAG CLI Command</h3>
+                <div class="code-block">
+/rag &lt;query&gt; [version] [path]
+
+# Default: current working directory, version 2
+/rag "search term"
+
+# Specify version
+/rag "search term" v3
+
+# Custom path
+/rag "search term" v2 /path/to/docs
+                </div>
+            </div>
+
+            <div class="section" id="contributing">
+                <h2><span class="emoji">🤝</span>Contributing</h2>
+                
+                <p>We welcome contributions! Areas of interest:</p>
+                
+                <ol>
+                    <li><strong>New Multi-Agent Architectures</strong> - Implement novel agent coordination patterns</li>
+                    <li><strong>Tool Development</strong> - Add new MCP tools</li>
+                    <li><strong>RAG Improvements</strong> - Enhance retrieval strategies</li>
+                    <li><strong>Memory Optimizations</strong> - Better fact extraction and storage</li>
+                </ol>
+                
+                <h3>Development Setup</h3>
+                <div class="code-block">
+# Fork and clone
+git clone https://github.com/yourusername/A-Modular-Kingdom.git
+
+# Create branch
+git checkout -b feature/your-feature
+
+# Make changes and test
+python -m pytest tests/
+
+# Commit with descriptive message
+git commit -m "feat: add new capability"
+
+# Push and create PR
+git push origin feature/your-feature
+                </div>
+            </div>
+
+            <div class="links-section" id="links">
+                <h2><span class="emoji">🔗</span>Links</h2>
+                <a href="https://www.youtube.com/watch?v=hWoQnAr6R_E" class="link-item" target="_blank">📺 YouTube Demo</a>
+                <a href="https://medium.com/@masihmoafi12/a-modular-kingdom-fcaa69a6c1f0" class="link-item" target="_blank">📝 Medium Article</a>
+            </div>
+
+            <div class="section" id="license">
+                <h2><span class="emoji">📜</span>License</h2>
+                <p>MIT License - See LICENSE for details</p>
+                
+                <div class="highlight-box">
+                    <div style="text-align: center; font-size: 1.2rem;">
+                        <em>A-Modular-Kingdom: Where AI agents come together in harmony</em> 🏰✨
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zoom Modal -->
+    <div class="zoom-overlay" id="zoomOverlay">
+        <div class="zoom-container">
+            <button class="zoom-close" id="zoomClose">×</button>
+            <img class="zoom-image" id="zoomImage" alt="Zoomed image">
+        </div>
+    </div>
+
+    <!-- Back to top button -->
+    <div class="nav-hint" id="backToTop" title="Back to top">
+        ↑
+    </div>
+
+    <script>
+        // Image zoom functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const zoomOverlay = document.getElementById('zoomOverlay');
+            const zoomImage = document.getElementById('zoomImage');
+            const zoomClose = document.getElementById('zoomClose');
+            const zoomableImages = document.querySelectorAll('.zoomable');
+            let isZoomed = false;
+            let zoomLevel = 1;
+            const maxZoom = 4;
+            const minZoom = 1;
+
+            // Add click listeners to all zoomable images
+            zoomableImages.forEach(img => {
+                img.addEventListener('click', function() {
+                    openZoom(this.src, this.alt);
+                });
+
+                // Remove loading state when image loads
+                img.addEventListener('load', function() {
+                    this.setAttribute('data-loading', 'false');
+                });
+
+                // Set loading state initially
+                img.setAttribute('data-loading', 'true');
+            });
+
+            function openZoom(src, alt) {
+                zoomImage.src = src;
+                zoomImage.alt = alt;
+                zoomOverlay.style.display = 'flex';
+                isZoomed = true;
+                zoomLevel = 1;
+                zoomImage.style.transform = 'scale(1)';
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeZoom() {
+                zoomOverlay.style.display = 'none';
+                isZoomed = false;
+                zoomLevel = 1;
+                document.body.style.overflow = 'auto';
+            }
+
+            // Mouse movement tracking for zoom
+            zoomOverlay.addEventListener('mousemove', function(e) {
+                if (!isZoomed || zoomLevel <= 1) return;
+
+                const rect = zoomImage.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+                zoomImage.style.transformOrigin = `${x}% ${y}%`;
+            });
+
+            // Scroll to zoom
+            zoomOverlay.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                if (!isZoomed) return;
+
+                const delta = e.deltaY > 0 ? -0.3 : 0.3;
+                zoomLevel = Math.min(maxZoom, Math.max(minZoom, zoomLevel + delta));
+                
+                zoomImage.style.transform = `scale(${zoomLevel})`;
+                
+                if (zoomLevel > 1) {
+                    zoomImage.style.cursor = 'grab';
+                } else {
+                    zoomImage.style.cursor = 'zoom-in';
+                }
+            });
+
+            // Click to zoom in/out
+            zoomImage.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (zoomLevel === 1) {
+                    zoomLevel = 2.5;
+                    this.style.cursor = 'grab';
+                } else {
+                    zoomLevel = 1;
+                    this.style.cursor = 'zoom-in';
+                }
+                this.style.transform = `scale(${zoomLevel})`;
+            });
+
+            // Drag functionality when zoomed
+            let isDragging = false;
+            let startX, startY, initialX, initialY;
+
+            zoomImage.addEventListener('mousedown', function(e) {
+                if (zoomLevel <= 1) return;
+                isDragging = true;
+                this.style.cursor = 'grabbing';
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                const transform = getComputedStyle(this).transform;
+                if (transform !== 'none') {
+                    const matrix = new DOMMatrix(transform);
+                    initialX = matrix.e;
+                    initialY = matrix.f;
+                } else {
+                    initialX = 0;
+                    initialY = 0;
+                }
+                
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging || zoomLevel <= 1) return;
+                
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                zoomImage.style.transform = `scale(${zoomLevel}) translate(${initialX + dx}px, ${initialY + dy}px)`;
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    zoomImage.style.cursor = zoomLevel > 1 ? 'grab' : 'zoom-in';
+                }
+            });
+
+            // Close zoom on escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && isZoomed) {
+                    closeZoom();
+                }
+            });
+
+            // Close zoom on overlay click (anywhere outside image)
+            zoomOverlay.addEventListener('click', function(e) {
+                if (e.target === zoomOverlay) {
+                    closeZoom();
+                }
+            });
+
+            // Close zoom on close button click
+            zoomClose.addEventListener('click', function(e) {
+                e.stopPropagation();
+                closeZoom();
+            });
+
+            // Back to top functionality
+            const backToTop = document.getElementById('backToTop');
+            
+            backToTop.addEventListener('click', function() {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+
+            // Show/hide back to top button
+            window.addEventListener('scroll', function() {
+                if (window.pageYOffset > 300) {
+                    backToTop.style.display = 'flex';
+                } else {
+                    backToTop.style.display = 'none';
+                }
+            });
+
+            // Add fade-in animation to sections on scroll
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('fade-in-up');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            // Observe all major sections
+            document.querySelectorAll('.component-section, .section, .architecture-section, .links-section').forEach(el => {
+                observer.observe(el);
+            });
+        });
+    </script>
+</body>
+</html>
