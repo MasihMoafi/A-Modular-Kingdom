@@ -144,7 +144,7 @@ Mem0-based persistent memory with ChromaDB:
 
 <img width="1672" height="1426" alt="architecture" src="https://github.com/user-attachments/assets/35ed7188-6d55-4ed1-9298-cbb5ac20bbb5" />
 
-<img width="1079" height="1228" alt="image" src="https://github.com/user-attachments/assets/08959c56-62e4-4067-8510-fddc53a18072" />
+<img width="400" height="500" alt="image" src="https://github.com/user-attachments/assets/08959c56-62e4-4067-8510-fddc53a18072" />
 
 Hierarchical multi-agent system with defined roles:
 
