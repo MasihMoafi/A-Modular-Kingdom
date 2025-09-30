@@ -146,7 +146,7 @@ Mem0-based persistent memory with ChromaDB:
 
 <img width="400" height="500" alt="image" src="https://github.com/user-attachments/assets/08959c56-62e4-4067-8510-fddc53a18072" />
 
-Hierarchical multi-agent system with defined roles:
+**Hierarchical multi-agent system with defined roles:**
 
 ```
 👑 King (User) → 👸 Queen Juliette → 🔥 Sexy Teacher → 🤖 Code Agent
