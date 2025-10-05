@@ -35,7 +35,7 @@ LLM_MODEL = 'gpt-oss:20b'
 class DocumentCompleter(Completer):
     def __init__(self):
         self.resources = []
-        self.commands = ['/memory', '/help', '/tools', '/files', '/browser_automation']
+        self.commands = ['/memory', '/help', '/tools', '/files', '/browser_automation', '/rag']
     
     def update_resources(self, resources: List[str]):
         self.resources = resources
@@ -163,6 +163,7 @@ async def main(think_level=None):
  - /tools - List all available tools  
  - /memory - List and manage memories
  - /files - List available files
+ - /rag <query> [version] [path] - Search documents with RAG
  - /browser_automation - Run a browser task interactively
  - @filename - Access file content (e.g., @Napoleon.pdf)
  - #message - Save message directly to memory""")
@@ -170,7 +171,7 @@ async def main(think_level=None):
                             
                         elif command == 'tools':
                             print("""Available MCP Tools:
-1. query_knowledge_base(query: str) - Search the RAG knowledge base
+1. query_knowledge_base(query: str, version: str = 'v3', doc_path: str = '') - Search RAG knowledge base
 2. search_memories(query: str, top_k: int = 3) - Search memory database
 3. save_direct_memory(content: str) - Save content directly to memory
 4. delete_memory(memory_id: str) - Delete memory by ID
@@ -247,6 +248,51 @@ async def main(think_level=None):
                                     print("No files found.")
                             except Exception as e:
                                 print(f"Error listing files: {e}")
+                            continue
+
+                        elif user_input.startswith('/rag'):
+                            parts = user_input.split(maxsplit=3)
+                            query = parts[1] if len(parts) > 1 else ''
+
+                            if not query:
+                                print("Usage: /rag <query> [version] [path]")
+                                continue
+
+                            # Defaults
+                            version = 'v2' # Default RAG version
+                            doc_path = ''
+
+                            # Check for version and path
+                            if len(parts) > 2:
+                                # Is it a version or a path?
+                                if parts[2] in ['v1', 'v2', 'v3']:
+                                    version = parts[2]
+                                    if len(parts) > 3:
+                                        doc_path = parts[3]
+                                else: # It's a path
+                                    doc_path = parts[2]
+
+                            print(f"📚 Querying knowledge base with RAG {version}...")
+
+                            try:
+                                params = {'query': query, 'version': version}
+                                if doc_path:
+                                    params['doc_path'] = doc_path
+
+                                rag_result = await session.call_tool('query_knowledge_base', params)
+                                knowledge = json.loads(rag_result.content[0].text)
+
+                                if 'result' in knowledge:
+                                    print("\n--- RAG Result ---")
+                                    print(knowledge['result'])
+                                    print("--------------------")
+                                else:
+                                    print(f"Error from RAG tool: {knowledge.get('error', 'Unknown error')}")
+
+                            except (json.JSONDecodeError, IndexError, TypeError) as e:
+                                print(f"Could not parse RAG response: {e}")
+                            except Exception as e:
+                                print(f"An error occurred during RAG query: {e}")
                             continue
 
                         else:
