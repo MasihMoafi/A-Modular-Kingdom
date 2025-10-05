@@ -8,11 +8,11 @@ import logging
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 import json
+import importlib
 from typing import Dict, List
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from memory.core import Mem0
-from rag.fetch_3 import fetchExternalKnowledge
 from tools.web_search import perform_web_search
 from tools.browser_agent import browse_web
 from tools.code_exec import run_code
@@ -99,31 +99,59 @@ def search_memories(
 
 @mcp.tool(
     name="query_knowledge_base",
-    description="Search external documents and knowledge base using the RAG system to find relevant information from stored documents"
+    description="Search external documents using a specific RAG version (v1, v2, v3) to find relevant information."
 )
 def query_knowledge_base(
-    query: str = Field(description="The search query to find relevant information in the knowledge base"),
-    doc_path: str = Field(default="", description="Optional absolute or relative path to a project-specific documents directory")
+    query: str = Field(description="The search query for the knowledge base"),
+    version: str = Field(default="v3", description="RAG version to use: 'v1', 'v2', or 'v3'"),
+    doc_path: str = Field(default="", description="Optional path to a specific documents directory")
 ) -> str:
-    """A tool to query the external knowledge base (RAG system)."""
-    import sys
-    sys.stderr.write(f"[HOST] RAG tool called with: {query[:20]}...\n")
+    """
+    A tool to query the external knowledge base (RAG system) with selectable versions.
+    """
+    sys.stderr.write(f"[HOST] RAG tool called with query: '{query[:20]}...', version: {version}, path: '{doc_path}'\n")
     sys.stderr.flush()
+
     try:
-        sys.stderr.write("[HOST] About to call fetchExternalKnowledge\n")
+        # Map version to module name
+        module_map = {
+            "v1": "rag.fetch",
+            "v2": "rag.fetch_2",
+            "v3": "rag.fetch_3"
+        }
+
+        module_name = module_map.get(version)
+        if not module_name:
+            return json.dumps({"error": f"Invalid RAG version '{version}'. Must be 'v1', 'v2', or 'v3'."})
+
+        # Dynamically import the correct module
+        rag_module = importlib.import_module(module_name)
+        fetchExternalKnowledge = getattr(rag_module, 'fetchExternalKnowledge')
+
+        sys.stderr.write(f"[HOST] Calling fetchExternalKnowledge from {module_name}\n")
         sys.stderr.flush()
-        # Allow optional project-specific document scoping
+
+        # Call the function with appropriate arguments
         if doc_path and isinstance(doc_path, str):
             results = fetchExternalKnowledge(query, doc_path=doc_path)
         else:
             results = fetchExternalKnowledge(query)
-        sys.stderr.write(f"[HOST] RAG returned {len(results)} chars\n")
+
+        sys.stderr.write(f"[HOST] RAG ({version}) returned {len(results)} chars\n")
         sys.stderr.flush()
+
         return json.dumps({"result": results})
-    except Exception as e:
-        sys.stderr.write(f"[HOST] RAG error: {e}\n")
+
+    except (ModuleNotFoundError, AttributeError):
+        error_msg = f"Could not find or load 'fetchExternalKnowledge' function in module for version '{version}'."
+        sys.stderr.write(f"[HOST] RAG error: {error_msg}\n")
         sys.stderr.flush()
-        return json.dumps({"error": f"Error querying knowledge base on host: {str(e)}"})
+        return json.dumps({"error": error_msg})
+    except Exception as e:
+        error_msg = f"Error querying knowledge base on host with version {version}: {str(e)}"
+        sys.stderr.write(f"[HOST] RAG error: {error_msg}\n")
+        sys.stderr.flush()
+        return json.dumps({"error": error_msg})
 
 @mcp.tool(
     name="list_all_memories",
