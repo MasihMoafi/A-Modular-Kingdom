@@ -1,133 +1,274 @@
 # 🏰 A-Modular-Kingdom
 
-**The Foundation for AI-Powered Multi-Agent Systems**
+**Stop rebuilding RAG, memory, and tools for every AI project**
 
-A-Modular-Kingdom is a comprehensive AI infrastructure that provides the building blocks for sophisticated multi-agent workflows. Built with modularity and standardization at its core, it seamlessly connects different multi-agent architectures through a unified foundation.
+A production-ready AI infrastructure that gives you everything you need to build intelligent agents: RAG with smart reindexing, persistent memory across conversations, browser automation, web search, vision, and code execution—all accessible through the Model Context Protocol (MCP).
 
-## 🎯 What Makes This Special
+## 🎯 Why This Exists
 
-This isn't just another AI project - it's a **foundation** that enables:
+Building AI agents means solving the same problems repeatedly:
+- 📚 **RAG**: Indexing documents, handling updates, semantic search
+- 🧠 **Memory**: Persisting context across sessions, semantic retrieval
+- 🛠️ **Tools**: Browser automation, web search, vision, code execution
+- 🔌 **Integration**: Connecting everything reliably
 
-- **🔗 Seamless Integration**: Multi-agent systems connect to `host.py` for instant access to long-term memory, RAG, and powerful tools
-- **🏗️ Modular Architecture**: Build hierarchical (Council Chamber) or sequential (Gym) workflows on the same foundation  
-- **🛠️ Rich Toolset**: Vision, code execution, browser automation, web search, and more - all standardized and ready to use
-- **📚 Smart Memory**: Persistent memory and RAG systems that work across all your agents
-- **🌐 ACP Communication**: Agents communicate through ACP servers for reliable, structured interactions
+**A-Modular-Kingdom solves this once.** Use it as a foundation for any AI project.
 
-## 🧠 Core Infrastructure
+## ✨ What You Get
 
-### 🖥️ Host.py - The Central Hub
-The heart of A-Modular-Kingdom, providing MCP (Model Context Protocol) access to:
+- **📚 Production RAG**: 3 versions (FAISS+BM25, custom indexes, LLM reranking), smart file-change detection, supports .py/.md/.txt/.pdf
+- **🧠 Persistent Memory**: Two-tier system (curated prompts + conversation memory), semantic search, ChromaDB + Ollama embeddings
+- **🌐 Browser Automation**: Clean Playwright integration, proper Unicode handling, 2-5s execution, no LLM dependency
+- **🔍 Web Search**: DuckDuckGo integration, structured results
+- **👁️ Vision**: Ollama multimodal analysis for images/videos
+- **⚡ Code Execution**: Sandboxed Python execution with timeout
+- **🎤 Voice**: Text-to-speech (pyttsx3/gtts/kokoro) and speech-to-text (Whisper)
+- **🔌 MCP Protocol**: Standard interface for AI tools and agents
 
-- **📚 RAG System**: Advanced document retrieval with multiple strategies (V1, V2, V3)
-- **🧠 Memory Core**: Persistent conversation and context memory
-- **👁️ Vision Tools**: Image analysis and processing capabilities  
-- **⚡ Code Execution**: Safe Python code execution environment
-- **🌐 Browser Automation**: Web interaction through Playwright
-- **🔍 Web Search**: Intelligent web search capabilities
+## 🎬 Quick Demo
 
-### 🔧 Tool Ecosystem
+```python
+# Use RAG to search your codebase
+from mcp import query_knowledge_base
 
-| Tool | Purpose | Status |
-|------|---------|--------|
-| **RAG** | Document retrieval & knowledge | ✅ Multiple versions |
-| **Memory** | Long-term conversation storage | ✅ Fully integrated |  
-| **Vision** | Image analysis | ✅ Ready to use |
-| **Code Exec** | Safe Python execution | ✅ Sandboxed |
-| **Browser** | Web automation | ✅ Playwright powered |
-| **Web Search** | Information retrieval | ✅ Integrated |
-| **Structured Output** | Formatted responses | 🔄 Coming soon |
+result = query_knowledge_base(
+    query="how does browser automation work",
+    doc_path="./tools",
+    version=2  # FAISS + BM25 + CrossEncoder
+)
 
-## 🚀 Quick Start
+# Browser automation with clean output
+from mcp import browser_automation
 
-### Prerequisites
-- Python 3.8+
-- Ollama (for local LLM)
-- UV package manager (recommended)
+result = browser_automation(
+    task="Go to https://github.com/trending and get top 3 repos",
+    headless=True
+)
 
-### Installation
+# Persistent memory across sessions
+from mcp import save_memory, search_memories
 
-```bash
-# Clone the repository
-git clone [repository-url]
-cd A-Modular-Kingdom
-
-# Install dependencies
-uv sync
-
-# Start the foundation
-python agent/host.py
-```
-
-### Launch Multi-Agent Systems
-
-**Council Chamber:**
-```bash
-# Terminal 1: Start Code Agent
-python council_chamber/code_agent_server.py
-
-# Terminal 2: Start Sexy Teacher  
-python council_chamber/enhanced_sexy_teacher_server.py
-
-# Terminal 3: Start Queen Juliette
-python council_chamber/queen_juliette.py
-```
-
-**Gym:**
-```bash
-cd gym/
-python setup.py
-python main.py
+save_memory("User prefers concise responses")
+results = search_memories("user preferences", top_k=3)
 ```
 
 ## 🏗️ Architecture
 
-A-Modular-Kingdom follows a **modular foundation** approach:
-
-<img width="3000" height="2000" alt="architecture" src="https://github.com/user-attachments/assets/fe937a83-07df-4927-a1f0-58d3a51bf1fb" />
-
 ```
 ┌─────────────────────────────────────┐
-│          Multi-Agent Layer          │
-│  ┌─────────────┐  ┌─────────────┐   │
-│  │   Council   │  │     Gym     │   │
-│  │   Chamber   │  │             │   │
-│  └─────────────┘  └─────────────┘   │
+│       Your AI Application           │
+│   (Agents, Chatbots, Workflows)     │
 └─────────────────────────────────────┘
-           │                │
-           ▼                ▼
+                 │
+                 │ MCP Protocol
+                 ▼
 ┌─────────────────────────────────────┐
-│         Foundation Layer            │
+│         A-Modular-Kingdom           │
 │  ┌─────────┐ ┌─────────┐ ┌────────┐ │
 │  │   RAG   │ │ Memory  │ │ Tools  │ │
+│  │  V1/V2  │ │ ChromaDB│ │Browser │ │
+│  │  /V3    │ │ +Ollama │ │Vision  │ │
 │  └─────────┘ └─────────┘ └────────┘ │
-│              host.py                │
+│              host.py (MCP Server)   │
 └─────────────────────────────────────┘
 ```
 
-**Key Principles:**
-- **Standard Interface**: All multi-agent systems use the same foundation
-- **ACP Communication**: Reliable agent-to-agent communication  
-- **Tool Sharing**: Common tools available to all agents
-- **Memory Persistence**: Shared memory across sessions
+**Key Features:**
+- **MCP Standard**: Works with any MCP-compatible client (Claude Desktop, custom agents)
+- **Modular**: Use only what you need (RAG only, memory only, or full stack)
+- **Production-Ready**: Smart reindexing, error handling, proper Unicode support
+- **No Vendor Lock-in**: Local Ollama models, open-source tools
+
+## 🚀 Quick Start
+
+### Prerequisites
+```bash
+# Required
+Python 3.11+
+Ollama (for embeddings: ollama pull embeddinggemma)
+
+# Recommended
+uv (Python package manager)
+```
+
+### Installation
+
+```bash
+# Clone and install
+git clone https://github.com/MasihMoafi/A-Modular-Kingdom.git
+cd A-Modular-Kingdom/A-Modular-Kingdom
+
+# Install dependencies
+uv sync  # or: pip install -r requirements.txt
+
+# Start MCP server
+python agent/host.py
+```
+
+### Usage Options
+
+**1. As MCP Server (Recommended)**
+```json
+// Add to your MCP client config (e.g., Claude Desktop)
+{
+  "mcpServers": {
+    "a-modular-kingdom": {
+      "command": "python",
+      "args": ["/path/to/A-Modular-Kingdom/agent/host.py"]
+    }
+  }
+}
+```
+
+**2. As Python Library**
+```python
+from rag.fetch_2 import fetchExternalKnowledge
+from memory.core import Mem0
+
+# Use RAG
+results = fetchExternalKnowledge("your query", doc_path="./docs")
+
+# Use Memory
+memory = Mem0()
+memory.add("Important fact to remember")
+```
+
+**3. Interactive CLI**
+```bash
+python agent/main.py  # Chat interface with all tools
+```
+
+## 📚 Core Components
+
+### RAG System (3 Versions)
+
+**V2 (Recommended)**: FAISS + BM25 + CrossEncoder
+- Smart file-change detection (only reindex when needed)
+- Code-aware search (boosts .py files for code queries)
+- Supports: .py, .md, .txt, .pdf
+- Fast: <1s search time
+
+**V1**: Basic Chroma + BM25
+**V3**: Custom indexes + RRF fusion + LLM reranking
+
+```python
+# Automatic reindexing when files change
+pipeline = get_rag_pipeline(doc_path="./my-project")
+results = pipeline.search("how does authentication work")
+```
+
+### Memory System
+
+Two-tier architecture:
+- **System Prompts**: Curated, high-priority instructions (never auto-deleted)
+- **Conversation Memory**: Auto-saved facts from conversations (can be cleared)
+
+```python
+memory = Mem0(chroma_path="./agent_chroma_db")
+
+# Add permanent instruction
+memory.add_system_prompt("User prefers minimal explanations")
+
+# Search across both tiers
+results = memory.search("user preferences", k=3)
+```
+
+### Browser Automation
+
+Fast Playwright integration with clean text extraction:
+- Removes navigation clutter
+- Proper Unicode/emoji support
+- 2-5s execution time
+- No LLM dependency
+
+```python
+result = await browse_web_playwright(
+    "Go to https://github.com/trending",
+    headless=True
+)
+# Returns: clean text + screenshot
+```
+
+### Tools
+
+| Tool | Description | Tech |
+|------|-------------|------|
+| `query_knowledge_base` | RAG search | FAISS, BM25, CrossEncoder |
+| `search_memories` | Semantic memory search | ChromaDB, Ollama |
+| `browser_automation` | Web scraping | Playwright |
+| `web_search` | Internet search | DuckDuckGo |
+| `analyze_media` | Vision analysis | Ollama multimodal |
+| `code_execute` | Python sandbox | subprocess |
+| `text_to_speech` | TTS | pyttsx3/gtts/kokoro |
+| `speech_to_text` | STT | Whisper |
+
+## 🎯 Use Cases
+
+**1. AI Coding Assistant**
+- RAG searches your codebase for relevant functions
+- Memory remembers your coding style and preferences
+- Browser automation fetches documentation
+- Code execution tests snippets
+
+**2. Research Assistant**
+- Web search finds papers and articles
+- Browser automation extracts content from websites
+- RAG indexes and searches your research library
+- Memory tracks research threads across sessions
+
+**3. Multi-Agent Systems**
+- Shared memory across multiple agents
+- Common tool access (no rebuilding infrastructure)
+- MCP protocol for reliable communication
+- Examples: Council Chamber (hierarchical), Gym (sequential)
+
+## 📊 Performance
+
+| Component | Speed | Notes |
+|-----------|-------|-------|
+| RAG Search | <1s | FAISS + BM25, reranking |
+| Memory Search | <100ms | ChromaDB semantic search |
+| Browser Automation | 2-5s | Playwright, clean output |
+| Code Execution | <15s | Configurable timeout |
+
+## 🛠️ Development
+
+```bash
+# Run tests
+python test_tools.py
+
+# Check tool status
+cat TOOLS_STATUS.md
+
+# View architecture
+cat A_Modular_Kingdom_Report.html
+```
 
 ## 📖 Documentation
 
-- **[RAG Documentation](rag/)**: Multiple RAG implementations and evaluations
-- **[Memory System](memory/)**: Conversation and context persistence
-- **[Tool Documentation](tools/)**: Individual tool guides
+- **[RAG Versions](rag/)**: V1, V2, V3 implementations and benchmarks
+- **[Memory System](memory/)**: Two-tier architecture details
+- **[Tools](tools/)**: Individual tool documentation
+- **[MCP Integration](agent/host.py)**: Server implementation
 
 ## 🤝 Contributing
 
-A-Modular-Kingdom grows through experimentation and iteration. Each multi-agent system teaches us more about effective AI coordination.
+Contributions welcome! Focus areas:
+- Additional RAG strategies
+- New tool integrations
+- Performance optimizations
+- Documentation improvements
 
-## 🔗 External Resources
+## 📜 License
 
-- **[ACP Tutorial](https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/)**  
-- **[Smolagents Paper](https://arxiv.org/pdf/2402.01030)**  
-- **[MCP Documentation](https://modelcontextprotocol.io/)**
+[Add your license here]
+
+## 🔗 Related Projects
+
+- **[Voice-commander](https://github.com/MasihMoafi/Voice-commander)**: Local voice transcription with AI refinement
+- **[Eyes-Wide-Shut](https://github.com/MasihMoafi/Eyes-Wide-Shut)**: LLM security research and red-teaming
 
 ---
 
-*A-Modular-Kingdom: Where AI agents come together in harmony* 🏰✨
+**Built with focus on production-readiness, modularity, and developer experience** 🏰
 
