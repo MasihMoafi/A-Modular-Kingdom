@@ -14,7 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from memory.core import Mem0
 from tools.web_search import perform_web_search
-from tools.browser_agent import browse_web
+from tools.browser_agent_playwright import browse_web_playwright
 from tools.code_exec import run_code
 from tools.vision import analyze_media_with_ollama
 from tools.tts import text_to_speech, list_tts_voices
@@ -103,7 +103,7 @@ def search_memories(
 )
 def query_knowledge_base(
     query: str = Field(description="The search query for the knowledge base"),
-    version: str = Field(default="v3", description="RAG version to use: 'v1', 'v2', or 'v3'"),
+    version: str = Field(default="v2", description="RAG version to use: 'v1', 'v2', or 'v3'"),
     doc_path: str = Field(default="", description="Optional path to a specific documents directory")
 ) -> str:
     """
@@ -193,7 +193,7 @@ def browser_automation(
 ) -> str:
     try:
         import asyncio as _asyncio
-        return _asyncio.run(browse_web(task, headless))
+        return _asyncio.run(browse_web_playwright(task, headless))
     except Exception as e:
         return json.dumps({"status": "error", "error": str(e)})
 
