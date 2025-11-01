@@ -10,7 +10,15 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 class RAGPipeline:
     def __init__(self, config: dict):
         self.config = config
-        self.embeddings = SentenceTransformerEmbeddings(model_name=self.config.get("embed_model"))
+        
+        # Use Ollama embeddings if specified
+        embed_provider = self.config.get("embed_provider", "sentencetransformer")
+        if embed_provider == "ollama":
+            from langchain_community.embeddings import OllamaEmbeddings
+            self.embeddings = OllamaEmbeddings(model=self.config.get("embed_model"))
+        else:
+            self.embeddings = SentenceTransformerEmbeddings(model_name=self.config.get("embed_model"))
+        
         self.reranker = CrossEncoder(self.config.get("reranker_model"))
         self.vector_db = self._load_or_create_database()
 
@@ -32,7 +40,11 @@ class RAGPipeline:
 
     def _load_or_create_database(self) -> FAISS:
         persist_dir = self.config.get("persist_dir")
-        if not os.path.exists(persist_dir) or self.config.get("force_reindex", False):
+        index_file = os.path.join(persist_dir, "index.faiss")
+        needs_reindex = (not os.path.exists(index_file) or 
+                        self.config.get("force_reindex", False))
+        
+        if needs_reindex:
             print(f"Creating new FAISS database at {persist_dir}...")
             all_docs = []
             for path in self.config.get("document_paths"):
