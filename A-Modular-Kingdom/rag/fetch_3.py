@@ -14,7 +14,7 @@ RAG_CONFIG_V3 = {
     "chunk_overlap": 25,
     "rrf_k": 60,  # RRF parameter instead of ensemble weights
     "rerank_top_k": 2,  # Enable LLM reranking
-    "force_reindex": True,
+    "force_reindex": False,
     "use_contextual": False,  # Disable contextual retrieval for performance
     "llm_model": "qwen3:8b",  # For LLM reranking
     "bm25_k1": 1.5,  # BM25 parameters
@@ -24,6 +24,32 @@ RAG_CONFIG_V3 = {
 
 _rag_system_v3_instances: Dict[str, RAGPipelineV3] = {}
 
+def resolve_path(path: str) -> str:
+    """Resolve user-friendly paths to absolute paths"""
+    if not path:
+        return None
+    
+    # Handle common shortcuts
+    shortcuts = {
+        "desktop": "~/Desktop",
+        "documents": "~/Documents",
+        "downloads": "~/Downloads",
+    }
+    
+    lower = path.lower().strip()
+    if lower in shortcuts:
+        path = shortcuts[lower]
+    
+    # Expand ~ and environment variables
+    path = os.path.expanduser(path)
+    path = os.path.expandvars(path)
+    
+    # Make absolute if relative
+    if not os.path.isabs(path):
+        path = os.path.abspath(path)
+    
+    return path
+
 def _safe_dir_name(path: str) -> str:
     abs_path = os.path.abspath(path)
     h = hashlib.md5(abs_path.encode("utf-8")).hexdigest()[:8]
@@ -32,19 +58,26 @@ def _safe_dir_name(path: str) -> str:
 
 def get_rag_pipeline_v3(doc_path: Optional[str] = None):
     import sys
-    key = os.path.abspath(doc_path) if doc_path else "__DEFAULT__"
+    
+    # Resolve path
+    if doc_path:
+        doc_path = resolve_path(doc_path)
+        if not os.path.exists(doc_path):
+            raise ValueError(f"Path does not exist: {doc_path}")
+    
+    key = doc_path if doc_path else "__DEFAULT__"
     if key in _rag_system_v3_instances:
-        sys.stderr.write(f"[RAG] Returning existing instance for key {key}\n")
+        sys.stderr.write(f"[RAG V3] Using cached instance for {key}\n")
         sys.stderr.flush()
         return _rag_system_v3_instances[key]
-    sys.stderr.write("[RAG] Creating new V3 instance...\n")
+    sys.stderr.write(f"[RAG V3] Creating new instance for {key}...\n")
     sys.stderr.flush()
     try:
         config = RAG_CONFIG_V3.copy()
         current_dir = os.path.dirname(os.path.abspath(__file__))
         if doc_path:
             # Scope documents to the provided directory
-            config["document_paths"] = [os.path.abspath(doc_path)]
+            config["document_paths"] = [doc_path]
             # Create a unique persist dir per doc scope
             scope_dir = os.path.join(current_dir, "rag_db_v3", _safe_dir_name(doc_path))
             os.makedirs(scope_dir, exist_ok=True)
