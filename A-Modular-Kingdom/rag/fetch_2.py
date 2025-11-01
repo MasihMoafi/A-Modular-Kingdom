@@ -45,16 +45,19 @@ def resolve_path(path: str) -> str:
     
     return path
 
-def get_rag_pipeline(doc_path: Optional[str] = None):
-    """Get or create RAG pipeline for given path"""
+def get_rag_pipeline(doc_path: Optional[str] = None, file_list: Optional[list] = None):
+    """Get or create RAG pipeline for given path or file list"""
     # Resolve path
     if doc_path:
         doc_path = resolve_path(doc_path)
         if not os.path.exists(doc_path):
             raise ValueError(f"Path does not exist: {doc_path}")
     
-    # Use path as cache key
-    key = doc_path if doc_path else "__DEFAULT__"
+    # Use path or file list hash as cache key
+    if file_list:
+        key = hashlib.md5(str(sorted(file_list)).encode()).hexdigest()[:8]
+    else:
+        key = doc_path if doc_path else "__DEFAULT__"
     
     if key in _rag_system_instances:
         print(f"[RAG V2] Using cached instance for {key}")
@@ -65,7 +68,14 @@ def get_rag_pipeline(doc_path: Optional[str] = None):
         config = RAG_CONFIG.copy()
         current_dir = os.path.dirname(os.path.abspath(__file__))
         
-        if doc_path:
+        if file_list:
+            # Use specific file list
+            config["document_paths"] = file_list
+            path_hash = hashlib.md5(str(sorted(file_list)).encode()).hexdigest()[:8]
+            scope_dir = os.path.join(current_dir, "rag_db_v2", f"scope_{path_hash}")
+            os.makedirs(scope_dir, exist_ok=True)
+            config["persist_dir"] = scope_dir
+        elif doc_path:
             # Use provided path
             config["document_paths"] = [doc_path]
             # Create unique persist dir for this path
@@ -86,11 +96,58 @@ def get_rag_pipeline(doc_path: Optional[str] = None):
         print(f"FATAL ERROR: Could not initialize RAGPipeline: {e}")
         raise
 
+def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
+    """Find files in directory whose names match query keywords"""
+    if not os.path.isdir(directory):
+        return []
+    
+    query_words = query.lower().split()
+    scored_files = []
+    
+    for file in os.listdir(directory):
+        file_path = os.path.join(directory, file)
+        if not os.path.isfile(file_path):
+            continue
+        if not file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+            continue
+        
+        # Score based on filename match
+        filename_lower = file.lower()
+        score = sum(1 for word in query_words if word in filename_lower)
+        
+        if score > 0:
+            scored_files.append((score, file_path))
+    
+    # Return top matches
+    scored_files.sort(reverse=True, key=lambda x: x[0])
+    return [path for score, path in scored_files[:max_files]]
+
 def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
     try:
-        pipeline = get_rag_pipeline(doc_path=doc_path)
         if not isinstance(query, str) or not query:
             return "Error: Invalid or empty query provided."
+        
+        # If custom path provided, find relevant files first
+        file_list = None
+        if doc_path:
+            resolved_path = resolve_path(doc_path)
+            if not os.path.exists(resolved_path):
+                return f"Error: Path does not exist: {resolved_path}"
+            
+            if os.path.isdir(resolved_path):
+                # Find relevant files based on query
+                relevant_files = find_relevant_files(query, resolved_path)
+                
+                if not relevant_files:
+                    return f"No files matching '{query}' found in {resolved_path}"
+                
+                print(f"[RAG] Found {len(relevant_files)} relevant files: {[os.path.basename(f) for f in relevant_files]}")
+                
+                # Use only relevant files for indexing
+                file_list = relevant_files
+                doc_path = None  # Clear doc_path, use file_list instead
+        
+        pipeline = get_rag_pipeline(doc_path=doc_path, file_list=file_list)
         return pipeline.search(query)
     except Exception as e:
         return f"Sorry, an error occurred while searching: {e}"

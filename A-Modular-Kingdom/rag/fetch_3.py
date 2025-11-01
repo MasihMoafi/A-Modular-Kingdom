@@ -128,11 +128,56 @@ def get_rag_pipeline_v3(doc_path: Optional[str] = None):
 #     pipeline = get_rag_pipeline_v3()
 #     return V3RetrieverAdapter(pipeline)
 
+def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
+    """Find files in directory whose names match query keywords"""
+    if not os.path.isdir(directory):
+        return []
+    
+    query_words = query.lower().split()
+    scored_files = []
+    
+    for file in os.listdir(directory):
+        file_path = os.path.join(directory, file)
+        if not os.path.isfile(file_path):
+            continue
+        if not file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+            continue
+        
+        # Score based on filename match
+        filename_lower = file.lower()
+        score = sum(1 for word in query_words if word in filename_lower)
+        
+        if score > 0:
+            scored_files.append((score, file_path))
+    
+    # Return top matches
+    scored_files.sort(reverse=True, key=lambda x: x[0])
+    return [path for score, path in scored_files[:max_files]]
+
 def fetchExternalKnowledgeV3(query: str, doc_path: Optional[str] = None) -> str:
     try:
-        pipeline = get_rag_pipeline_v3(doc_path=doc_path)
         if not isinstance(query, str) or not query:
             return "Error: Invalid or empty query provided."
+        
+        # If custom path provided, find relevant files first
+        if doc_path:
+            resolved_path = resolve_path(doc_path)
+            if not os.path.exists(resolved_path):
+                return f"Error: Path does not exist: {resolved_path}"
+            
+            if os.path.isdir(resolved_path):
+                # Find relevant files based on query
+                relevant_files = find_relevant_files(query, resolved_path)
+                
+                if not relevant_files:
+                    return f"No files matching '{query}' found in {resolved_path}"
+                
+                print(f"[RAG V3] Found {len(relevant_files)} relevant files: {[os.path.basename(f) for f in relevant_files]}")
+                
+                # Use first relevant file for now (TODO: support multiple)
+                doc_path = relevant_files[0]
+        
+        pipeline = get_rag_pipeline_v3(doc_path=doc_path)
         return pipeline.search(query)
     except Exception as e:
         return f"Sorry, an error occurred while searching: {e}"
