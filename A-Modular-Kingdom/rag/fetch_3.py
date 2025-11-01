@@ -7,13 +7,14 @@ RAG_CONFIG_V3 = {
     "version": "v3",
     "persist_dir": "./rag_db_v3", 
     "document_paths": ["./files/"],
-    "embed_model": "all-MiniLM-L6-v2",
-    "top_k": 20,
-    "chunk_size": 350,
-    "chunk_overlap": 75,
+    "embed_provider": "ollama",
+    "embed_model": "embeddinggemma",
+    "top_k": 5,
+    "chunk_size": 200,
+    "chunk_overlap": 25,
     "rrf_k": 60,  # RRF parameter instead of ensemble weights
-    "rerank_top_k": 3,  # Enable LLM reranking
-    "force_reindex": False,
+    "rerank_top_k": 2,  # Enable LLM reranking
+    "force_reindex": True,
     "use_contextual": False,  # Disable contextual retrieval for performance
     "llm_model": "qwen3:8b",  # For LLM reranking
     "bm25_k1": 1.5,  # BM25 parameters

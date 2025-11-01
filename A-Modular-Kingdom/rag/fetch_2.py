@@ -4,13 +4,14 @@ from .core_2 import RAGPipeline
 RAG_CONFIG = {
     "persist_dir": "./rag_db_v2",
     "document_paths": ["./files/"],
-    "embed_model": "all-MiniLM-L6-v2",
-    "top_k": 20,
-    "chunk_size": 350,
-    "chunk_overlap": 75,
+    "embed_provider": "ollama",
+    "embed_model": "embeddinggemma",
+    "top_k": 5,
+    "chunk_size": 200,
+    "chunk_overlap": 25,
     "ensemble_weights": [0.7, 0.3],
     "reranker_model": 'cross-encoder/ms-marco-MiniLM-L-6-v2',
-    "rerank_top_k": 3,
+    "rerank_top_k": 2,
     "force_reindex": True
 }
 
