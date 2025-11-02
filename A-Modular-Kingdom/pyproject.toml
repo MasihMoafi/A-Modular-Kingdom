@@ -19,6 +19,7 @@ dependencies = [
     "rank-bm25",
     "prompt-toolkit",
     "langchain-huggingface",
+    "instructor>=1.0.0",
     # TTS/STT dependencies
     "pyttsx3>=2.90",
     "gtts>=2.2.0",
@@ -28,6 +29,8 @@ dependencies = [
     # Browser automation
     "browser-use>=0.1.0",
     "playwright>=1.40.0",
+    # PyTorch CPU-only (CUDA 13 driver incompatible with PyTorch pre-built wheels)
+    # Ollama handles GPU for embeddings, PyTorch only used for CPU reranker
 ]
 
 [build-system]
