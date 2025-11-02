@@ -128,17 +128,51 @@ def get_rag_pipeline_v3(doc_path: Optional[str] = None):
 #     pipeline = get_rag_pipeline_v3()
 #     return V3RetrieverAdapter(pipeline)
 
+def extract_search_topic(full_query: str) -> str:
+    """
+    Use LLM to extract the actual search topic from a query that may include location info.
+    
+    Examples:
+    "Napoleon in Downloads" -> "Napoleon"
+    "AI research on Desktop" -> "AI research"
+    "machine learning" -> "machine learning"
+    """
+    import ollama
+    
+    prompt = f"""Extract only the topic/subject that the user wants to search for, removing any location/path information.
+
+Examples:
+- "Napoleon in Downloads" → "Napoleon"
+- "AI research on Desktop" → "AI research"  
+- "python code in tools folder" → "python code"
+- "machine learning" → "machine learning"
+- "what is in my documents" → "" (no specific topic)
+
+Query: "{full_query}"
+
+Return ONLY the topic, nothing else:"""
+    
+    try:
+        response = ollama.chat(model='qwen3:8b', messages=[{'role': 'user', 'content': prompt}])
+        topic = response['message']['content'].strip().strip('"').strip("'")
+        return topic if topic else full_query
+    except Exception as e:
+        print(f"[RAG V3] LLM topic extraction failed: {e}, using original query")
+        return full_query
+
 def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
     """Find files in directory whose names match query keywords"""
     if not os.path.isdir(directory):
         return []
     
-    # Remove common location words from query
-    stop_words = {'in', 'on', 'at', 'from', 'the', 'a', 'an', 'desktop', 'documents', 'downloads', 'folder', 'directory', 'file'}
-    query_words = [w for w in query.lower().split() if w not in stop_words]
+    # Extract just the topic from the full query
+    topic = extract_search_topic(query)
+    print(f"[RAG V3] Extracted topic: '{topic}' from query: '{query}'")
     
-    # If no words left after filtering, return all indexable files (up to max)
-    if not query_words:
+    query_words = topic.lower().split()
+    
+    # If no meaningful topic, return first few indexable files
+    if not query_words or not topic:
         all_files = []
         for file in os.listdir(directory):
             file_path = os.path.join(directory, file)
