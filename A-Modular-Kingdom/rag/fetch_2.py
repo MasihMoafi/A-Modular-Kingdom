@@ -101,7 +101,19 @@ def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
     if not os.path.isdir(directory):
         return []
     
-    query_words = query.lower().split()
+    # Remove common location words from query
+    stop_words = {'in', 'on', 'at', 'from', 'the', 'a', 'an', 'desktop', 'documents', 'downloads', 'folder', 'directory', 'file'}
+    query_words = [w for w in query.lower().split() if w not in stop_words]
+    
+    # If no words left after filtering, return all indexable files (up to max)
+    if not query_words:
+        all_files = []
+        for file in os.listdir(directory):
+            file_path = os.path.join(directory, file)
+            if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+                all_files.append(file_path)
+        return all_files[:max_files]
+    
     scored_files = []
     
     for file in os.listdir(directory):
