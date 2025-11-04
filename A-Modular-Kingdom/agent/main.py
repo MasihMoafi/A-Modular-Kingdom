@@ -21,16 +21,31 @@ def clear_proxy_settings():
             del os.environ[var]
 clear_proxy_settings()
 
-import ollama
 from langchain.memory import ConversationBufferWindowMemory
 from mcp import ClientSession, stdio_client, StdioServerParameters
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # --- Get the absolute path to the host.py script ---
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOST_PATH = os.path.join(AGENT_DIR, "host.py")
 
 nest_asyncio.apply()
-LLM_MODEL = 'gpt-oss:20b'
+
+# Check for Gemini API key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    from google import genai
+    from google.genai import types
+    genai_client = genai.Client(api_key=GEMINI_API_KEY)
+    LLM_MODEL = 'gemini'
+    print("Using Gemini API")
+else:
+    import ollama
+    LLM_MODEL = 'qwen3:8b'
+    print("Using Ollama")
 
 class DocumentCompleter(Completer):
     def __init__(self):
@@ -251,26 +266,32 @@ async def main(think_level=None):
                             continue
 
                         elif user_input.startswith('/rag'):
-                            parts = user_input.split(maxsplit=3)
-                            query = parts[1] if len(parts) > 1 else ''
-
-                            if not query:
-                                print("Usage: /rag <query> [version] [path]")
+                            import re
+                            # Extract quoted query: /rag "query text" [path] [version]
+                            match = re.search(r'"([^"]+)"', user_input)
+                            if not match:
+                                print("Usage: /rag \"<query>\" [path] [version]")
                                 continue
-
+                            
+                            query = match.group(1)
+                            # Get remaining parts after quote
+                            remainder = user_input[match.end():].strip()
+                            parts = remainder.split()
+                            
                             # Defaults
-                            version = 'v2' # Default RAG version
+                            version = 'v2'
                             doc_path = ''
-
-                            # Check for version and path
-                            if len(parts) > 2:
-                                # Is it a version or a path?
-                                if parts[2] in ['v1', 'v2', 'v3']:
-                                    version = parts[2]
-                                    if len(parts) > 3:
-                                        doc_path = parts[3]
-                                else: # It's a path
-                                    doc_path = parts[2]
+                            
+                            # Parse: first part is path, second is version (or vice versa)
+                            if len(parts) > 0:
+                                if parts[0] in ['v1', 'v2', 'v3']:
+                                    version = parts[0]
+                                    if len(parts) > 1:
+                                        doc_path = parts[1]
+                                else:
+                                    doc_path = parts[0]
+                                    if len(parts) > 1 and parts[1] in ['v1', 'v2', 'v3']:
+                                        version = parts[1]
 
                             print(f"📚 Querying knowledge base with RAG {version}...")
 
@@ -345,31 +366,80 @@ async def main(think_level=None):
                     external_context = ""
                     if not document_context:
                         print("🤔 Analyzing query for tool use...")
-                        decision_prompt = f"""You are a tool-use decision engine. Your job is to decide which tool, if any, is appropriate for the user's query. You have three choices:
-1.  `rag`: If the query is about documents, knowledge from files, or general information that might be in our knowledge base.
-2.  `web_search`: If the query requires up-to-date information, current events, or real-time data.
-3.  `none`: If the query is personal, conversational, or can be answered from memory alone.
+                        decision_prompt = f"""You are a tool-use decision engine. Analyze the user query and extract:
+1. tool: "rag" (for documents/knowledge), "web_search" (for current info), or "none"
+2. doc_path: Extract any path mentioned. Convert common names to full paths:
+   - "Desktop" → "~/Desktop"
+   - "Documents" → "~/Documents"
+   - "Downloads" → "~/Downloads"
+   - Relative paths like "tools" → "./tools"
+   - Absolute paths stay as-is
+   - Empty string if not mentioned
+3. version: Extract RAG version if mentioned ("v1", "v2", "v3"). Default "v2" if not specified.
 
-Respond with a single JSON object with one key: "tool", and the value as one of ["rag", "web_search", "none"].
+Examples:
+- "search Desktop for Napoleon" → {{"tool": "rag", "doc_path": "~/Desktop", "version": "v2"}}
+- "what's in tools folder using v3?" → {{"tool": "rag", "doc_path": "./tools", "version": "v3"}}
+- "current weather" → {{"tool": "web_search", "doc_path": "", "version": "v2"}}
 
 User Query: "{user_input}"
 
 JSON Response:"""
                         
-                        # Don't use thinking for tool decision to avoid JSON parsing issues
-                        decision_response = ollama.chat(model=LLM_MODEL, messages=[{'role': 'user', 'content': decision_prompt}], format='json')
-                        try:
+                        # Use Gemini or Ollama for tool decision
+                        if LLM_MODEL == 'gemini':
+                            response = genai_client.models.generate_content(
+                                model='gemini-2.0-flash-exp',
+                                contents=decision_prompt,
+                                config=types.GenerateContentConfig(
+                                    response_mime_type='application/json',
+                                    response_schema={
+                                        'type': 'object',
+                                        'properties': {
+                                            'tool': {'type': 'string', 'enum': ['rag', 'web_search', 'none']},
+                                            'doc_path': {'type': 'string'},
+                                            'version': {'type': 'string', 'enum': ['v1', 'v2', 'v3']}
+                                        },
+                                        'required': ['tool', 'doc_path', 'version']
+                                    }
+                                )
+                            )
+                            decision = json.loads(response.text)
+                        else:
+                            decision_response = ollama.chat(model=LLM_MODEL, messages=[{'role': 'user', 'content': decision_prompt}], format='json')
                             content = decision_response['message']['content']
                             if not content.strip():
                                 raise json.JSONDecodeError("Empty response", "", 0)
                             decision = json.loads(content)
-                            tool_to_use = decision.get("tool")
+                        
+                        try:
+                            tool_to_use = decision.get("tool", "none")
+                            doc_path = decision.get("doc_path", "")
+                            version = decision.get("version", "v2")
+                        except (json.JSONDecodeError, KeyError) as e:
+                            print(f"Tool decision parsing error: {e}, defaulting to none")
+                            tool_to_use = "none"
+                            doc_path = ""
+                            version = "v2"
 
+                        try:
                             if tool_to_use == "rag":
                                 print(f"📚 Querying knowledge base for: '{user_input}'...")
-                                rag_result = await session.call_tool('query_knowledge_base', {'query': user_input})
+                                params = {'query': user_input, 'version': version}
+                                if doc_path:
+                                    params['doc_path'] = doc_path
+                                rag_result = await session.call_tool('query_knowledge_base', params)
                                 knowledge = json.loads(rag_result.content[0].text)
-                                external_context = f"\n--- External Knowledge (Books) ---\n{knowledge.get('result', 'No result found.')}"
+                                result_text = knowledge.get('result', 'No result found.')
+                                
+                                # Check if RAG found relevant info
+                                if 'No relevant' in result_text or 'error' in result_text.lower() or len(result_text) < 100:
+                                    print("⚠️  Local knowledge insufficient, searching web...")
+                                    search_result = await session.call_tool('web_search', {'query': user_input})
+                                    web_results = json.loads(search_result.content[0].text)
+                                    external_context = f"\n--- External Knowledge (Web) ---\n{web_results.get('results', 'No results found.')}"
+                                else:
+                                    external_context = f"\n--- External Knowledge (Books) ---\n{result_text}"
                             
                             elif tool_to_use == "web_search":
                                 print(f"🌐 Performing web search for: '{user_input}'...")
@@ -377,8 +447,8 @@ JSON Response:"""
                                 results = json.loads(search_result.content[0].text)
                                 external_context = f"\n--- External Knowledge (Web) ---\n{results.get('results', 'No results found.')}"
 
-                        except (json.JSONDecodeError, IndexError, TypeError) as e:
-                            print(f"Could not parse tool decision response: {e}")
+                        except Exception as e:
+                            print(f"Tool execution error: {e}")
                     else:
                         print("Using document context from @ mentions, skipping tool selection.")
 
@@ -390,6 +460,10 @@ You have access to your personal memory, external knowledge base, web search, an
 
 Your primary source of truth is your memory. If the user contradicts it, you MUST correct them.
 Use the provided information sources to answer questions when appropriate.
+
+--- CONVERSATION HISTORY ---
+{short_term_context}
+---
 
 --- MEMORY ---
 {memory_context}
@@ -419,38 +493,48 @@ User: {user_input}"""
                     assistant_output = ""
                     thinking_output = ""
                     
-                    stream = ollama.chat(**chat_params)
-                    thinking_started = False
-                    response_started = False
-                    
-                    for chunk in stream:
-                        # Handle thinking output FIRST
-                        if hasattr(chunk.message, 'thinking') and chunk.message.thinking:
-                            if not thinking_started and think_level:
-                                print(f"\n💭 Raw CoT Thinking:")
-                                print("=" * 50)
-                                thinking_started = True
-                            
-                            thinking_chunk = chunk.message.thinking
-                            thinking_output += thinking_chunk
-                            if think_level:  # Display raw thinking in real-time
-                                print(thinking_chunk, end="", flush=True)
+                    if LLM_MODEL == 'gemini':
+                        response = genai_client.models.generate_content(
+                            model='gemini-2.0-flash-exp',
+                            contents=final_prompt
+                        )
+                        answer = response.text.strip()
+                        print(f"\nJuliette: {answer}\n")
+                        assistant_output = answer
+                    else:
+                        stream = ollama.chat(**chat_params)
+                        thinking_started = False
+                        response_started = False
                         
-                        # Handle regular content AFTER thinking
-                        elif chunk.message.content:
-                            if thinking_started and not response_started and think_level:
-                                print("\n" + "=" * 50)
-                                print(f"\nJuliette: ", end="", flush=True)
-                                response_started = True
-                            elif not response_started:
-                                print(f"\nJuliette: ", end="", flush=True)
-                                response_started = True
+                        for chunk in stream:
+                            # Handle thinking output FIRST
+                            if hasattr(chunk.message, 'thinking') and chunk.message.thinking:
+                                if not thinking_started and think_level:
+                                    print(f"\n💭 Raw CoT Thinking:")
+                                    print("=" * 50)
+                                    thinking_started = True
                                 
-                            content = chunk.message.content
-                            print(content, end="", flush=True)
-                            assistant_output += content
+                                thinking_chunk = chunk.message.thinking
+                                thinking_output += thinking_chunk
+                                if think_level:  # Display raw thinking in real-time
+                                    print(thinking_chunk, end="", flush=True)
+                            
+                            # Handle regular content AFTER thinking
+                            elif chunk.message.content:
+                                if thinking_started and not response_started and think_level:
+                                    print("\n" + "=" * 50)
+                                    print(f"\nJuliette: ", end="", flush=True)
+                                    response_started = True
+                                elif not response_started:
+                                    print(f"\nJuliette: ", end="", flush=True)
+                                    response_started = True
+                                    
+                                content = chunk.message.content
+                                print(content, end="", flush=True)
+                                assistant_output += content
+                        
+                        print()  # New line after streaming
                     
-                    print()  # New line after streaming
                     try:
                         stm.chat_memory.add_ai_message(assistant_output)
                     except Exception:
