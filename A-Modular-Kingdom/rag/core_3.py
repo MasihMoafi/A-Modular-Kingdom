@@ -1,4 +1,5 @@
 import os, re, string, fitz, json, math
+import torch
 
 # --- FIX for Ollama Proxy ---
 # This is necessary to ensure the local Ollama server can be reached.
@@ -268,9 +269,24 @@ class RAGPipelineV3:
     def __init__(self, config: dict):
         self.config = config
         print(f"[RAG V3] Initializing with config: {config.get('version', 'unknown')}")
-        
-        # Initialize embedding function
-        embeddings_model = SentenceTransformerEmbeddings(model_name=self.config.get("embed_model"))
+
+        # Determine device (CUDA if available, else CPU)
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"[RAG V3] Using device: {self.device}")
+
+        # Initialize embedding function based on provider
+        embed_provider = self.config.get("embed_provider", "sentencetransformer")
+        if embed_provider == "ollama":
+            from langchain_community.embeddings import OllamaEmbeddings
+            embeddings_model = OllamaEmbeddings(model=self.config.get("embed_model"))
+            print(f"[RAG V3] Using Ollama embeddings with model: {self.config.get('embed_model')}")
+        else:
+            embeddings_model = SentenceTransformerEmbeddings(
+                model_name=self.config.get("embed_model"),
+                model_kwargs={'device': self.device}
+            )
+            print(f"[RAG V3] Using SentenceTransformer embeddings with model: {self.config.get('embed_model')}")
+
         self.embedding_fn = lambda text: embeddings_model.embed_query(text)
         
         # Initialize indexes
