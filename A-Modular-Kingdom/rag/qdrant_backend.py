@@ -119,16 +119,27 @@ class QdrantVectorDB:
         except:
             pass
 
-        # Fallback to sequential (Ollama, etc.)
+        # Fallback to sequential
         vectors = []
         for text in texts:
-            vector = self.embedding_fn(text)
+            vector = self._embed_single(text)
             vectors.append(vector)
         return vectors
 
+    def _embed_single(self, text: str) -> List[float]:
+        """Embed single text - handles different embedding APIs"""
+        # Try method-based APIs (Ollama, etc.)
+        if hasattr(self.embedding_fn, 'embed_query'):
+            return self.embedding_fn.embed_query(text)
+        # Try callable
+        elif callable(self.embedding_fn):
+            return self.embedding_fn(text)
+        else:
+            raise ValueError(f"Unsupported embedding function type: {type(self.embedding_fn)}")
+
     def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Vector similarity search."""
-        query_vector = self.embedding_fn(query)
+        query_vector = self._embed_single(query)
 
         results = self.client.search(
             collection_name=self.collection_name,
