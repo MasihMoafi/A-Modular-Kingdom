@@ -52,16 +52,25 @@ def get_rag_pipeline(doc_path: Optional[str] = None, file_list: Optional[list] =
         doc_path = resolve_path(doc_path)
         if not os.path.exists(doc_path):
             raise ValueError(f"Path does not exist: {doc_path}")
-    
+
     # Use path or file list hash as cache key
     if file_list:
         key = hashlib.md5(str(sorted(file_list)).encode()).hexdigest()[:8]
     else:
         key = doc_path if doc_path else "__DEFAULT__"
-    
+
+    # Check if cached instance exists AND if files haven't changed
     if key in _rag_system_instances:
-        print(f"[RAG V2] Using cached instance for {key}")
-        return _rag_system_instances[key]
+        cached_pipeline = _rag_system_instances[key]
+        persist_dir = cached_pipeline.config.get("persist_dir")
+
+        # Check if files changed since last index
+        if not cached_pipeline._files_changed(persist_dir):
+            print(f"[RAG V2] Using cached instance for {key} (no file changes)")
+            return cached_pipeline
+        else:
+            print(f"[RAG V2] Files changed, invalidating cache for {key}")
+            del _rag_system_instances[key]
     
     print(f"[RAG V2] Creating new instance for {key}...")
     try:
@@ -96,71 +105,84 @@ def get_rag_pipeline(doc_path: Optional[str] = None, file_list: Optional[list] =
         print(f"FATAL ERROR: Could not initialize RAGPipeline: {e}")
         raise
 
-def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
-    """Find files in directory whose names match query keywords"""
+def find_all_indexable_files(directory: str, max_depth: int = 5) -> list:
+    """Recursively find all indexable files in directory
+
+    Args:
+        directory: Root directory to search
+        max_depth: Maximum recursion depth to prevent infinite loops
+
+    Returns:
+        List of file paths that can be indexed
+    """
     if not os.path.isdir(directory):
         return []
-    
-    # Query should already be cleaned by main.py's Instructor parsing
-    print(f"[RAG] Searching for files matching: '{query}' in {directory}")
-    
-    query_words = query.lower().split()
-    
-    # If no meaningful topic, return first few indexable files
-    if not query_words or not topic:
-        all_files = []
-        for file in os.listdir(directory):
-            file_path = os.path.join(directory, file)
-            if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
-                all_files.append(file_path)
-        return all_files[:max_files]
-    
-    scored_files = []
-    
-    for file in os.listdir(directory):
-        file_path = os.path.join(directory, file)
-        if not os.path.isfile(file_path):
-            continue
-        if not file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
-            continue
-        
-        # Score based on filename match
-        filename_lower = file.lower()
-        score = sum(1 for word in query_words if word in filename_lower)
-        
-        if score > 0:
-            scored_files.append((score, file_path))
-    
-    # Return top matches
-    scored_files.sort(reverse=True, key=lambda x: x[0])
-    return [path for score, path in scored_files[:max_files]]
+
+    indexable_extensions = ('.pdf', '.txt', '.py', '.md')
+    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build'}
+
+    all_files = []
+
+    def walk_dir(path: str, depth: int = 0):
+        if depth > max_depth:
+            return
+
+        try:
+            for entry in os.listdir(path):
+                # Skip hidden files and excluded directories
+                if entry.startswith('.') or entry in exclude_dirs:
+                    continue
+
+                entry_path = os.path.join(path, entry)
+
+                if os.path.isfile(entry_path):
+                    if entry.lower().endswith(indexable_extensions):
+                        all_files.append(entry_path)
+                elif os.path.isdir(entry_path):
+                    walk_dir(entry_path, depth + 1)
+        except PermissionError:
+            print(f"[RAG] Permission denied: {path}")
+
+    print(f"[RAG] Recursively scanning directory: {directory}")
+    walk_dir(directory)
+    print(f"[RAG] Found {len(all_files)} indexable files")
+
+    return all_files
 
 def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
     try:
         if not isinstance(query, str) or not query:
             return "Error: Invalid or empty query provided."
-        
-        # If custom path provided, find relevant files first
+
+        # If custom path provided, find all indexable files
         file_list = None
         if doc_path:
             resolved_path = resolve_path(doc_path)
             if not os.path.exists(resolved_path):
                 return f"Error: Path does not exist: {resolved_path}"
-            
+
             if os.path.isdir(resolved_path):
-                # Find relevant files based on query
-                relevant_files = find_relevant_files(query, resolved_path)
-                
-                if not relevant_files:
-                    return f"No files matching '{query}' found in {resolved_path}"
-                
-                print(f"[RAG] Found {len(relevant_files)} relevant files: {[os.path.basename(f) for f in relevant_files]}")
-                
-                # Use only relevant files for indexing
-                file_list = relevant_files
+                # Find ALL indexable files recursively
+                all_files = find_all_indexable_files(resolved_path)
+
+                if not all_files:
+                    return f"No indexable files (.pdf, .txt, .py, .md) found in {resolved_path}"
+
+                # Limit files to prevent excessive indexing (can be tuned)
+                max_files = 500
+                if len(all_files) > max_files:
+                    print(f"[RAG] Warning: Found {len(all_files)} files, limiting to {max_files}")
+                    all_files = all_files[:max_files]
+
+                print(f"[RAG] Indexing {len(all_files)} files from {resolved_path}")
+
+                # Use all found files for indexing
+                file_list = all_files
                 doc_path = None  # Clear doc_path, use file_list instead
-        
+
         pipeline = get_rag_pipeline(doc_path=doc_path, file_list=file_list)
         return pipeline.search(query)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return f"Sorry, an error occurred while searching: {e}"

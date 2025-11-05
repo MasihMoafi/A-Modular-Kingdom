@@ -56,7 +56,8 @@ def test_rag_system():
         try:
             result = fetchExternalKnowledge(query, doc_path=doc_path)
             
-            if "error" in result.lower() or "no relevant" in result.lower():
+            # Check for actual errors (not just the word "error" in results)
+            if result.startswith("Error:") or "no relevant" in result.lower():
                 print(f"❌ FAILED: {result[:200]}")
             else:
                 print(f"✅ SUCCESS")

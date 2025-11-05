@@ -1,4 +1,5 @@
-import os, re, string, fitz
+import os, re, string, fitz, json, hashlib
+import torch
 from sentence_transformers import CrossEncoder
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import SentenceTransformerEmbeddings
@@ -10,16 +11,28 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 class RAGPipeline:
     def __init__(self, config: dict):
         self.config = config
-        
+
+        # Determine device (CUDA if available, else CPU)
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"[RAG V2] Using device: {self.device}")
+
         # Use Ollama embeddings if specified
         embed_provider = self.config.get("embed_provider", "sentencetransformer")
         if embed_provider == "ollama":
             from langchain_community.embeddings import OllamaEmbeddings
+            # Note: OllamaEmbeddings runs on Ollama server, not local GPU
             self.embeddings = OllamaEmbeddings(model=self.config.get("embed_model"))
         else:
-            self.embeddings = SentenceTransformerEmbeddings(model_name=self.config.get("embed_model"))
-        
-        self.reranker = CrossEncoder(self.config.get("reranker_model"))
+            self.embeddings = SentenceTransformerEmbeddings(
+                model_name=self.config.get("embed_model"),
+                model_kwargs={'device': self.device}
+            )
+
+        # CrossEncoder with GPU support
+        self.reranker = CrossEncoder(
+            self.config.get("reranker_model"),
+            device=self.device
+        )
         self.vector_db = self._load_or_create_database()
 
     def _normalize_text(self, text: str) -> str:
@@ -38,11 +51,95 @@ class RAGPipeline:
             print(f"Error extracting text from {pdf_path}: {e}")
             return ""
 
+    def _get_file_hash(self, file_path: str) -> str:
+        """Get hash of file modification time and size for change detection"""
+        try:
+            stat = os.stat(file_path)
+            # Use mtime and size for faster checking than full content hash
+            hash_input = f"{file_path}:{stat.st_mtime}:{stat.st_size}"
+            return hashlib.md5(hash_input.encode()).hexdigest()
+        except Exception as e:
+            print(f"Error hashing file {file_path}: {e}")
+            return ""
+
+    def _get_all_source_files(self) -> list:
+        """Get list of all source files from document_paths"""
+        all_files = []
+        for path in self.config.get("document_paths"):
+            if not os.path.exists(path):
+                continue
+            if os.path.isdir(path):
+                for file in os.listdir(path):
+                    file_path = os.path.join(path, file)
+                    if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+                        all_files.append(file_path)
+            else:
+                all_files.append(path)
+        return all_files
+
+    def _build_manifest(self) -> dict:
+        """Build manifest of all source files with their hashes"""
+        files = self._get_all_source_files()
+        return {f: self._get_file_hash(f) for f in files}
+
+    def _save_manifest(self, persist_dir: str, manifest: dict):
+        """Save manifest to disk"""
+        manifest_path = os.path.join(persist_dir, "manifest.json")
+        try:
+            with open(manifest_path, 'w') as f:
+                json.dump(manifest, f, indent=2)
+        except Exception as e:
+            print(f"Error saving manifest: {e}")
+
+    def _load_manifest(self, persist_dir: str) -> dict:
+        """Load manifest from disk"""
+        manifest_path = os.path.join(persist_dir, "manifest.json")
+        if not os.path.exists(manifest_path):
+            return {}
+        try:
+            with open(manifest_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading manifest: {e}")
+            return {}
+
+    def _files_changed(self, persist_dir: str) -> bool:
+        """Check if any source files have changed since last index"""
+        old_manifest = self._load_manifest(persist_dir)
+        new_manifest = self._build_manifest()
+
+        # Check if file lists differ
+        old_files = set(old_manifest.keys())
+        new_files = set(new_manifest.keys())
+
+        if old_files != new_files:
+            added = new_files - old_files
+            removed = old_files - new_files
+            if added:
+                print(f"[RAG V2] New files detected: {[os.path.basename(f) for f in added]}")
+            if removed:
+                print(f"[RAG V2] Removed files detected: {[os.path.basename(f) for f in removed]}")
+            return True
+
+        # Check if any file hashes changed
+        for file_path, new_hash in new_manifest.items():
+            old_hash = old_manifest.get(file_path)
+            if old_hash != new_hash:
+                print(f"[RAG V2] File changed: {os.path.basename(file_path)}")
+                return True
+
+        return False
+
     def _load_or_create_database(self) -> FAISS:
         persist_dir = self.config.get("persist_dir")
         index_file = os.path.join(persist_dir, "index.faiss")
-        needs_reindex = (not os.path.exists(index_file) or 
-                        self.config.get("force_reindex", False))
+
+        # Smart reindexing: check if files changed
+        needs_reindex = (
+            not os.path.exists(index_file) or
+            self.config.get("force_reindex", False) or
+            self._files_changed(persist_dir)
+        )
         
         if needs_reindex:
             print(f"Creating new FAISS database at {persist_dir}...")
@@ -71,27 +168,46 @@ class RAGPipeline:
             if not all_docs: raise ValueError("No documents processed.")
             vector_db = FAISS.from_documents(all_docs, self.embeddings)
             vector_db.save_local(persist_dir)
+
+            # Save manifest for future change detection
+            manifest = self._build_manifest()
+            self._save_manifest(persist_dir, manifest)
+            print(f"[RAG V2] Indexed {len(all_docs)} chunks from {len(manifest)} files")
+
             return vector_db
         else:
             print(f"Loading existing FAISS database from {persist_dir}...")
             return FAISS.load_local(persist_dir, self.embeddings, allow_dangerous_deserialization=True)
 
     def search(self, query: str) -> str:
-        top_k = self.config.get("top_k", 5)
-        vector_retriever = self.vector_db.as_retriever(search_kwargs={"k": top_k})
-        docs_for_bm25 = [Document(page_content=doc.page_content, metadata=doc.metadata) for doc in self.vector_db.docstore._dict.values()]
-        bm25_retriever = BM25Retriever.from_documents(docs_for_bm25)
-        bm25_retriever.k = top_k
-        ensemble_retriever = EnsembleRetriever(retrievers=[vector_retriever, bm25_retriever], weights=self.config.get("ensemble_weights"))
-        initial_results = ensemble_retriever.get_relevant_documents(query)
-        if not initial_results:
-            return "No relevant information found."
-        print(f"Re-ranking {len(initial_results)} initial results...")
-        rerank_top_k = self.config.get("rerank_top_k", 3)
-        pairs = [[query, doc.page_content] for doc in initial_results]
-        scores = self.reranker.predict(pairs)
-        scored_results = zip(scores, initial_results)
-        sorted_results = sorted(scored_results, key=lambda x: x[0], reverse=True)
-        final_results = [doc for score, doc in sorted_results[:rerank_top_k]]
-        unique_content = list({doc.page_content for doc in final_results})
-        return "Document search results:\n\n" + "\n\n---\n\n".join(unique_content)
+        try:
+            print(f"[RAG V2] Searching for: '{query[:50]}...'")
+            top_k = self.config.get("top_k", 5)
+            vector_retriever = self.vector_db.as_retriever(search_kwargs={"k": top_k})
+            docs_for_bm25 = [Document(page_content=doc.page_content, metadata=doc.metadata) for doc in self.vector_db.docstore._dict.values()]
+            bm25_retriever = BM25Retriever.from_documents(docs_for_bm25)
+            bm25_retriever.k = top_k
+            ensemble_retriever = EnsembleRetriever(retrievers=[vector_retriever, bm25_retriever], weights=self.config.get("ensemble_weights"))
+            initial_results = ensemble_retriever.get_relevant_documents(query)
+
+            if not initial_results:
+                print("[RAG V2] No results found in initial search")
+                return "No relevant information found."
+
+            print(f"[RAG V2] Re-ranking {len(initial_results)} initial results...")
+            rerank_top_k = self.config.get("rerank_top_k", 3)
+            pairs = [[query, doc.page_content] for doc in initial_results]
+            scores = self.reranker.predict(pairs)
+            scored_results = zip(scores, initial_results)
+            sorted_results = sorted(scored_results, key=lambda x: x[0], reverse=True)
+            final_results = [doc for score, doc in sorted_results[:rerank_top_k]]
+            unique_content = list({doc.page_content for doc in final_results})
+
+            print(f"[RAG V2] Returning {len(unique_content)} unique results")
+            return "Document search results:\n\n" + "\n\n---\n\n".join(unique_content)
+        except Exception as e:
+            error_msg = f"[RAG V2] Search error: {type(e).__name__}: {str(e)}"
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+            return f"Search failed: {str(e)}"
