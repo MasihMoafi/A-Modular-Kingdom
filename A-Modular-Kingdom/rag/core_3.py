@@ -332,7 +332,7 @@ class RAGPipelineV3:
     def _load_or_create_database(self):
         """Load or create the V3 database with all tutorial techniques"""
         persist_dir = self.config.get("persist_dir")
-        
+
         if not os.path.exists(persist_dir) or self.config.get("force_reindex", False):
             print(f"[RAG V3] Creating new database at {persist_dir}...")
             self._index_documents()
@@ -342,14 +342,15 @@ class RAGPipelineV3:
 
     def _index_documents(self):
         """Index all documents using V3 techniques"""
+        import sys
         all_docs = []
-        document_contents = {}  # Store full document content for contextual processing
-        
+        document_contents = {}
+
         # First pass: extract all document content
         for path in self.config.get("document_paths"):
-            if not os.path.exists(path): 
+            if not os.path.exists(path):
                 continue
-                
+
             if os.path.isdir(path):
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
@@ -392,7 +393,9 @@ class RAGPipelineV3:
 
         # Add documents to both indexes
         print(f"[RAG V3] Indexing {len(all_docs)} chunks...")
-        for doc in all_docs:
+        for i, doc in enumerate(all_docs):
+            if i % 500 == 0:
+                print(f"[RAG V3] Progress: {i}/{len(all_docs)} chunks...")
             # STEP 2: EMBEDDINGS + STEP 3: VECTOR SEARCH
             self.vector_index.add_document(doc)
             # STEP 4: BM25
@@ -427,17 +430,21 @@ class RAGPipelineV3:
         """Load existing database (simplified for now)"""
         persist_dir = self.config.get("persist_dir")
         docs_file = os.path.join(persist_dir, "docs.json")
-        
+
         if os.path.exists(docs_file):
             with open(docs_file, 'r') as f:
                 docs = json.load(f)
-            
+
             # Rebuild indexes
             for doc in docs:
                 self.vector_index.add_document(doc)
                 self.bm25_index.add_document(doc)
-            
+
             print(f"[RAG V3] Loaded {len(docs)} chunks from existing database")
+        else:
+            # Database directory exists but no docs.json - trigger indexing
+            print(f"[RAG V3] Database directory exists but empty. Triggering indexing...")
+            self._index_documents()
 
     def _rrf_fusion(self, vector_results: List[Tuple], bm25_results: List[Tuple], k: int = 60) -> List[Dict]:
         """
