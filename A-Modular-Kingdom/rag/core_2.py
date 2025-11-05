@@ -80,6 +80,34 @@ class RAGPipeline:
             print(f"Error extracting text from {pdf_path}: {e}")
             return ""
 
+    def _extract_text_from_json(self, json_path: str) -> str:
+        """Extract text from JSON - handles various structures"""
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Convert JSON to searchable text
+            def flatten_json(obj, prefix=''):
+                text_parts = []
+                if isinstance(obj, dict):
+                    for key, value in obj.items():
+                        if isinstance(value, (dict, list)):
+                            text_parts.extend(flatten_json(value, f"{prefix}{key}."))
+                        else:
+                            text_parts.append(f"{prefix}{key}: {value}")
+                elif isinstance(obj, list):
+                    for i, item in enumerate(obj):
+                        text_parts.extend(flatten_json(item, f"{prefix}[{i}]."))
+                else:
+                    text_parts.append(str(obj))
+                return text_parts
+
+            text_parts = flatten_json(data)
+            return "\n".join(text_parts)
+        except Exception as e:
+            print(f"Error extracting text from {json_path}: {e}")
+            return ""
+
     def _get_file_hash(self, file_path: str) -> str:
         """Get hash of file modification time and size for change detection"""
         try:
@@ -100,7 +128,7 @@ class RAGPipeline:
             if os.path.isdir(path):
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
-                    if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+                    if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
                         all_files.append(file_path)
             else:
                 all_files.append(path)
@@ -182,8 +210,13 @@ class RAGPipeline:
                 if os.path.isdir(path):
                     for file in os.listdir(path):
                         file_path = os.path.join(path, file)
-                        if file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
-                            text = self._extract_text_from_pdf(file_path) if file.lower().endswith(".pdf") else open(file_path, 'r', encoding='utf-8').read()
+                        if file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
+                            if file.lower().endswith(".pdf"):
+                                text = self._extract_text_from_pdf(file_path)
+                            elif file.lower().endswith(".json"):
+                                text = self._extract_text_from_json(file_path)
+                            else:
+                                text = open(file_path, 'r', encoding='utf-8').read()
                             if text:
                                 text_splitter = RecursiveCharacterTextSplitter(
                                     chunk_size=self.config.get("chunk_size"),
