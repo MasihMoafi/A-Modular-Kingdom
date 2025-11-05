@@ -3,6 +3,7 @@ import re # Stands for Regular Expressions. It's a powerful tool for finding and
 import string # A simple library that contains common strings, like all punctuation marks (string.punctuation).
 import fitz  # PyMuPDF: To read PDF file.
 import numpy as np
+import torch
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import SentenceTransformerEmbeddings #Because SentenceTransformerEmbeddings process each sentence at once, unlike older embedding systems.
 from langchain_core.documents import Document
@@ -18,7 +19,15 @@ class RAGPipeline:
         self.document_paths = self.config.get("document_paths")
         self.chunk_size = self.config.get("chunk_size", 400)
         self.chunk_overlap = self.config.get("chunk_overlap", 150)
-        self.embeddings = SentenceTransformerEmbeddings(model_name=self.embed_model_name)
+
+        # Determine device (CUDA if available, else CPU)
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"[RAG V1] Using device: {self.device}")
+
+        self.embeddings = SentenceTransformerEmbeddings(
+            model_name=self.embed_model_name,
+            model_kwargs={'device': self.device}
+        )
         self.vector_db = self._load_or_create_database()
 
     #This is a fast way to remove all punctuation

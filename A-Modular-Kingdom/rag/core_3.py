@@ -1,5 +1,6 @@
 import os, re, string, fitz, json, math
 import torch
+from typing import List, Dict, Tuple, Any, Optional
 
 # --- FIX for Ollama Proxy ---
 # This is necessary to ensure the local Ollama server can be reached.
@@ -15,6 +16,7 @@ from typing import List, Dict, Any, Tuple, Callable, Optional
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from .qdrant_backend import QdrantVectorDB
 
 
 class VectorIndex:
@@ -276,7 +278,12 @@ class RAGPipelineV3:
 
         # Initialize embedding function based on provider
         embed_provider = self.config.get("embed_provider", "sentencetransformer")
-        if embed_provider == "ollama":
+
+        if embed_provider == "vllm":
+            from .vllm_embeddings import VLLMEmbeddingFunction
+            embeddings_model = VLLMEmbeddingFunction(model=self.config.get("embed_model"))
+            print(f"[RAG V3] Using vLLM embeddings (BATCH MODE) with model: {self.config.get('embed_model')}")
+        elif embed_provider == "ollama":
             from langchain_community.embeddings import OllamaEmbeddings
             embeddings_model = OllamaEmbeddings(model=self.config.get("embed_model"))
             print(f"[RAG V3] Using Ollama embeddings with model: {self.config.get('embed_model')}")
@@ -287,13 +294,28 @@ class RAGPipelineV3:
             )
             print(f"[RAG V3] Using SentenceTransformer embeddings with model: {self.config.get('embed_model')}")
 
-        self.embedding_fn = lambda text: embeddings_model.embed_query(text)
-        
-        # Initialize indexes
-        self.vector_index = VectorIndex(
-            distance_metric=self.config.get("distance_metric", "cosine"),
-            embedding_fn=self.embedding_fn
+        self.embedding_fn = embeddings_model  # Pass object directly for batch support
+
+        # Initialize Qdrant vector DB (replaces custom VectorIndex)
+        qdrant_path = os.path.join(self.config.get("persist_dir"), "qdrant_storage")
+
+        # Determine vector size based on model
+        vector_size_map = {
+            "ollama": 768,  # embeddinggemma
+            "vllm": 4096,  # e5-mistral-7b-instruct
+            "sentencetransformer": 384  # all-MiniLM-L6-v2
+        }
+        vector_size = vector_size_map.get(embed_provider, 384)
+
+        self.vector_db = QdrantVectorDB(
+            collection_name="rag_v3_vectors",
+            embedding_fn=self.embedding_fn,
+            vector_size=vector_size,
+            distance=self.config.get("distance_metric", "cosine"),
+            persist_path=qdrant_path
         )
+
+        # Keep BM25 (still valuable for lexical search)
         self.bm25_index = BM25Index(
             k1=self.config.get("bm25_k1", 1.5),
             b=self.config.get("bm25_b", 0.75)
@@ -391,14 +413,15 @@ class RAGPipelineV3:
         if not all_docs:
             raise ValueError("No documents processed.")
 
-        # Add documents to both indexes
+        # Add documents to indexes
         print(f"[RAG V3] Indexing {len(all_docs)} chunks...")
-        for i, doc in enumerate(all_docs):
-            if i % 500 == 0:
-                print(f"[RAG V3] Progress: {i}/{len(all_docs)} chunks...")
-            # STEP 2: EMBEDDINGS + STEP 3: VECTOR SEARCH
-            self.vector_index.add_document(doc)
-            # STEP 4: BM25
+
+        # STEP 2: VECTOR SEARCH - Batch indexing with Qdrant (FAST)
+        self.vector_db.add_documents_batch(all_docs, batch_size=100)
+
+        # STEP 4: BM25 - Sequential (lightweight, fast enough)
+        print(f"[RAG V3] Building BM25 index...")
+        for doc in all_docs:
             self.bm25_index.add_document(doc)
 
         # Save database
@@ -427,23 +450,26 @@ class RAGPipelineV3:
             json.dump(docs, f, indent=2)
 
     def _load_existing_database(self):
-        """Load existing database (simplified for now)"""
+        """Load existing database"""
         persist_dir = self.config.get("persist_dir")
         docs_file = os.path.join(persist_dir, "docs.json")
 
-        if os.path.exists(docs_file):
+        # Check if Qdrant collection has data
+        qdrant_count = self.vector_db.count()
+
+        if qdrant_count > 0 and os.path.exists(docs_file):
+            # Qdrant already loaded, just rebuild BM25
             with open(docs_file, 'r') as f:
                 docs = json.load(f)
 
-            # Rebuild indexes
+            print(f"[RAG V3] Loading {len(docs)} chunks from existing database...")
             for doc in docs:
-                self.vector_index.add_document(doc)
                 self.bm25_index.add_document(doc)
 
-            print(f"[RAG V3] Loaded {len(docs)} chunks from existing database")
+            print(f"[RAG V3] Loaded {len(docs)} chunks (Qdrant: {qdrant_count}, BM25: {len(docs)})")
         else:
-            # Database directory exists but no docs.json - trigger indexing
-            print(f"[RAG V3] Database directory exists but empty. Triggering indexing...")
+            # Database directory exists but empty - trigger indexing
+            print(f"[RAG V3] Database empty. Triggering indexing...")
             self._index_documents()
 
     def _rrf_fusion(self, vector_results: List[Tuple], bm25_results: List[Tuple], k: int = 60) -> List[Dict]:
@@ -574,11 +600,13 @@ Respond in the following format:
             
             print(f"[RAG V3] Searching with query: '{query[:50]}...'")
             
-            # STEP 3: VECTOR SEARCH
+            # STEP 3: QDRANT VECTOR SEARCH
             print("[RAG V3] Step 3: Vector search...")
-            vector_results = self.vector_index.search(query, k=top_k)
-            
-            # STEP 4: BM25 SEARCH  
+            vector_results_qdrant = self.vector_db.search(query, top_k=top_k)
+            # Convert to tuple format for RRF
+            vector_results = [(doc, doc.get("score", 0)) for doc in vector_results_qdrant]
+
+            # STEP 4: BM25 SEARCH
             print("[RAG V3] Step 4: BM25 search...")
             bm25_results = self.bm25_index.search(query, k=top_k)
             

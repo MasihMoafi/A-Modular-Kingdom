@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+  This XML document outlines various problem-solving methodologies.
+  The structure is hierarchical, with each <method> representing a distinct approach.
+-->
+<note title="Problem Solving Methodologies">
+
+  <!-- Method 1: A general, iterative approach -->
+  <method id="1" title="Isolate, Solve, and Scale">
+    <summary>A fundamental technique focused on breaking down a problem into its smallest component, solving it in isolation, and then scaling the solution.</summary>
+    <steps>
+      <step n="1">Boil down the problem to its tiniest element. Isolate the problematic part.</step>
+      <step n="2">Try to solve that tiny element in isolation.</step>
+      <step n="3">When fixed, and you are sure that fundamentally you're correct, scale it.</step>
+      <step n="4">Repeat the cycle.</step>
+    </steps>
+    <example title="Debugging a MetaTrader ML Integration Error">
+      <exchange>
+        <message speaker="user">
+          No matter what I do, I can't get back-testing in MetaTrader from my ML models (.pt). I've tried everything, from a C++ bridge to using MQ5, ONNX, etc., but to no avail.
+        </message>
+        <message speaker="assistant">
+          <think>Okay. Let's break this down. The user wants to backtest a PyTorch model in MT5. The core issue is data transfer. The most direct path is generating signals in Python and having MT5 read them. I will ask the user to try this isolated step first.</think>
+          <response>Let's isolate the data transfer. Please try to generate your signals in a simple CSV file using Python, and then try to have your MQL5 script read that file. What is the exact error you receive?</response>
+        </message>
+      </exchange>
+      <exchange>
+        <message speaker="user">
+          I get error 5104.
+        </message>
+        <message speaker="assistant">
+          <think>Excellent. Error 5104 means MQL5 failed to open the file correctly. It's a file access or format issue. Let's simplify further to isolate the cause. Is it the file path, permissions, or the content format? Let's test with the simplest possible content.</think>
+          <response>Okay, error 5104 points to a file reading problem. To isolate this, please replace your signal data with a single word like "test" in your CSV file and try to read that. Do you still get the same error?</response>
+        </message>
+      </exchange>
+      <exchange>
+        <message speaker="user">
+          Same error.
+        </message>
+        <message speaker="assistant">
+          <think>That's very telling. If it fails with simple text, the problem is not the data's complexity but something more fundamental. I recall the MQL5 documentation being very strict about file encoding. It often defaults to or requires ANSI/UTF-16, whereas Python defaults to UTF-8. This is the most likely culprit.</think>
+          <response>This suggests the issue might be file encoding. Python's default UTF-8 can be problematic for MQL5. Please re-save your simple text file with "UTF-16 LE" encoding and try again.</response>
+        </message>
+      </exchange>
+      <exchange>
+        <message speaker="user">
+          Wow! I can't believe it. It's successful!
+        </message>
+      </exchange>
+    </example>
+  </method>
+
+  <!-- Method 2: Elon Musk's engineering algorithm -->
+  <method id="2" title="Elon Musk's Engineering Algorithm">
+    <summary>A five-step algorithm for engineering that prioritizes questioning requirements and aggressive simplification before optimization.</summary>
+    <steps>
+      <step n="1" name="Question The Requirements">
+        Try to get the question as least wrong as possible. Otherwise, you'll be solving a problem that shouldn't have existed in the first place. Make your requirements less dumb by assuming you're wrong. Then try to be less wrong. The right question is the difficult and important part; the answer is easy.
+      </step>
+      <step n="2" name="Delete The Part or Process">
+        You must delete so much of the process that you are forced to add back at least 10% of it later. Otherwise, you're not deleting enough.
+      </step>
+      <step n="3" name="Simplify and Optimize">
+        <emphasis level="crucial">You should only do this step after rigorously questioning the requirements and deleting all non-essential parts.</emphasis> Do not optimize a process that should not exist.
+      </step>
+      <step n="4" name="Accelerate Cycle Time">
+        You're moving too slowly, move faster. But don't go faster if you're digging your grave.
+      </step>
+      <step n="5" name="Automate">
+        The final step is to automate the optimized process.
+      </step>
+    </steps>
+  </method>
+  
+  <!-- Method 3: First-Principles Thinking -->
+  <method id="3" title="First-Principles Thinking">
+    <summary>An approach that involves deconstructing a problem into its most fundamental, axiomatic truths and reasoning up from there.</summary>
+    <steps>
+      <step n="1">Boil down the problem to its axiomatic truths. Build up your solution from that foundation, constantly cross-checking what you've built against those truths.</step>
+    </steps>
+  </method>
+  
+</note>

@@ -138,8 +138,8 @@ def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
     
     query_words = query.lower().split()
     
-    # If no meaningful topic, return first few indexable files
-    if not query_words or not topic:
+    # If no meaningful query, return first few indexable files
+    if not query_words:
         all_files = []
         for file in os.listdir(directory):
             file_path = os.path.join(directory, file)
@@ -171,28 +171,37 @@ def fetchExternalKnowledgeV3(query: str, doc_path: Optional[str] = None) -> str:
     try:
         if not isinstance(query, str) or not query:
             return "Error: Invalid or empty query provided."
-        
-        # If custom path provided, find relevant files first
+
+        # If custom path provided, find all indexable files
         if doc_path:
             resolved_path = resolve_path(doc_path)
             if not os.path.exists(resolved_path):
                 return f"Error: Path does not exist: {resolved_path}"
-            
+
             if os.path.isdir(resolved_path):
-                # Find relevant files based on query
-                relevant_files = find_relevant_files(query, resolved_path)
-                
-                if not relevant_files:
-                    return f"No files matching '{query}' found in {resolved_path}"
-                
-                print(f"[RAG V3] Found {len(relevant_files)} relevant files: {[os.path.basename(f) for f in relevant_files]}")
-                
-                # Use first relevant file for now (TODO: support multiple)
-                doc_path = relevant_files[0]
-        
+                # Find ALL indexable files recursively
+                all_files = find_all_indexable_files(resolved_path)
+
+                if not all_files:
+                    return f"No indexable files (.pdf, .txt, .py, .md) found in {resolved_path}"
+
+                # Limit files to prevent excessive indexing
+                max_files = 500
+                if len(all_files) > max_files:
+                    print(f"[RAG V3] Warning: Found {len(all_files)} files, limiting to {max_files}")
+                    all_files = all_files[:max_files]
+
+                print(f"[RAG V3] Indexing {len(all_files)} files from {resolved_path}")
+
+                # Use first file as doc_path (V3 handles single file better)
+                # TODO: Extend V3 to support multiple files like V2
+                doc_path = all_files[0]
+
         pipeline = get_rag_pipeline_v3(doc_path=doc_path)
         return pipeline.search(query)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return f"Sorry, an error occurred while searching: {e}"
 
 # For compatibility with a unified interface
