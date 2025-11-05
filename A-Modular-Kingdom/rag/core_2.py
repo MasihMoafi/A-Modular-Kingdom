@@ -1,12 +1,14 @@
 import os, re, string, fitz, json, hashlib
 import torch
 from sentence_transformers import CrossEncoder
-from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_core.documents import Document
 from langchain_community.retrievers import BM25Retriever
-from langchain.retrievers import EnsembleRetriever
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from typing import List, Dict, Any
+
+# Import Qdrant backend
+from .qdrant_backend import QdrantVectorDB
 
 class RAGPipeline:
     def __init__(self, config: dict):
@@ -21,19 +23,46 @@ class RAGPipeline:
         if embed_provider == "ollama":
             from langchain_community.embeddings import OllamaEmbeddings
             # Note: OllamaEmbeddings runs on Ollama server, not local GPU
-            self.embeddings = OllamaEmbeddings(model=self.config.get("embed_model"))
+            embeddings_model = OllamaEmbeddings(model=self.config.get("embed_model"))
+            print(f"[RAG V2] Using Ollama embeddings with model: {self.config.get('embed_model')}")
         else:
-            self.embeddings = SentenceTransformerEmbeddings(
+            embeddings_model = SentenceTransformerEmbeddings(
                 model_name=self.config.get("embed_model"),
                 model_kwargs={'device': self.device}
             )
+            print(f"[RAG V2] Using SentenceTransformer embeddings with model: {self.config.get('embed_model')}")
+
+        self.embeddings = embeddings_model
 
         # CrossEncoder with GPU support
         self.reranker = CrossEncoder(
             self.config.get("reranker_model"),
             device=self.device
         )
-        self.vector_db = self._load_or_create_database()
+
+        # Initialize Qdrant vector DB (replaces FAISS)
+        qdrant_path = os.path.join(self.config.get("persist_dir"), "qdrant_storage")
+
+        # Determine vector size based on provider
+        vector_size_map = {
+            "ollama": 768,  # embeddinggemma
+            "sentencetransformer": 384  # all-MiniLM-L6-v2
+        }
+        vector_size = vector_size_map.get(embed_provider, 384)
+
+        self.vector_db = QdrantVectorDB(
+            collection_name="rag_v2_vectors",
+            embedding_fn=self.embeddings,
+            vector_size=vector_size,
+            distance=self.config.get("distance_metric", "cosine"),
+            persist_path=qdrant_path
+        )
+
+        # Store documents for BM25
+        self.all_documents: List[Document] = []
+
+        # Load or create database
+        self._load_or_create_database()
 
     def _normalize_text(self, text: str) -> str:
         if not text: return ""
@@ -130,20 +159,24 @@ class RAGPipeline:
 
         return False
 
-    def _load_or_create_database(self) -> FAISS:
+    def _load_or_create_database(self):
+        """Load or create Qdrant database"""
         persist_dir = self.config.get("persist_dir")
-        index_file = os.path.join(persist_dir, "index.faiss")
+        docs_file = os.path.join(persist_dir, "docs.json")
 
-        # Smart reindexing: check if files changed
+        # Check if database exists and is populated
+        qdrant_count = self.vector_db.count()
         needs_reindex = (
-            not os.path.exists(index_file) or
+            qdrant_count == 0 or
             self.config.get("force_reindex", False) or
             self._files_changed(persist_dir)
         )
-        
+
         if needs_reindex:
-            print(f"Creating new FAISS database at {persist_dir}...")
+            print(f"[RAG V2] Creating new Qdrant database at {persist_dir}...")
             all_docs = []
+            all_qdrant_docs = []  # For Qdrant batch indexing
+
             for path in self.config.get("document_paths"):
                 if not os.path.exists(path): continue
                 if os.path.isdir(path):
@@ -152,43 +185,106 @@ class RAGPipeline:
                         if file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
                             text = self._extract_text_from_pdf(file_path) if file.lower().endswith(".pdf") else open(file_path, 'r', encoding='utf-8').read()
                             if text:
-                                text_splitter = RecursiveCharacterTextSplitter(chunk_size=self.config.get("chunk_size"), chunk_overlap=self.config.get("chunk_overlap"))
+                                text_splitter = RecursiveCharacterTextSplitter(
+                                    chunk_size=self.config.get("chunk_size"),
+                                    chunk_overlap=self.config.get("chunk_overlap")
+                                )
                                 chunks = text_splitter.split_text(text)
                                 for i, chunk in enumerate(chunks):
                                     if len(chunk.strip()) > 50:
-                                        all_docs.append(Document(page_content=chunk, metadata={"source": file_path, "chunk_id": i}))
+                                        # Langchain Document for BM25
+                                        all_docs.append(Document(
+                                            page_content=chunk,
+                                            metadata={"source": file_path, "chunk_id": i}
+                                        ))
+                                        # Dict for Qdrant
+                                        all_qdrant_docs.append({
+                                            "content": chunk,
+                                            "source": file_path,
+                                            "chunk_id": i
+                                        })
                 else:
                     text = self._extract_text_from_pdf(path) if path.lower().endswith(".pdf") else open(path, 'r', encoding='utf-8').read()
                     if not text: continue
-                text_splitter = RecursiveCharacterTextSplitter(chunk_size=self.config.get("chunk_size"), chunk_overlap=self.config.get("chunk_overlap"))
-                chunks = text_splitter.split_text(text)
-                for i, chunk in enumerate(chunks):
-                    if len(chunk.strip()) > 50:
-                        all_docs.append(Document(page_content=chunk, metadata={"source": path, "chunk_id": i}))
-            if not all_docs: raise ValueError("No documents processed.")
-            vector_db = FAISS.from_documents(all_docs, self.embeddings)
-            vector_db.save_local(persist_dir)
+                    text_splitter = RecursiveCharacterTextSplitter(
+                        chunk_size=self.config.get("chunk_size"),
+                        chunk_overlap=self.config.get("chunk_overlap")
+                    )
+                    chunks = text_splitter.split_text(text)
+                    for i, chunk in enumerate(chunks):
+                        if len(chunk.strip()) > 50:
+                            all_docs.append(Document(
+                                page_content=chunk,
+                                metadata={"source": path, "chunk_id": i}
+                            ))
+                            all_qdrant_docs.append({
+                                "content": chunk,
+                                "source": path,
+                                "chunk_id": i
+                            })
 
-            # Save manifest for future change detection
+            if not all_docs:
+                raise ValueError("No documents processed.")
+
+            # Index with Qdrant (batch mode - FAST)
+            self.vector_db.add_documents_batch(all_qdrant_docs, batch_size=100)
+
+            # Store documents for BM25
+            self.all_documents = all_docs
+
+            # Save manifest and docs for future loading
             manifest = self._build_manifest()
             self._save_manifest(persist_dir, manifest)
-            print(f"[RAG V2] Indexed {len(all_docs)} chunks from {len(manifest)} files")
+            os.makedirs(persist_dir, exist_ok=True)
+            with open(docs_file, 'w') as f:
+                json.dump([{"content": doc.page_content, **doc.metadata} for doc in all_docs], f)
 
-            return vector_db
+            print(f"[RAG V2] Indexed {len(all_docs)} chunks from {len(manifest)} files")
         else:
-            print(f"Loading existing FAISS database from {persist_dir}...")
-            return FAISS.load_local(persist_dir, self.embeddings, allow_dangerous_deserialization=True)
+            print(f"[RAG V2] Loading existing Qdrant database from {persist_dir}...")
+            # Load documents for BM25
+            if os.path.exists(docs_file):
+                with open(docs_file, 'r') as f:
+                    docs_data = json.load(f)
+                self.all_documents = [
+                    Document(page_content=doc["content"], metadata={k: v for k, v in doc.items() if k != "content"})
+                    for doc in docs_data
+                ]
+                print(f"[RAG V2] Loaded {len(self.all_documents)} documents for BM25")
+            else:
+                print("[RAG V2] Warning: No docs.json found, BM25 will be empty")
 
     def search(self, query: str) -> str:
         try:
             print(f"[RAG V2] Searching for: '{query[:50]}...'")
             top_k = self.config.get("top_k", 5)
-            vector_retriever = self.vector_db.as_retriever(search_kwargs={"k": top_k})
-            docs_for_bm25 = [Document(page_content=doc.page_content, metadata=doc.metadata) for doc in self.vector_db.docstore._dict.values()]
-            bm25_retriever = BM25Retriever.from_documents(docs_for_bm25)
-            bm25_retriever.k = top_k
-            ensemble_retriever = EnsembleRetriever(retrievers=[vector_retriever, bm25_retriever], weights=self.config.get("ensemble_weights"))
-            initial_results = ensemble_retriever.get_relevant_documents(query)
+
+            # Step 1: Qdrant vector search
+            vector_results = self.vector_db.search(query, top_k=top_k)
+            # Convert to Langchain Documents
+            vector_docs = [
+                Document(page_content=doc["content"], metadata={k: v for k, v in doc.items() if k not in ["content", "score"]})
+                for doc in vector_results
+            ]
+
+            # Step 2: BM25 search
+            if not self.all_documents:
+                print("[RAG V2] Warning: No documents loaded for BM25, using vector results only")
+                initial_results = vector_docs
+            else:
+                bm25_retriever = BM25Retriever.from_documents(self.all_documents)
+                bm25_retriever.k = top_k
+                bm25_docs = bm25_retriever.get_relevant_documents(query)
+
+                # Combine results (simple union - could use RRF like V3)
+                combined_docs = vector_docs + bm25_docs
+                # Deduplicate by content
+                seen = set()
+                initial_results = []
+                for doc in combined_docs:
+                    if doc.page_content not in seen:
+                        seen.add(doc.page_content)
+                        initial_results.append(doc)
 
             if not initial_results:
                 print("[RAG V2] No results found in initial search")
