@@ -376,7 +376,7 @@ class RAGPipelineV3:
             if os.path.isdir(path):
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
-                    if file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+                    if file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
                         content = self._extract_content(file_path)
                         if content:
                             document_contents[file_path] = content
@@ -432,6 +432,8 @@ class RAGPipelineV3:
         """Extract content from various file types"""
         if file_path.lower().endswith(".pdf"):
             return self._extract_text_from_pdf(file_path)
+        elif file_path.lower().endswith(".json"):
+            return self._extract_text_from_json(file_path)
         else:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -439,6 +441,34 @@ class RAGPipelineV3:
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
                 return ""
+
+    def _extract_text_from_json(self, json_path: str) -> str:
+        """Extract text from JSON - handles various structures"""
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Convert JSON to searchable text
+            def flatten_json(obj, prefix=''):
+                text_parts = []
+                if isinstance(obj, dict):
+                    for key, value in obj.items():
+                        if isinstance(value, (dict, list)):
+                            text_parts.extend(flatten_json(value, f"{prefix}{key}."))
+                        else:
+                            text_parts.append(f"{prefix}{key}: {value}")
+                elif isinstance(obj, list):
+                    for i, item in enumerate(obj):
+                        text_parts.extend(flatten_json(item, f"{prefix}[{i}]."))
+                else:
+                    text_parts.append(str(obj))
+                return text_parts
+
+            text_parts = flatten_json(data)
+            return "\n".join(text_parts)
+        except Exception as e:
+            print(f"Error extracting text from {json_path}: {e}")
+            return ""
 
     def _save_database(self, docs: List[Dict]):
         """Save the database (simplified for now)"""
