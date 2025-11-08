@@ -83,13 +83,13 @@ pip install -r requirements.txt
 
 ```bash
 # Start the MCP server
-python agent/host.py
+python src/agent/host.py
 
 # In another terminal, start the interactive client
-python agent/main.py
+python src/agent/main.py
 
 # Or use UV
-uv run agent/main.py
+uv run src/agent/main.py
 ```
 
 ## 🛠️ Core Components
@@ -125,8 +125,8 @@ Feature-rich chat interface with intelligent tool selection:
 Three versions of RAG implementation with different strategies:
 
 - **V1** - Basic Chroma + BM25 ensemble
-- **V2** - FAISS + CrossEncoder reranking  
-- **V3** - Custom indexes + RRF fusion + LLM reranking
+- **V2** - Qdrant + BM25 + CrossEncoder reranking (sub-second queries)
+- **V3** - Qdrant + BM25 + RRF fusion + LLM reranking
 
 ### 🧠 Memory System
 
@@ -239,7 +239,7 @@ Create `gemini-extension.json`:
   "mcpServers": {
     "unified_knowledge_agent": {
       "command": "python",
-      "args": ["path/to/agent/host.py"]
+      "args": ["path/to/src/agent/host.py"]
     }
   },
   "contextFileName": "KINGDOM.md"
