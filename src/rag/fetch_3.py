@@ -5,15 +5,15 @@ from .core_3 import RAGPipelineV3
 
 RAG_CONFIG_V3 = {
     "version": "v3",
-    "persist_dir": "./rag_db_v3", 
+    "persist_dir": "./rag_db_v3",
     "document_paths": ["./files/"],
     "embed_provider": "ollama",
     "embed_model": "embeddinggemma",
     "top_k": 5,
-    "chunk_size": 200,
-    "chunk_overlap": 25,
+    "chunk_size": 700,
+    "chunk_overlap": 100,
     "rrf_k": 60,  # RRF parameter instead of ensemble weights
-    "rerank_top_k": 2,  # Enable LLM reranking
+    "rerank_top_k": 5,  # Enable LLM reranking
     "force_reindex": False,
     "use_contextual": False,  # Disable contextual retrieval for performance
     "llm_model": "qwen3:8b",  # For LLM reranking
