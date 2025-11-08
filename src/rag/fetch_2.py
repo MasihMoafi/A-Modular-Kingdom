@@ -9,12 +9,12 @@ RAG_CONFIG = {
     "embed_provider": "ollama",
     "embed_model": "embeddinggemma",
     "top_k": 5,
-    "chunk_size": 200,
-    "chunk_overlap": 25,
+    "chunk_size": 700,
+    "chunk_overlap": 100,
     "ensemble_weights": [0.7, 0.3],
     "reranker_model": 'cross-encoder/ms-marco-MiniLM-L-6-v2',
-    "rerank_top_k": 2,
-    "force_reindex": False,
+    "rerank_top_k": 5,
+    "force_reindex": True,
     "distance_metric": "cosine"  # Qdrant distance metric
 }
 

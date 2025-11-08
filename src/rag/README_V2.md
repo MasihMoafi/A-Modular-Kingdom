@@ -8,11 +8,18 @@ This file contains the `RAGPipeline` class, which is the core of the retrieval e
 
 ### Architecture
 
--   **Vector Database**: Uses a `FAISS` index for fast and efficient vector search.
--   **Hybrid Retrieval**: Implements an `EnsembleRetriever` that combines two search methods for superior results:
-    1.  **Vector Search (FAISS)**: Finds documents that are semantically similar to the query.
+-   **Vector Database**: Uses `Qdrant` for fast and efficient vector search with persistence.
+-   **Embeddings**: `embeddinggemma` via Ollama (768-dimensional vectors).
+-   **Hybrid Retrieval**: Combines two search methods for superior results:
+    1.  **Vector Search (Qdrant)**: Finds documents that are semantically similar to the query.
     2.  **Lexical Search (BM25)**: Finds documents that contain the exact keywords from the query.
--   **Re-ranking**: After the initial retrieval, a `CrossEncoder` model (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is used to re-rank the results for the highest possible relevance, addressing a key limitation of the V1 system.
+-   **Re-ranking**: After the initial retrieval, a `CrossEncoder` model (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is used to re-rank the results for the highest possible relevance.
+
+### Configuration
+
+- **chunk_size**: 700 (optimal for coherent context)
+- **chunk_overlap**: 100 (ensures continuity between chunks)
+- **rerank_top_k**: 5 (returns 5 best results after reranking)
 
 ## `fetch_2.py` - The Control Panel
 
