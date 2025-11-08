@@ -14,7 +14,7 @@ RAG_CONFIG = {
     "ensemble_weights": [0.7, 0.3],
     "reranker_model": 'cross-encoder/ms-marco-MiniLM-L-6-v2',
     "rerank_top_k": 5,
-    "force_reindex": True,
+    "force_reindex": False,
     "distance_metric": "cosine"  # Qdrant distance metric
 }
 
