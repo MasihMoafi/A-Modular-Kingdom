@@ -4,7 +4,7 @@ from sentence_transformers import CrossEncoder
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_core.documents import Document
 from langchain_community.retrievers import BM25Retriever
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from typing import List, Dict, Any
 
 # Import Qdrant backend
@@ -50,8 +50,12 @@ class RAGPipeline:
         }
         vector_size = vector_size_map.get(embed_provider, 384)
 
+        # Create unique collection name from persist_dir to avoid conflicts
+        persist_dir_name = os.path.basename(self.config.get("persist_dir"))
+        collection_name = f"rag_v2_{persist_dir_name}" if persist_dir_name != "rag_db_v2" else "rag_v2_default"
+
         self.vector_db = QdrantVectorDB(
-            collection_name="rag_v2_vectors",
+            collection_name=collection_name,
             embedding_fn=self.embeddings,
             vector_size=vector_size,
             distance=self.config.get("distance_metric", "cosine"),
@@ -307,7 +311,7 @@ class RAGPipeline:
             else:
                 bm25_retriever = BM25Retriever.from_documents(self.all_documents)
                 bm25_retriever.k = top_k
-                bm25_docs = bm25_retriever.get_relevant_documents(query)
+                bm25_docs = bm25_retriever.invoke(query)
 
                 # Combine results (simple union - could use RRF like V3)
                 combined_docs = vector_docs + bm25_docs
