@@ -60,18 +60,10 @@ def get_rag_pipeline(doc_path: Optional[str] = None, file_list: Optional[list] =
     else:
         key = doc_path if doc_path else "__DEFAULT__"
 
-    # Check if cached instance exists AND if files haven't changed
+    # Check if cached instance exists
     if key in _rag_system_instances:
-        cached_pipeline = _rag_system_instances[key]
-        persist_dir = cached_pipeline.config.get("persist_dir")
-
-        # Check if files changed since last index
-        if not cached_pipeline._files_changed(persist_dir):
-            print(f"[RAG V2] Using cached instance for {key} (no file changes)")
-            return cached_pipeline
-        else:
-            print(f"[RAG V2] Files changed, invalidating cache for {key}")
-            del _rag_system_instances[key]
+        print(f"[RAG V2] Using cached instance for {key}")
+        return _rag_system_instances[key]
     
     print(f"[RAG V2] Creating new instance for {key}...")
     try:
@@ -119,8 +111,8 @@ def find_all_indexable_files(directory: str, max_depth: int = 5) -> list:
     if not os.path.isdir(directory):
         return []
 
-    indexable_extensions = ('.pdf', '.txt', '.py', '.md')
-    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build'}
+    indexable_extensions = ('.pdf', '.txt', '.py', '.md', '.ipynb')
+    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build', '.ipynb_checkpoints'}
 
     all_files = []
 
@@ -167,7 +159,7 @@ def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
                 all_files = find_all_indexable_files(resolved_path)
 
                 if not all_files:
-                    return f"No indexable files (.pdf, .txt, .py, .md) found in {resolved_path}"
+                    return f"No indexable files (.pdf, .txt, .py, .md, .ipynb) found in {resolved_path}"
 
                 # Limit files to prevent excessive indexing (can be tuned)
                 max_files = 500
