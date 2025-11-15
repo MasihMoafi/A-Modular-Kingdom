@@ -10,6 +10,9 @@ from typing import List, Dict, Any
 # Import Qdrant backend
 from .qdrant_backend import QdrantVectorDB
 
+# Import notebook chunker
+from .notebook_chunker import process_notebook_for_rag
+
 class RAGPipeline:
     def __init__(self, config: dict):
         self.config = config
@@ -132,7 +135,7 @@ class RAGPipeline:
             if os.path.isdir(path):
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
-                    if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
+                    if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json', '.ipynb')):
                         all_files.append(file_path)
             else:
                 all_files.append(path)
@@ -214,7 +217,37 @@ class RAGPipeline:
                 if os.path.isdir(path):
                     for file in os.listdir(path):
                         file_path = os.path.join(path, file)
-                        if file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
+
+                        # Handle Jupyter notebooks specially
+                        if file.lower().endswith('.ipynb'):
+                            print(f"[RAG V2] Processing notebook: {file}")
+                            notebook_chunks = process_notebook_for_rag(file_path, max_chunk_size=2000)
+                            for cell_data in notebook_chunks:
+                                content = cell_data['content']
+                                if len(content.strip()) > 50:
+                                    # Build rich metadata
+                                    metadata = {
+                                        "source": file_path,
+                                        "cell_type": cell_data.get('cell_type'),
+                                        "cell_id": cell_data.get('cell_id'),
+                                        "cell_index": cell_data.get('cell_index'),
+                                        "exercise_number": cell_data.get('exercise_number'),
+                                        "chunk_id": cell_data.get('chunk_id'),
+                                        "is_partial": cell_data.get('is_partial', False)
+                                    }
+                                    # Langchain Document for BM25
+                                    all_docs.append(Document(
+                                        page_content=content,
+                                        metadata=metadata
+                                    ))
+                                    # Dict for Qdrant
+                                    all_qdrant_docs.append({
+                                        "content": content,
+                                        **metadata
+                                    })
+
+                        # Handle other file types
+                        elif file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
                             if file.lower().endswith(".pdf"):
                                 text = self._extract_text_from_pdf(file_path)
                             elif file.lower().endswith(".json"):
