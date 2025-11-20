@@ -62,7 +62,10 @@ class RAGPipeline:
             embedding_fn=self.embeddings,
             vector_size=vector_size,
             distance=self.config.get("distance_metric", "cosine"),
-            persist_path=qdrant_path
+            persist_path=qdrant_path,
+            mode=self.config.get("qdrant_mode", "local"),
+            url=self.config.get("qdrant_url"),
+            api_key=self.config.get("qdrant_api_key")
         )
 
         # Store documents for BM25

@@ -6,8 +6,8 @@ from .core_2 import RAGPipeline
 RAG_CONFIG = {
     "persist_dir": "./rag_db_v2",
     "document_paths": ["./files/"],
-    "embed_provider": "ollama",
-    "embed_model": "embeddinggemma",
+    "embed_provider": "sentencetransformer",
+    "embed_model": "all-MiniLM-L6-v2",
     "top_k": 5,
     "chunk_size": 700,
     "chunk_overlap": 100,
@@ -15,7 +15,11 @@ RAG_CONFIG = {
     "reranker_model": 'cross-encoder/ms-marco-MiniLM-L-6-v2',
     "rerank_top_k": 5,
     "force_reindex": False,
-    "distance_metric": "cosine"  # Qdrant distance metric
+    "distance_metric": "cosine",  # Qdrant distance metric
+    # Qdrant backend options
+    "qdrant_mode": "cloud",  # "local" or "cloud"
+    "qdrant_url": "https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333",
+    "qdrant_api_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.jPT9n6OF6yTtc_nZoL50d8sxA67GM_VDjznulfl87Sg",
 }
 
 _rag_system_instances: Dict[str, RAGPipeline] = {}
