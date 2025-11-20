@@ -1,13 +1,37 @@
 import os
 import hashlib
 from typing import Optional, Dict
-from .core_2 import RAGPipeline
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Validate environment on import
+def _validate_rag_dependencies():
+    """Validate RAG dependencies are available"""
+    try:
+        import torch
+        import sentence_transformers
+        from qdrant_client import QdrantClient
+        return True
+    except ImportError as e:
+        logger.error(f"Missing RAG dependency: {e}")
+        return False
+
+_DEPENDENCIES_OK = _validate_rag_dependencies()
+
+try:
+    from .core_2 import RAGPipeline
+except Exception as e:
+    logger.error(f"Failed to import RAGPipeline: {e}")
+    RAGPipeline = None
 
 RAG_CONFIG = {
     "persist_dir": "./rag_db_v2",
     "document_paths": ["./files/"],
     "embed_provider": "sentencetransformer",
-    "embed_model": "all-MiniLM-L6-v2",
+    "embed_model": "all-MiniLM-L6-v2",  # 384-dim, 80MB model (fast)
     "top_k": 5,
     "chunk_size": 700,
     "chunk_overlap": 100,
@@ -20,6 +44,9 @@ RAG_CONFIG = {
     "qdrant_mode": "cloud",  # "local" or "cloud"
     "qdrant_url": "https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333",
     "qdrant_api_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.jPT9n6OF6yTtc_nZoL50d8sxA67GM_VDjznulfl87Sg",
+    # Speed optimization
+    "batch_size": 500,  # Process 500 chunks at once
+    "max_files": 100,  # Limit to prevent massive indexing
 }
 
 _rag_system_instances: Dict[str, RAGPipeline] = {}
@@ -102,12 +129,21 @@ def get_rag_pipeline(doc_path: Optional[str] = None, file_list: Optional[list] =
         print(f"FATAL ERROR: Could not initialize RAGPipeline: {e}")
         raise
 
-def find_all_indexable_files(directory: str, max_depth: int = 5) -> list:
-    """Recursively find all indexable files in directory
+def find_all_indexable_files(
+    directory: str,
+    max_depth: int = 5,
+    include_patterns: Optional[list] = None,
+    exclude_patterns: Optional[list] = None,
+    max_files: Optional[int] = None
+) -> list:
+    """Recursively find indexable files with selective filtering
 
     Args:
         directory: Root directory to search
-        max_depth: Maximum recursion depth to prevent infinite loops
+        max_depth: Maximum recursion depth
+        include_patterns: Only include files matching these patterns (e.g., ['*.py', 'src/**'])
+        exclude_patterns: Exclude files matching these patterns (e.g., ['*test*', '*__pycache__*'])
+        max_files: Stop after finding this many files
 
     Returns:
         List of file paths that can be indexed
@@ -115,13 +151,23 @@ def find_all_indexable_files(directory: str, max_depth: int = 5) -> list:
     if not os.path.isdir(directory):
         return []
 
-    indexable_extensions = ('.pdf', '.txt', '.py', '.md', '.ipynb')
-    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build', '.ipynb_checkpoints'}
+    indexable_extensions = ('.pdf', '.txt', '.py', '.md', '.ipynb', '.js', '.ts', '.tsx', '.jsx')
+    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build', '.ipynb_checkpoints', 'migrations'}
 
     all_files = []
 
+    def matches_pattern(path: str, patterns: list) -> bool:
+        """Check if path matches any glob pattern"""
+        import fnmatch
+        for pattern in patterns:
+            if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
+                return True
+        return False
+
     def walk_dir(path: str, depth: int = 0):
         if depth > max_depth:
+            return
+        if max_files and len(all_files) >= max_files:
             return
 
         try:
@@ -132,54 +178,117 @@ def find_all_indexable_files(directory: str, max_depth: int = 5) -> list:
 
                 entry_path = os.path.join(path, entry)
 
+                # Apply exclude patterns
+                if exclude_patterns and matches_pattern(entry_path, exclude_patterns):
+                    continue
+
                 if os.path.isfile(entry_path):
                     if entry.lower().endswith(indexable_extensions):
-                        all_files.append(entry_path)
+                        # Apply include patterns
+                        if include_patterns:
+                            if matches_pattern(entry_path, include_patterns):
+                                all_files.append(entry_path)
+                        else:
+                            all_files.append(entry_path)
+
+                        if max_files and len(all_files) >= max_files:
+                            return
                 elif os.path.isdir(entry_path):
                     walk_dir(entry_path, depth + 1)
         except PermissionError:
             print(f"[RAG] Permission denied: {path}")
 
-    print(f"[RAG] Recursively scanning directory: {directory}")
+    print(f"[RAG] Scanning: {directory}")
+    if include_patterns:
+        print(f"[RAG] Include patterns: {include_patterns}")
+    if exclude_patterns:
+        print(f"[RAG] Exclude patterns: {exclude_patterns}")
+    if max_files:
+        print(f"[RAG] Max files: {max_files}")
+
     walk_dir(directory)
     print(f"[RAG] Found {len(all_files)} indexable files")
 
     return all_files
 
 def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
+    """Query RAG system with robust error handling
+
+    Args:
+        query: Search query string
+        doc_path: Optional path to documents (file or directory)
+
+    Returns:
+        Search results or error message
+    """
+    # Validate dependencies
+    if not _DEPENDENCIES_OK:
+        return "Error: RAG dependencies not properly installed. Run: uv pip install torch sentence-transformers qdrant-client"
+
+    if RAGPipeline is None:
+        return "Error: RAGPipeline failed to import. Check logs for details."
+
     try:
-        if not isinstance(query, str) or not query:
-            return "Error: Invalid or empty query provided."
+        # Validate query
+        if not isinstance(query, str) or not query.strip():
+            logger.error("Invalid query provided")
+            return "Error: Query must be a non-empty string."
 
         # If custom path provided, find all indexable files
         file_list = None
         if doc_path:
-            resolved_path = resolve_path(doc_path)
+            try:
+                resolved_path = resolve_path(doc_path)
+            except Exception as e:
+                logger.error(f"Path resolution failed: {e}")
+                return f"Error: Could not resolve path: {doc_path}"
+
             if not os.path.exists(resolved_path):
+                logger.error(f"Path does not exist: {resolved_path}")
                 return f"Error: Path does not exist: {resolved_path}"
 
             if os.path.isdir(resolved_path):
-                # Find ALL indexable files recursively
-                all_files = find_all_indexable_files(resolved_path)
+                # Smart file discovery with limits
+                max_files = RAG_CONFIG.get("max_files", 100)
+
+                try:
+                    all_files = find_all_indexable_files(
+                        resolved_path,
+                        max_files=max_files,
+                        exclude_patterns=['*test*', '*__pycache__*', '*.pyc']
+                    )
+                except Exception as e:
+                    logger.error(f"File discovery failed: {e}")
+                    return f"Error: Failed to scan directory: {e}"
 
                 if not all_files:
-                    return f"No indexable files (.pdf, .txt, .py, .md, .ipynb) found in {resolved_path}"
+                    logger.warning(f"No indexable files found in {resolved_path}")
+                    return f"No indexable files found in {resolved_path}"
 
-                # Limit files to prevent excessive indexing (can be tuned)
-                max_files = 500
-                if len(all_files) > max_files:
-                    print(f"[RAG] Warning: Found {len(all_files)} files, limiting to {max_files}")
-                    all_files = all_files[:max_files]
-
-                print(f"[RAG] Indexing {len(all_files)} files from {resolved_path}")
+                logger.info(f"Indexing {len(all_files)} files from {resolved_path}")
 
                 # Use all found files for indexing
                 file_list = all_files
                 doc_path = None  # Clear doc_path, use file_list instead
 
-        pipeline = get_rag_pipeline(doc_path=doc_path, file_list=file_list)
-        return pipeline.search(query)
+        # Get or create pipeline
+        try:
+            pipeline = get_rag_pipeline(doc_path=doc_path, file_list=file_list)
+        except Exception as e:
+            logger.error(f"Pipeline initialization failed: {e}", exc_info=True)
+            return f"Error: Failed to initialize RAG system: {e}"
+
+        # Perform search
+        try:
+            result = pipeline.search(query)
+            return result
+        except Exception as e:
+            logger.error(f"Search failed: {e}", exc_info=True)
+            return f"Error: Search failed: {e}"
+
+    except KeyboardInterrupt:
+        logger.info("Search interrupted by user")
+        return "Search interrupted by user"
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return f"Sorry, an error occurred while searching: {e}"
+        logger.error(f"Unexpected error in fetchExternalKnowledge: {e}", exc_info=True)
+        return f"Error: Unexpected failure: {e}"

@@ -99,7 +99,7 @@ def search_memories(
 
 @mcp.tool(
     name="query_knowledge_base",
-    description="Search external documents using a specific RAG version (v1, v2, v3) to find relevant information."
+    description="Use RAG to explore codebases efficiently without loading entire files into context. Answers 'how does X work?', 'what's in folder Y?', architectural questions. Works on .py, .md, .ipynb, .js, .ts, etc. 98% less context than reading files. Use BEFORE reading files for exploration tasks. Supports v1, v2, v3 (v2 recommended)."
 )
 def query_knowledge_base(
     query: str = Field(description="The search query for the knowledge base"),
