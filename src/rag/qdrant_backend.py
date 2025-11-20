@@ -23,14 +23,22 @@ class QdrantVectorDB:
         embedding_fn: Callable,
         vector_size: int = 768,
         distance: str = "cosine",
-        persist_path: str = "./qdrant_db"
+        persist_path: str = "./qdrant_db",
+        mode: str = "local",
+        url: str = None,
+        api_key: str = None
     ):
         self.collection_name = collection_name
         self.embedding_fn = embedding_fn
         self.vector_size = vector_size
 
-        # Initialize Qdrant client (persistent on-disk storage)
-        self.client = QdrantClient(path=persist_path)
+        # Initialize Qdrant client (local or cloud)
+        if mode == "cloud" and url:
+            print(f"[Qdrant] Connecting to cloud: {url}")
+            self.client = QdrantClient(url=url, api_key=api_key)
+        else:
+            print(f"[Qdrant] Using local storage: {persist_path}")
+            self.client = QdrantClient(path=persist_path)
 
         # Map distance metric
         distance_map = {
