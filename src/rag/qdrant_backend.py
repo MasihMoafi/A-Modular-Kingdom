@@ -68,11 +68,11 @@ class QdrantVectorDB:
         else:
             print(f"[Qdrant] Using existing collection: {self.collection_name}")
 
-    def add_documents_batch(self, documents: List[Dict[str, Any]], batch_size: int = 100):
+    def add_documents_batch(self, documents: List[Dict[str, Any]], batch_size: int = 500):
         """
         Add documents in batches with batch embedding.
 
-        This is the KEY speedup: embed 100 chunks at once instead of one-by-one.
+        Large batch size (500) for maximum embedding throughput.
         """
         total = len(documents)
         print(f"[Qdrant] Batch indexing {total} documents...")
@@ -110,7 +110,7 @@ class QdrantVectorDB:
 
     def _batch_embed(self, texts: List[str]) -> List[List[float]]:
         """
-        Batch embedding - check if embedding_fn supports batch, otherwise fallback.
+        Batch embedding with parallel processing for speed.
         """
         # Check if embedding_fn has batch method (vLLM, Gemini, etc.)
         if hasattr(self.embedding_fn, 'embed_documents'):
@@ -127,11 +127,18 @@ class QdrantVectorDB:
         except:
             pass
 
-        # Fallback to sequential
-        vectors = []
-        for text in texts:
-            vector = self._embed_single(text)
-            vectors.append(vector)
+        # Parallel processing fallback (FAST)
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+
+        max_workers = min(os.cpu_count() or 4, 8)  # Use up to 8 cores
+
+        def embed_chunk(text):
+            return self._embed_single(text)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            vectors = list(executor.map(embed_chunk, texts))
+
         return vectors
 
     def _embed_single(self, text: str) -> List[float]:
