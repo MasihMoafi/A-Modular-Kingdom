@@ -1,0 +1,98 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "memory-mcp"
+version = "0.1.0"
+description = "RAG and Memory tools exposed via Model Context Protocol (MCP)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Masih" }
+]
+keywords = ["mcp", "rag", "memory", "llm", "embeddings", "qdrant", "chromadb"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastmcp>=0.1.0",
+    "mcp>=1.0.0",
+    "qdrant-client>=1.7.0",
+    "rank-bm25>=0.2.2",
+    "chromadb>=0.4.0",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "pymupdf>=1.24.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "httpx>=0.27.0",
+    "numpy>=1.24.0",
+    "tomli>=2.0.0;python_version<'3.11'",
+    "sentence-transformers>=3.0.0",  # Default embedding provider (all-MiniLM-L6-v2)
+]
+
+[project.optional-dependencies]
+ollama = ["ollama>=0.3.0"]
+openai = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.30.0"]
+cohere = ["cohere>=5.0.0"]
+all = [
+    "memory-mcp[ollama,openai,anthropic,cohere]",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "black>=24.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+memory-mcp = "memory_mcp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/masih/memory-mcp"
+Repository = "https://github.com/masih/memory-mcp"
+Documentation = "https://github.com/masih/memory-mcp#readme"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/memory_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
