@@ -1,4 +1,4 @@
-# Memory MCP
+# rag-mem
 
 RAG and Memory tools exposed via Model Context Protocol (MCP).
 
@@ -24,19 +24,19 @@ RAG and Memory tools exposed via Model Context Protocol (MCP).
 
 ```bash
 # Basic install (includes SentenceTransformers - fast, local embeddings)
-pip install memory-mcp
+pip install rag-mem
 
 # With Ollama support (for local LLM embeddings)
-pip install memory-mcp[ollama]
+pip install rag-mem[ollama]
 
 # With cloud providers
-pip install memory-mcp[openai]
+pip install rag-mem[openai]
 
 # All providers
-pip install memory-mcp[all]
+pip install rag-mem[all]
 
 # Using uv (recommended - faster)
-uv pip install memory-mcp
+uv pip install rag-mem
 ```
 
 **Default**: Uses `sentence-transformers` with `all-MiniLM-L6-v2` (384-dim, 80MB, fast).

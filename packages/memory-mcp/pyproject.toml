@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "memory-mcp"
+name = "rag-mem"
 version = "0.1.0"
 description = "RAG and Memory tools exposed via Model Context Protocol (MCP)"
 readme = "README.md"
@@ -47,7 +47,7 @@ openai = ["openai>=1.0.0"]
 anthropic = ["anthropic>=0.30.0"]
 cohere = ["cohere>=5.0.0"]
 all = [
-    "memory-mcp[ollama,openai,anthropic,cohere]",
+    "rag-mem[ollama,openai,anthropic,cohere]",
 ]
 dev = [
     "pytest>=8.0.0",
@@ -61,9 +61,9 @@ dev = [
 memory-mcp = "memory_mcp.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/masih/memory-mcp"
-Repository = "https://github.com/masih/memory-mcp"
-Documentation = "https://github.com/masih/memory-mcp#readme"
+Homepage = "https://github.com/MasihMoafi/A-Modular-Kingdom/tree/main/packages/memory-mcp"
+Repository = "https://github.com/MasihMoafi/A-Modular-Kingdom"
+Documentation = "https://github.com/MasihMoafi/A-Modular-Kingdom/tree/main/packages/memory-mcp#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/memory_mcp"]
