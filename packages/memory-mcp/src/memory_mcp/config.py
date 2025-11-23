@@ -54,11 +54,11 @@ class Settings(BaseSettings):
         "ollama", "sentence-transformers", "openai", "anthropic", "cohere"
     ] = Field(
         default="sentence-transformers",
-        description="Embedding provider to use",
+        description="Embedding provider. Default requires: pip install rag-mem[local]",
     )
     embed_model: str = Field(
         default="all-MiniLM-L6-v2",
-        description="Model name for embeddings. Default: all-MiniLM-L6-v2 (384-dim, fast)",
+        description="Model name for embeddings",
     )
 
     # Ollama settings
@@ -177,17 +177,27 @@ def init_config_dir():
 
     if not CONFIG_FILE.exists():
         default_config = '''# Memory MCP Configuration
-# See https://github.com/masih/memory-mcp for documentation
+# See https://github.com/MasihMoafi/A-Modular-Kingdom/tree/main/packages/memory-mcp
 
-# Embedding provider: ollama, sentence-transformers, openai, anthropic, cohere
+# Embedding provider - CHOOSE ONE:
+#
+# Option 1: Local with SentenceTransformers (offline, ~2GB download first time)
+#   pip install rag-mem[local]
 embed_provider = "sentence-transformers"
-# embed_model = "all-MiniLM-L6-v2"  # Optional, uses provider default
+embed_model = "all-MiniLM-L6-v2"
 
-# Ollama settings (if using ollama provider)
+# Option 2: Ollama (free, requires Ollama running)
+# embed_provider = "ollama"
+# embed_model = "nomic-embed-text"
 # ollama_base_url = "http://localhost:11434"
 
-# API keys (uncomment and set for cloud providers)
+# Option 3: OpenAI (paid API)
+#   pip install rag-mem[openai]
+# embed_provider = "openai"
+# embed_model = "text-embedding-3-small"
 # openai_api_key = "sk-..."
+
+# Other API keys
 # anthropic_api_key = "..."
 # cohere_api_key = "..."
 
