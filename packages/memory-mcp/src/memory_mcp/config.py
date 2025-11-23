@@ -53,12 +53,12 @@ class Settings(BaseSettings):
     embed_provider: Literal[
         "ollama", "sentence-transformers", "openai", "anthropic", "cohere"
     ] = Field(
-        default="sentence-transformers",
-        description="Embedding provider. Default requires: pip install rag-mem[local]",
+        default="ollama",
+        description="Embedding provider. Default: ollama (free, local). Alternative: pip install rag-mem[local]",
     )
     embed_model: str = Field(
-        default="all-MiniLM-L6-v2",
-        description="Model name for embeddings",
+        default="nomic-embed-text",
+        description="Model name for embeddings. Default: nomic-embed-text for ollama",
     )
 
     # Ollama settings
@@ -177,29 +177,24 @@ def init_config_dir():
 
     if not CONFIG_FILE.exists():
         default_config = '''# Memory MCP Configuration
-# See https://github.com/MasihMoafi/A-Modular-Kingdom/tree/main/packages/memory-mcp
+# https://github.com/MasihMoafi/A-Modular-Kingdom/tree/main/packages/memory-mcp
 
-# Embedding provider - CHOOSE ONE:
-#
-# Option 1: Local with SentenceTransformers (offline, ~2GB download first time)
-#   pip install rag-mem[local]
-embed_provider = "sentence-transformers"
-embed_model = "all-MiniLM-L6-v2"
+# Default: Ollama (free, local, private)
+# Setup: ollama pull nomic-embed-text
+embed_provider = "ollama"
+embed_model = "nomic-embed-text"
+ollama_base_url = "http://localhost:11434"
 
-# Option 2: Ollama (free, requires Ollama running)
-# embed_provider = "ollama"
-# embed_model = "nomic-embed-text"
-# ollama_base_url = "http://localhost:11434"
+# Alternative: Offline embeddings (no Ollama needed)
+# Requires: pip install rag-mem[local]
+# embed_provider = "sentence-transformers"
+# embed_model = "all-MiniLM-L6-v2"
 
-# Option 3: OpenAI (paid API)
-#   pip install rag-mem[openai]
+# Alternative: OpenAI API
+# Requires: pip install rag-mem[openai]
 # embed_provider = "openai"
 # embed_model = "text-embedding-3-small"
 # openai_api_key = "sk-..."
-
-# Other API keys
-# anthropic_api_key = "..."
-# cohere_api_key = "..."
 
 # Qdrant settings (for RAG vector storage)
 qdrant_mode = "local"  # local, cloud, or memory
