@@ -13,6 +13,8 @@ from typing import Dict, List
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from memory.core import Mem0
+from memory.scoped_manager import ScopedMemoryManager
+from memory.memory_config import MemoryScope
 from tools.web_search import perform_web_search
 from tools.browser_agent_playwright import browse_web_playwright
 from tools.code_exec import run_code
@@ -22,14 +24,19 @@ from tools.stt import speech_to_text, list_stt_models
 import glob
 
 mcp = FastMCP("unified_knowledge_agent_host")
-memory_database = None
+memory_database = None  # Legacy
+scoped_memory = None
 
 try:
+    # Initialize scoped memory manager
+    scoped_memory = ScopedMemoryManager(project_root=project_root)
+    # Keep legacy for backward compatibility
     chroma_path = os.path.join(project_root, "agent_chroma_db")
     memory_database = Mem0(chroma_path=chroma_path)
 except Exception as e:
-    sys.stderr.write(f"[HOST] WARNING: MemoryDB disabled: {e}\n")
+    sys.stderr.write(f"[HOST] WARNING: Memory systems disabled: {e}\n")
     memory_database = None
+    scoped_memory = None
 
 @mcp.tool(
     name="save_fact",
@@ -51,19 +58,54 @@ def save_fact(
 
 @mcp.tool(
     name="save_memory",
-    description="Save content directly to the personal memory system for future reference and retrieval"
+    description="Save content to scoped memory (global or project). Prefix with #global:rule, #global:pref, #persona, #project:context, or let system infer scope."
 )
 def save_direct_memory(
-    content: str = Field(description="The text content to save to memory")
+    content: str = Field(description="Text to save (with optional #scope:type prefix)"),
+    scope: str = Field(default="", description="Explicit scope: 'global_rules', 'global_preferences', 'project_context', etc.")
 ) -> str:
-    """Save content directly to memory without fact extraction."""
-    if memory_database is None:
-        return json.dumps({"error": "MemoryDB is not initialized on the host."})
+    """Save content to scoped memory."""
+    if scoped_memory is None:
+        return json.dumps({"error": "Scoped memory not initialized."})
     try:
-        new_id = memory_database.direct_add(content)
-        return json.dumps({"status": "success", "message": f"Content saved directly to memory: '{content[:50]}...'", "id": new_id})
+        # Parse scope from content prefix if present
+        target_scope = None
+        if scope:
+            try:
+                target_scope = MemoryScope(scope)
+            except ValueError:
+                pass
+        
+        # Check for prefix in content
+        if not target_scope and content.startswith("#"):
+            from memory.memory_config import MemoryConfig
+            config = MemoryConfig()
+            parsed_scope, cleaned_content = config.parse_scope_prefix(content)
+            if parsed_scope:
+                target_scope = parsed_scope
+                content = cleaned_content
+        
+        memory_id = scoped_memory.save(content, scope=target_scope)
+        scope_name = target_scope.value if target_scope else "inferred"
+        return json.dumps({"status": "success", "scope": scope_name, "id": memory_id})
     except Exception as e:
-        return json.dumps({"error": f"Error saving direct memory on host: {str(e)}"})
+        return json.dumps({"error": f"Error saving scoped memory: {str(e)}"})
+
+@mcp.tool(
+    name="set_global_rule",
+    description="Set a permanent global rule that persists across all projects and sessions"
+)
+def set_global_rule(
+    rule: str = Field(description="The rule/instruction to save globally")
+) -> str:
+    """Convenience tool to save global rules."""
+    if scoped_memory is None:
+        return json.dumps({"error": "Scoped memory not initialized."})
+    try:
+        memory_id = scoped_memory.save(rule, scope=MemoryScope.GLOBAL_RULES)
+        return json.dumps({"status": "success", "scope": "global_rules", "id": memory_id})
+    except Exception as e:
+        return json.dumps({"error": f"Error setting global rule: {str(e)}"})
 
 @mcp.tool(
     name="delete_memory",
@@ -83,19 +125,35 @@ def delete_memory(
 
 @mcp.tool(
     name="search_memories",
-    description="Search through saved memories using semantic similarity to find relevant stored information"
+    description="Search scoped memories with priority (global rules → preferences → personas → project). Returns scope metadata."
 )
 def search_memories(
-    query: str = Field(description="The search query to find relevant memories"),
-    top_k: int = Field(default=3, description="Number of top matching memories to return")
+    query: str = Field(description="Search query"),
+    top_k: int = Field(default=3, description="Results per scope"),
+    scope_filter: str = Field(default="", description="Optional: search only specific scope")
 ) -> str:
-    if memory_database is None:
-        return json.dumps([{"error": "MemoryDB not initialized on the host."}] )
+    if scoped_memory is None:
+        return json.dumps([{"error": "Scoped memory not initialized."}])
     try:
-        results = memory_database.search(query, k=top_k)
-        return json.dumps([{"content": res["content"]} for res in results])
+        scopes_to_search = None
+        if scope_filter:
+            try:
+                scopes_to_search = [MemoryScope(scope_filter)]
+            except ValueError:
+                pass
+        
+        results = scoped_memory.search(query, k=top_k, scopes=scopes_to_search)
+        formatted = [
+            {
+                "content": res["content"],
+                "scope": res.get("metadata", {}).get("scope", "unknown"),
+                "id": res["id"]
+            }
+            for res in results
+        ]
+        return json.dumps(formatted)
     except Exception as e:
-        return json.dumps([{"error": f"Error searching memories on host: {str(e)}"}])
+        return json.dumps([{"error": f"Error searching scoped memories: {str(e)}"}])
 
 @mcp.tool(
     name="query_knowledge_base",
