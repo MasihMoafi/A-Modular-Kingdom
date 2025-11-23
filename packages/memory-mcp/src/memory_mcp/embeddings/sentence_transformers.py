@@ -36,8 +36,14 @@ class SentenceTransformerEmbeddings(EmbeddingProvider):
                 self._dimension = self._model.get_sentence_embedding_dimension()
             except ImportError:
                 raise ImportError(
-                    "SentenceTransformers support requires the 'sentence-transformers' package. "
-                    "Install with: pip install memory-mcp[sentence-transformers]"
+                    "Embedding provider 'sentence-transformers' requires extra dependencies.\n\n"
+                    "Install with: pip install rag-mem[local]\n\n"
+                    "Or use a different provider:\n"
+                    "  - ollama: Free, local (requires Ollama running)\n"
+                    "  - openai: pip install rag-mem[openai] + API key\n"
+                    "  - anthropic: pip install rag-mem[anthropic] + API key\n"
+                    "  - cohere: pip install rag-mem[cohere] + API key\n\n"
+                    "Configure in ~/.memory-mcp/config.toml or via MEMORY_MCP_EMBED_PROVIDER env var"
                 )
         return self._model
 

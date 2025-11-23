@@ -61,7 +61,7 @@ def get_embedding_provider(settings: "Settings") -> EmbeddingProvider:
     if provider == "ollama":
         from memory_mcp.embeddings.ollama import OllamaEmbeddings
         return OllamaEmbeddings(
-            model=settings.embed_model or "embeddinggemma",
+            model=settings.embed_model if settings.embed_model != "all-MiniLM-L6-v2" else "nomic-embed-text",
             base_url=settings.ollama_base_url,
         )
 

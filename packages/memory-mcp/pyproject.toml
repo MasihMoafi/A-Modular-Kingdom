@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rag-mem"
-version = "0.1.0"
+version = "0.1.1"
 description = "RAG and Memory tools exposed via Model Context Protocol (MCP)"
 readme = "README.md"
 license = "MIT"
@@ -38,16 +38,15 @@ dependencies = [
     "httpx>=0.27.0",
     "numpy>=1.24.0",
     "tomli>=2.0.0;python_version<'3.11'",
-    "sentence-transformers>=3.0.0",  # Default embedding provider (all-MiniLM-L6-v2)
 ]
 
 [project.optional-dependencies]
-ollama = ["ollama>=0.3.0"]
+local = ["sentence-transformers>=3.0.0"]
 openai = ["openai>=1.0.0"]
 anthropic = ["anthropic>=0.30.0"]
 cohere = ["cohere>=5.0.0"]
 all = [
-    "rag-mem[ollama,openai,anthropic,cohere]",
+    "rag-mem[local,openai,anthropic,cohere]",
 ]
 dev = [
     "pytest>=8.0.0",

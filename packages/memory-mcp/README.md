@@ -13,33 +13,26 @@ RAG and Memory tools exposed via Model Context Protocol (MCP).
   - ChromaDB vector fallback
   - Simple CRUD operations
 - **Multiple Embedding Providers**:
-  - Ollama (local, default)
-  - SentenceTransformers (local, requires torch)
-  - OpenAI
-  - Anthropic/Voyage
-  - Cohere
+  - Ollama (default, requires Ollama running)
+  - SentenceTransformers (`pip install rag-mem[local]`)
+  - OpenAI (`pip install rag-mem[openai]`)
+  - Anthropic/Voyage (`pip install rag-mem[anthropic]`)
+  - Cohere (`pip install rag-mem[cohere]`)
 - **LLM-Agnostic**: Works with any LLM client that supports MCP
 
 ## Installation
 
 ```bash
-# Basic install (includes SentenceTransformers - fast, local embeddings)
+# Basic install (fast, lightweight ~50MB)
 pip install rag-mem
 
-# With Ollama support (for local LLM embeddings)
-pip install rag-mem[ollama]
-
-# With cloud providers
-pip install rag-mem[openai]
-
-# All providers
-pip install rag-mem[all]
-
-# Using uv (recommended - faster)
-uv pip install rag-mem
+# Then install an embedding provider:
+pip install rag-mem[local]    # SentenceTransformers (offline, +2GB PyTorch)
+pip install rag-mem[openai]   # OpenAI API
+pip install rag-mem[all]      # All providers
 ```
 
-**Default**: Uses `sentence-transformers` with `all-MiniLM-L6-v2` (384-dim, 80MB, fast).
+**Note**: Base install is fast. You must install an embedding provider separately, or use [Ollama](https://ollama.ai) (no extra install needed if Ollama is running).
 
 ## Quick Start
 
@@ -101,11 +94,17 @@ export MEMORY_MCP_QDRANT_API_KEY=...
 ```toml
 # ~/.memory-mcp/config.toml
 
-# Embedding provider: ollama, sentence-transformers, openai, anthropic, cohere
+# Embedding provider (choose one):
+# Option 1: SentenceTransformers (requires: pip install rag-mem[local])
 embed_provider = "sentence-transformers"
 embed_model = "all-MiniLM-L6-v2"
 
-# API keys (for cloud providers)
+# Option 2: Ollama (requires Ollama running, no extra pip install)
+# embed_provider = "ollama"
+# embed_model = "nomic-embed-text"
+
+# Option 3: OpenAI (requires: pip install rag-mem[openai])
+# embed_provider = "openai"
 # openai_api_key = "sk-..."
 
 # Qdrant settings
