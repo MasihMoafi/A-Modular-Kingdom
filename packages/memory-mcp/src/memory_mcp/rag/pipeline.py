@@ -125,9 +125,9 @@ class RAGPipeline:
                 continue
 
             if os.path.isdir(path):
-                for file in os.listdir(path):
-                    file_path = os.path.join(path, file)
-                    if os.path.isfile(file_path):
+                for root, _, files in os.walk(path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
                         docs = self._process_file(file_path)
                         for doc in docs:
                             all_docs.append(
@@ -258,9 +258,9 @@ class RAGPipeline:
             if not os.path.exists(path):
                 continue
             if os.path.isdir(path):
-                for file in os.listdir(path):
-                    file_path = os.path.join(path, file)
-                    if os.path.isfile(file_path):
+                for root, _, files in os.walk(path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
                         manifest[file_path] = self._get_file_hash(file_path)
             else:
                 manifest[path] = self._get_file_hash(path)
