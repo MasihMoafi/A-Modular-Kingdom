@@ -1,6 +1,11 @@
 """
 Tests for scoped memory system.
 """
+import os
+import sys
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
 import pytest
 import tempfile
 import shutil
@@ -16,18 +21,18 @@ class TestMemoryConfig:
         """Test parsing scope prefixes from content."""
         config = MemoryConfig()
         
-        # Test global rule
-        scope, content = config.parse_scope_prefix("#global:rule Always use types")
+        # Test global rule (two colons: #global:rule:content)
+        scope, content = config.parse_scope_prefix("#global:rule:Always use types")
         assert scope == MemoryScope.GLOBAL_RULES
         assert content == "Always use types"
         
         # Test global preference  
-        scope, content = config.parse_scope_prefix("#global:pref Dark mode")
+        scope, content = config.parse_scope_prefix("#global:pref:Dark mode")
         assert scope == MemoryScope.GLOBAL_PREFERENCES
         assert content == "Dark mode"
         
-        # Test persona
-        scope, content = config.parse_scope_prefix("#persona You are a teacher")
+        # Test persona (single colon)
+        scope, content = config.parse_scope_prefix("#persona:You are a teacher")
         assert scope == MemoryScope.GLOBAL_PERSONAS
         assert content == "You are a teacher"
         
