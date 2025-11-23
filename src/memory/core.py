@@ -11,7 +11,7 @@ import re
 from rank_bm25 import BM25Okapi
 
 LLM_MODEL = 'qwen3:8b'
-COLLECTION_NAME = "agent_memories"
+COLLECTION_NAME = "agent_memories"  # Legacy default
 LOG_FILE = "mem0_debug_log.txt"
 
 # --- Helper function for logging to a file ---
@@ -20,8 +20,16 @@ def log_message(message: str):
     pass
 
 class Mem0:
-    def __init__(self, chroma_path: str):
+    def __init__(self, chroma_path: str, collection_name: str = COLLECTION_NAME):
+        """
+        Initialize Mem0 memory system.
+        
+        Args:
+            chroma_path: Path to ChromaDB storage
+            collection_name: Name of collection (for scoped memories)
+        """
         self.chroma_path = chroma_path
+        self.collection_name = collection_name
         if not os.path.exists(self.chroma_path):
             os.makedirs(self.chroma_path)
         # In-memory BM25 index state
@@ -32,7 +40,7 @@ class Mem0:
 
     def _get_client_and_collection(self):
         client = chromadb.PersistentClient(path=self.chroma_path)
-        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+        collection = client.get_or_create_collection(name=self.collection_name)
         return client, collection
 
     def _execute_operation(self, operation: str, fact: str, memory_id: str = None):
