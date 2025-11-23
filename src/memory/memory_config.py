@@ -93,7 +93,16 @@ class MemoryConfig:
             return None, text
             
         prefix_part = text[1:text.index(":")]
-        content = text[text.index(":") + 1:].strip()
+        content_after_first_colon = text[text.index(":") + 1:]
+        
+        # Check if there's a second colon for format like "#global:rule"
+        if ":" in content_after_first_colon:
+            second_part = content_after_first_colon[:content_after_first_colon.index(":")]
+            full_prefix = f"{prefix_part}:{second_part}".lower()
+            content = content_after_first_colon[content_after_first_colon.index(":") + 1:].strip()
+        else:
+            full_prefix = prefix_part.lower()
+            content = content_after_first_colon.strip()
         
         # Map prefix to scope
         prefix_map = {
@@ -105,7 +114,7 @@ class MemoryConfig:
             "project:session": MemoryScope.PROJECT_SESSIONS,
         }
         
-        scope = prefix_map.get(prefix_part.lower())
+        scope = prefix_map.get(full_prefix)
         return scope, content
     
     def infer_scope_from_content(self, content: str) -> MemoryScope:
@@ -120,17 +129,17 @@ class MemoryConfig:
         """
         lower = content.lower()
         
-        # Check for rule indicators
-        if any(word in lower for word in ["always", "never", "must", "rule", "should"]):
+        # Check for rule indicators (strong keywords)
+        if any(word in lower for word in ["always ", "never ", "must ", " rule", "should "]):
             return MemoryScope.GLOBAL_RULES
         
-        # Check for preference indicators
-        if any(word in lower for word in ["prefer", "like", "favorite", "use", "is a"]):
-            return MemoryScope.GLOBAL_PREFERENCES
-        
-        # Check for persona indicators
+        # Check for persona indicators (highest specificity)
         if any(word in lower for word in ["role:", "persona:", "act as", "you are"]):
             return MemoryScope.GLOBAL_PERSONAS
+        
+        # Check for preference indicators (avoid generic "use" which is too broad)
+        if any(word in lower for word in ["prefer", " like", "favorite", " is a "]):
+            return MemoryScope.GLOBAL_PREFERENCES
         
         # Default to project context
         return MemoryScope.PROJECT_CONTEXT
