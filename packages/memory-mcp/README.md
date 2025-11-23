@@ -23,16 +23,25 @@ RAG and Memory tools exposed via Model Context Protocol (MCP).
 ## Installation
 
 ```bash
-# Basic install (fast, lightweight ~50MB)
-pip install rag-mem
+# Fast install with uv (recommended)
+uv pip install rag-mem
 
-# Then install an embedding provider:
-pip install rag-mem[local]    # SentenceTransformers (offline, +2GB PyTorch)
-pip install rag-mem[openai]   # OpenAI API
-pip install rag-mem[all]      # All providers
+# Or with pip
+pip install rag-mem
 ```
 
-**Note**: Base install is fast. You must install an embedding provider separately, or use [Ollama](https://ollama.ai) (no extra install needed if Ollama is running).
+**Default**: Uses [Ollama](https://ollama.ai) for embeddings (free, local, private).
+
+```bash
+# One-time Ollama setup:
+ollama pull nomic-embed-text
+```
+
+**No Ollama?** Use offline embeddings instead:
+```bash
+pip install rag-mem[local]
+export MEMORY_MCP_EMBED_PROVIDER=sentence-transformers
+```
 
 ## Quick Start
 
@@ -94,26 +103,18 @@ export MEMORY_MCP_QDRANT_API_KEY=...
 ```toml
 # ~/.memory-mcp/config.toml
 
-# Embedding provider (choose one):
-# Option 1: SentenceTransformers (requires: pip install rag-mem[local])
-embed_provider = "sentence-transformers"
-embed_model = "all-MiniLM-L6-v2"
+# Default: Ollama (free, local)
+embed_provider = "ollama"
+embed_model = "nomic-embed-text"
 
-# Option 2: Ollama (requires Ollama running, no extra pip install)
-# embed_provider = "ollama"
-# embed_model = "nomic-embed-text"
-
-# Option 3: OpenAI (requires: pip install rag-mem[openai])
-# embed_provider = "openai"
-# openai_api_key = "sk-..."
-
-# Qdrant settings
-qdrant_mode = "local"  # local, cloud, or memory
+# Alternative: Offline (pip install rag-mem[local])
+# embed_provider = "sentence-transformers"
+# embed_model = "all-MiniLM-L6-v2"
 
 # RAG settings
+qdrant_mode = "local"
 rag_chunk_size = 700
 rag_top_k = 5
-rag_rerank = true
 ```
 
 ## Docker

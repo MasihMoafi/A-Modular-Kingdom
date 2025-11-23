@@ -12,8 +12,8 @@ def test_default_settings():
     """Test that default settings are loaded correctly."""
     settings = Settings()
 
-    assert settings.embed_provider == "sentence-transformers"
-    assert settings.embed_model == "all-MiniLM-L6-v2"
+    assert settings.embed_provider == "ollama"
+    assert settings.embed_model == "nomic-embed-text"
     assert settings.qdrant_mode == "local"
     assert settings.rag_chunk_size == 700
     assert settings.rag_rerank is True

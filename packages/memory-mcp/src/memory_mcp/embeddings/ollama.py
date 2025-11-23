@@ -51,11 +51,17 @@ class OllamaEmbeddings(EmbeddingProvider):
             return response.json()["embedding"]
         except httpx.ConnectError:
             raise ConnectionError(
-                f"Cannot connect to Ollama at {self.base_url}. "
-                "Make sure Ollama is running: https://ollama.ai\n"
-                "Or use a different provider:\n"
-                "  - pip install rag-mem[local]  # SentenceTransformers (offline)\n"
-                "  - pip install rag-mem[openai] # OpenAI API"
+                f"Cannot connect to Ollama at {self.base_url}.\n\n"
+                "OPTION 1 - Start Ollama (free, local):\n"
+                "  1. Install from https://ollama.ai\n"
+                "  2. Run: ollama pull nomic-embed-text\n"
+                "  3. Start ollama (it runs in background)\n\n"
+                "OPTION 2 - Use offline embeddings (downloads PyTorch ~2GB once):\n"
+                "  pip install rag-mem[local]\n"
+                "  Then set: MEMORY_MCP_EMBED_PROVIDER=sentence-transformers\n\n"
+                "OPTION 3 - Use OpenAI API:\n"
+                "  pip install rag-mem[openai]\n"
+                "  Then set: MEMORY_MCP_EMBED_PROVIDER=openai MEMORY_MCP_OPENAI_API_KEY=sk-..."
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
