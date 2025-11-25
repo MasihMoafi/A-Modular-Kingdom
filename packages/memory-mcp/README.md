@@ -1,6 +1,17 @@
 # rag-mem
 
-RAG and Memory tools exposed via Model Context Protocol (MCP).
+> **RAG and Memory tools exposed via Model Context Protocol (MCP)**
+
+Add document retrieval and persistent memory to any AI agent. One `pip install`, zero vendor lock-in.
+
+## Why?
+
+Every AI agent needs:
+- Document search (RAG) for knowledge access
+- Long-term memory across sessions
+- Standard tool interface (MCP)
+
+**rag-mem** gives you all three in a single package.
 
 ## Features
 
