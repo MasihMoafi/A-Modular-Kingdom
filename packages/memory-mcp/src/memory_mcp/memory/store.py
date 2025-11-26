@@ -1,10 +1,10 @@
-"""Memory Store for persistent fact/memory storage.
+"""Memory Store using Qdrant for persistent storage.
 
-This module provides:
-- ChromaDB-based persistent storage
+Unified vector DB - same backend as RAG for consistency.
+Provides:
+- Qdrant-based persistent storage (local or cloud)
 - BM25 lexical search (primary, fast)
 - Vector similarity search (fallback)
-- Optional LLM-based fact extraction (requires external LLM)
 """
 
 import re
@@ -12,21 +12,19 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, PointStruct, VectorParams, Filter, FieldCondition, MatchValue
+
 if TYPE_CHECKING:
     from memory_mcp.config import Settings
 
 
 class MemoryStore:
-    """Persistent memory store using ChromaDB with BM25 search.
+    """Persistent memory store using Qdrant with BM25 search.
 
-    This is a simple, LLM-agnostic memory store. Users can:
-    1. Store memories directly with `add()`
-    2. Search memories with `search()`
-    3. Delete memories with `delete()`
-    4. List all memories with `get_all()`
-
-    For LLM-based fact extraction, use your own LLM to extract facts
-    from conversations, then store them here.
+    Uses same vector DB as RAG for architectural consistency.
+    BM25 is primary search (fast, no embedding needed).
+    Vector search is fallback for semantic queries.
     """
 
     def __init__(self, settings: "Settings"):
@@ -41,16 +39,45 @@ class MemoryStore:
         self._bm25_ids: list[str] = []
         self._bm25_dirty: bool = True
 
-        self._chroma_path = Path(settings.chroma_path).expanduser()
-        self._chroma_path.mkdir(parents=True, exist_ok=True)
+        self._embedding_provider = None
         self._collection_name = settings.memory_collection
 
-    def _get_collection(self):
-        """Get ChromaDB collection (lazy initialization)."""
-        import chromadb
+        persist_path = Path(settings.qdrant_path).expanduser()
+        persist_path.mkdir(parents=True, exist_ok=True)
 
-        client = chromadb.PersistentClient(path=str(self._chroma_path))
-        return client.get_or_create_collection(name=self._collection_name)
+        if settings.qdrant_mode == "cloud" and settings.qdrant_url:
+            self._client = QdrantClient(
+                url=settings.qdrant_url,
+                api_key=settings.qdrant_api_key
+            )
+        elif settings.qdrant_mode == "memory":
+            self._client = QdrantClient(":memory:")
+        else:
+            self._client = QdrantClient(path=str(persist_path / "memory_storage"))
+
+        self._init_collection()
+
+    def _get_embedding_provider(self):
+        """Lazy load embedding provider."""
+        if self._embedding_provider is None:
+            from memory_mcp.embeddings import get_embedding_provider
+            self._embedding_provider = get_embedding_provider(self.settings)
+        return self._embedding_provider
+
+    def _init_collection(self):
+        """Initialize Qdrant collection for memories."""
+        collections = self._client.get_collections().collections
+        exists = any(c.name == self._collection_name for c in collections)
+
+        if not exists:
+            provider = self._get_embedding_provider()
+            self._client.create_collection(
+                collection_name=self._collection_name,
+                vectors_config=VectorParams(
+                    size=provider.dimension,
+                    distance=Distance.COSINE
+                ),
+            )
 
     def add(self, content: str, metadata: dict[str, Any] | None = None) -> str:
         """Add a memory to the store.
@@ -62,12 +89,21 @@ class MemoryStore:
         Returns:
             The ID of the stored memory
         """
-        collection = self._get_collection()
         memory_id = str(uuid.uuid4())
-        collection.add(
-            ids=[memory_id],
-            documents=[content],
-            metadatas=[metadata] if metadata else None,
+        provider = self._get_embedding_provider()
+        vector = provider.embed_query(content)
+
+        payload = {
+            "memory_id": memory_id,
+            "content": content,
+            **(metadata or {})
+        }
+
+        point_id = abs(hash(memory_id)) % (2**63)
+
+        self._client.upsert(
+            collection_name=self._collection_name,
+            points=[PointStruct(id=point_id, vector=vector, payload=payload)]
         )
         self._bm25_dirty = True
         return memory_id
@@ -82,8 +118,12 @@ class MemoryStore:
             True if deletion was successful
         """
         try:
-            collection = self._get_collection()
-            collection.delete(ids=[memory_id])
+            self._client.delete(
+                collection_name=self._collection_name,
+                points_selector=Filter(
+                    must=[FieldCondition(key="memory_id", match=MatchValue(value=memory_id))]
+                )
+            )
             self._bm25_dirty = True
             return True
         except Exception:
@@ -109,23 +149,16 @@ class MemoryStore:
                 ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
                 top = ranked[:k]
 
-                collection = self._get_collection()
                 results: list[dict[str, Any]] = []
-
                 for idx, score in top:
                     if score <= 0:
                         continue
                     doc_id = self._bm25_ids[idx]
-                    got = collection.get(ids=[doc_id], include=["documents", "metadatas"])
-                    if got.get("documents"):
-                        results.append(
-                            {
-                                "id": doc_id,
-                                "content": got["documents"][0],
-                                "metadata": (got.get("metadatas", [None])[0] or {}),
-                                "score": float(score),
-                            }
-                        )
+                    memory = self._get_by_id(doc_id)
+                    if memory:
+                        memory["score"] = float(score)
+                        results.append(memory)
+
                 if results:
                     return results
         except Exception:
@@ -133,30 +166,51 @@ class MemoryStore:
 
         return self._vector_search(query, k)
 
-    def _vector_search(self, query: str, k: int) -> list[dict[str, Any]]:
-        """Fallback vector similarity search via ChromaDB."""
+    def _get_by_id(self, memory_id: str) -> dict[str, Any] | None:
+        """Get memory by ID."""
         try:
-            collection = self._get_collection()
-            results = collection.query(
-                query_texts=[query],
-                n_results=k,
-                include=["documents", "metadatas", "distances"],
+            results = self._client.scroll(
+                collection_name=self._collection_name,
+                scroll_filter=Filter(
+                    must=[FieldCondition(key="memory_id", match=MatchValue(value=memory_id))]
+                ),
+                limit=1,
+                with_payload=True,
+            )
+            if results[0]:
+                point = results[0][0]
+                return {
+                    "id": point.payload.get("memory_id"),
+                    "content": point.payload.get("content", ""),
+                    "metadata": {k: v for k, v in point.payload.items()
+                               if k not in ("memory_id", "content")},
+                }
+        except Exception:
+            pass
+        return None
+
+    def _vector_search(self, query: str, k: int) -> list[dict[str, Any]]:
+        """Fallback vector similarity search."""
+        try:
+            provider = self._get_embedding_provider()
+            query_vector = provider.embed_query(query)
+
+            results = self._client.query_points(
+                collection_name=self._collection_name,
+                query=query_vector,
+                limit=k,
+                with_payload=True,
             )
 
             formatted = []
-            if results.get("ids") and results["ids"][0]:
-                for i, doc_id in enumerate(results["ids"][0]):
-                    formatted.append(
-                        {
-                            "id": doc_id,
-                            "content": results["documents"][0][i],
-                            "metadata": (
-                                results["metadatas"][0][i]
-                                if results["metadatas"] and results["metadatas"][0]
-                                else {}
-                            ),
-                        }
-                    )
+            for hit in results.points:
+                formatted.append({
+                    "id": hit.payload.get("memory_id"),
+                    "content": hit.payload.get("content", ""),
+                    "metadata": {k: v for k, v in hit.payload.items()
+                               if k not in ("memory_id", "content")},
+                    "score": hit.score,
+                })
             return formatted
         except Exception:
             return []
@@ -168,19 +222,20 @@ class MemoryStore:
             List of all memories with id, content, and metadata
         """
         try:
-            collection = self._get_collection()
-            results = collection.get(include=["documents", "metadatas"])
+            results = self._client.scroll(
+                collection_name=self._collection_name,
+                limit=10000,
+                with_payload=True,
+            )
 
             formatted = []
-            if results.get("ids"):
-                for i, doc_id in enumerate(results["ids"]):
-                    formatted.append(
-                        {
-                            "id": doc_id,
-                            "content": results["documents"][i],
-                            "metadata": results["metadatas"][i] if results["metadatas"] else {},
-                        }
-                    )
+            for point in results[0]:
+                formatted.append({
+                    "id": point.payload.get("memory_id"),
+                    "content": point.payload.get("content", ""),
+                    "metadata": {k: v for k, v in point.payload.items()
+                               if k not in ("memory_id", "content")},
+                })
             return formatted
         except Exception:
             return []
@@ -192,8 +247,8 @@ class MemoryStore:
             Number of memories in the store
         """
         try:
-            collection = self._get_collection()
-            return collection.count()
+            info = self._client.get_collection(self._collection_name)
+            return info.points_count
         except Exception:
             return 0
 
@@ -203,15 +258,23 @@ class MemoryStore:
         return [tok for tok in re.split(r"[^a-z0-9]+", text) if tok]
 
     def _rebuild_bm25(self):
-        """Rebuild BM25 index from ChromaDB."""
+        """Rebuild BM25 index from Qdrant."""
         try:
             from rank_bm25 import BM25Okapi
 
-            collection = self._get_collection()
-            results = collection.get(include=["documents"])
-            ids = results.get("ids") or []
-            docs = results.get("documents") or []
-            tokenized = [self._tokenize(d or "") for d in docs]
+            results = self._client.scroll(
+                collection_name=self._collection_name,
+                limit=10000,
+                with_payload=True,
+            )
+
+            ids = []
+            docs = []
+            for point in results[0]:
+                ids.append(point.payload.get("memory_id", ""))
+                docs.append(point.payload.get("content", ""))
+
+            tokenized = [self._tokenize(d) for d in docs]
 
             self._bm25_ids = ids
             self._bm25_docs = tokenized

@@ -119,3 +119,9 @@ wiseapp/
 *.jpeg
 *.gif
 *.svg
+# Database folders
+agent_qdrant_db/
+agent_chroma_db/
+*_qdrant_db/
+*_chroma_db/
+rag_db*/

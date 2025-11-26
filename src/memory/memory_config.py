@@ -29,7 +29,8 @@ class MemoryConfig:
             project_root: Root directory of current project. If None, uses cwd.
         """
         self.project_root = project_root or os.getcwd()
-        self.global_memory_base = Path.home() / ".gemini" / "memories"
+        # Store memories in a distinct global directory, not hidden in agent state
+        self.global_memory_base = Path.home() / ".modular_kingdom" / "memories"
         self.project_hash = self._compute_project_hash(self.project_root)
         
     def _compute_project_hash(self, path: str) -> str:
