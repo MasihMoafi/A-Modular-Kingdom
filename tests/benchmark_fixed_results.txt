@@ -1,459 +1,0 @@
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-/home/masih/Desktop/projects/A-Modular-Kingdom/tests/../src/rag/core_2.py:39: LangChainDeprecationWarning: The class `HuggingFaceEmbeddings` was deprecated in LangChain 0.2.2 and will be removed in 1.0. An updated version of the class exists in the :class:`~langchain-huggingface package and should be used instead. To use it run `pip install -U :class:`~langchain-huggingface` and import as `from :class:`~langchain_huggingface import HuggingFaceEmbeddings``.
-  embeddings_model = SentenceTransformerEmbeddings(
-INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
-INFO:httpx:HTTP Request: GET https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333 "HTTP/1.1 200 OK"
-INFO:httpx:HTTP Request: GET https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections "HTTP/1.1 200 OK"
-INFO:httpx:HTTP Request: GET https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7 "HTTP/1.1 200 OK"
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-
-######################################################################
-# Real-World RAG Benchmark (FIXED)
-# Documents: 9 files
-# Queries: 10 (content-based verification)
-######################################################################
-
-======================================================================
-Benchmarking RAG V2
-======================================================================
-
-[1/10] SEMANTIC: How does the RAG system handle reranking and what models doe...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Creating new instance for 7fc74ee7...
-[RAG V2] Using device: cuda
-[RAG V2] Using SentenceTransformer embeddings with model: all-MiniLM-L6-v2
-[Qdrant] Connecting to cloud: https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333
-[Qdrant] Using existing collection: rag_v2_scope_7fc74ee7
-[RAG V2] Loading existing Qdrant database from /home/masih/Desktop/projects/A-Modular-Kingdom/src/rag/rag_db_v2/scope_7fc74ee7...
-[RAG V2] Loaded 1230 documents for BM25
-[RAG V2] Initialization complete
-[RAG V2] Searching for: 'How does the RAG system handle reranking and what ...'
-[RAG V2] Re-ranking 10 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 44.18it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 17.53s
-  ✓ Keywords: 3/4
-  📊 Relevance: 75%
-  📝 Result: 2692 chars
-  ⚠️  Missing: ms-marco
-
-[2/10] SEMANTIC: What is Napoleon's strategy for military campaigns?...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'What is Napoleon's strategy for military campaigns...'
-[RAG V2] Re-ranking 10 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 125.00it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.39s
-  ✓ Keywords: 4/5
-  📊 Relevance: 80%
-  📝 Result: 3532 chars
-  ⚠️  Missing: military
-
-[3/10] SEMANTIC: Explain the memory system architecture and scoping mechanism...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'Explain the memory system architecture and scoping...'
-[RAG V2] Re-ranking 10 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 130.53it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.38s
-  ✓ Keywords: 4/5
-  📊 Relevance: 80%
-  📝 Result: 2984 chars
-  ⚠️  Missing: context
-
-[4/10] SEMANTIC: How does multi-intent RAG work and what are its components?...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'How does multi-intent RAG work and what are its co...'
-[RAG V2] Re-ranking 9 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 139.46it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.40s
-  ✓ Keywords: 3/4
-  📊 Relevance: 75%
-  📝 Result: 2921 chars
-  ⚠️  Missing: component
-
-[5/10] KEYWORD: CrossEncoder ms-marco-MiniLM...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'CrossEncoder ms-marco-MiniLM...'
-[RAG V2] Re-ranking 6 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 110.79it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.38s
-  ✓ Keywords: 4/4
-  📊 Relevance: 100%
-  📝 Result: 2992 chars
-
-[6/10] KEYWORD: Qdrant collection vector database...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'Qdrant collection vector database...'
-[RAG V2] Re-ranking 9 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 136.65it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.38s
-  ✓ Keywords: 4/4
-  📊 Relevance: 100%
-  📝 Result: 2876 chars
-
-[7/10] KEYWORD: MCP protocol tools server...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'MCP protocol tools server...'
-[RAG V2] Re-ranking 10 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 109.48it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.39s
-  ✓ Keywords: 3/4
-  📊 Relevance: 75%
-  📝 Result: 3066 chars
-  ⚠️  Missing: protocol
-
-[8/10] KEYWORD: forex zigzag pattern trading...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'forex zigzag pattern trading...'
-[RAG V2] Re-ranking 7 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 145.61it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.38s
-  ✓ Keywords: 2/4
-  📊 Relevance: 50%
-  📝 Result: 2733 chars
-  ⚠️  Missing: zigzag, pattern
-
-[9/10] MIXED: What GPU acceleration features are available and how do they...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'What GPU acceleration features are available and h...'
-[RAG V2] Re-ranking 8 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 134.20it/s]
-INFO:rag.fetch_2:Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-INFO:httpx:HTTP Request: POST https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333/collections/rag_v2_scope_7fc74ee7/points/search "HTTP/1.1 200 OK"
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.39s
-  ✓ Keywords: 5/5
-  📊 Relevance: 100%
-  📝 Result: 2856 chars
-
-[10/10] MIXED: How to implement scoped memory with global and project-speci...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V2] Using cached instance for 7fc74ee7
-[RAG V2] Searching for: 'How to implement scoped memory with global and pro...'
-[RAG V2] Re-ranking 6 initial results...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 149.83it/s]
-[RAG V3] Creating new instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs...
-[RAG] About to create RAGPipelineV3...
-INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
-[RAG] V3 initialization complete
-[RAG V2] Returning 5 unique results
-  ⏱️  Time: 0.38s
-  ✓ Keywords: 5/5
-  📊 Relevance: 100%
-  📝 Result: 3446 chars
-
-======================================================================
-RAG V2 Summary
-======================================================================
-Total Time: 20.99s
-Avg Time/Query: 2.10s
-Overall Relevance: 83.5%
-  - Semantic: 77.5%
-  - Keyword: 81.2%
-  - Mixed: 100.0%
-
-======================================================================
-Benchmarking RAG V3
-======================================================================
-
-[1/10] SEMANTIC: How does the RAG system handle reranking and what models doe...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Initializing with config: v3
-[RAG V3] Using device: cuda
-[RAG V3] Using SentenceTransformer embeddings with model: all-MiniLM-L6-v2
-[Qdrant] Using local storage: /home/masih/Desktop/projects/A-Modular-Kingdom/src/rag/rag_db_v3/real_docs_e38d9329/qdrant_storage
-[Qdrant] Using existing collection: rag_v3_vectors
-[RAG V3] Using CrossEncoder reranking with model: cross-encoder/ms-marco-MiniLM-L-6-v2
-[RAG V3] Loading existing database from /home/masih/Desktop/projects/A-Modular-Kingdom/src/rag/rag_db_v3/real_docs_e38d9329...
-[RAG V3] Loading 1206 chunks from existing database...
-[RAG V3] Loaded 1206 chunks (Qdrant: 1206, BM25: 1206)
-[RAG V3] Searching with query: 'How does the RAG system handle reranking and what ...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 201.73it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 31.65it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 12.84s
-  ✓ Keywords: 4/4
-  📊 Relevance: 100%
-  📝 Result: 3299 chars
-
-[2/10] SEMANTIC: What is Napoleon's strategy for military campaigns?...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'What is Napoleon's strategy for military campaigns...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 108.37it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 38.01it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.11s
-  ✓ Keywords: 3/5
-  📊 Relevance: 60%
-  📝 Result: 3554 chars
-  ⚠️  Missing: strategy, battle
-
-[3/10] SEMANTIC: Explain the memory system architecture and scoping mechanism...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'Explain the memory system architecture and scoping...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 90.90it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 38.74it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.11s
-  ✓ Keywords: 4/5
-  📊 Relevance: 80%
-  📝 Result: 3554 chars
-  ⚠️  Missing: context
-
-[4/10] SEMANTIC: How does multi-intent RAG work and what are its components?...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'How does multi-intent RAG work and what are its co...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 73.69it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 42.80it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.09s
-  ✓ Keywords: 3/4
-  📊 Relevance: 75%
-  📝 Result: 3299 chars
-  ⚠️  Missing: component
-
-[5/10] KEYWORD: CrossEncoder ms-marco-MiniLM...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'CrossEncoder ms-marco-MiniLM...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 72.75it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 53.69it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.10s
-  ✓ Keywords: 4/4
-  📊 Relevance: 100%
-  📝 Result: 3341 chars
-
-[6/10] KEYWORD: Qdrant collection vector database...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'Qdrant collection vector database...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 83.69it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 34.89it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.11s
-  ✓ Keywords: 4/4
-  📊 Relevance: 100%
-  📝 Result: 3554 chars
-
-[7/10] KEYWORD: MCP protocol tools server...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'MCP protocol tools server...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 90.75it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 40.48it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.07s
-  ✓ Keywords: 3/4
-  📊 Relevance: 75%
-  📝 Result: 3554 chars
-  ⚠️  Missing: protocol
-
-[8/10] KEYWORD: forex zigzag pattern trading...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'forex zigzag pattern trading...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 91.56it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 32.97it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.10s
-  ✓ Keywords: 3/4
-  📊 Relevance: 75%
-  📝 Result: 3299 chars
-  ⚠️  Missing: zigzag
-
-[9/10] MIXED: What GPU acceleration features are available and how do they...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'What GPU acceleration features are available and h...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 91.85it/s]
-[RAG V3] Using cached instance for /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.09s
-  ✓ Keywords: 5/5
-  📊 Relevance: 100%
-  📝 Result: 3341 chars
-
-[10/10] MIXED: How to implement scoped memory with global and project-speci...
-[RAG] Scanning: /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG] Exclude patterns: ['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
-[RAG] Max files: 100
-[RAG] Found 9 indexable files
-[RAG V3] Indexing 9 files from /home/masih/Desktop/projects/A-Modular-Kingdom/tests/fixtures/real_docs
-[RAG V3] Searching with query: 'How to implement scoped memory with global and pro...'
-[RAG V3] Step 3: Vector search...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 138.14it/s]
-[RAG V3] Step 4: BM25 search...
-[RAG V3] Step 5: RRF fusion...
-[RAG V3] Step 6: CrossEncoder reranking...
-Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 54.34it/s]
-[RAG V3] Search completed, returning 5 unique results
-  ⏱️  Time: 0.07s
-  ✓ Keywords: 5/5
-  📊 Relevance: 100%
-  📝 Result: 3554 chars
-
-======================================================================
-RAG V3 Summary
-======================================================================
-Total Time: 13.69s
-Avg Time/Query: 1.37s
-Overall Relevance: 86.5%
-  - Semantic: 78.8%
-  - Keyword: 87.5%
-  - Mixed: 100.0%
-
-
-======================================================================
-FINAL COMPARISON
-======================================================================
-
-Metric                    V2                   V3                  
-----------------------------------------------------------------------
-Avg Time/Query            2.10                 1.37                
-Overall Relevance         83.5                 86.5                
-Semantic Relevance        77.5                 78.8                
-Keyword Relevance         81.2                 87.5                
-Mixed Relevance           100.0                100.0               
-
-======================================================================
-VERDICT
-======================================================================
-
-⚡ V3 is 1.5x faster
-🎯 V3 is more relevant (86.5% vs 83.5%)
