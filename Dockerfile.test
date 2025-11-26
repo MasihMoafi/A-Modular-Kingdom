@@ -1,0 +1,21 @@
+# Test Dockerfile for rag-mem package
+FROM python:3.12-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create test directory
+WORKDIR /test
+
+# Copy test documents
+COPY tests/fixtures/docs /test/docs
+
+# Install rag-mem from PyPI
+RUN pip install --no-cache-dir rag-mem
+
+# Test script
+RUN echo 'from memory_mcp import Settings; from memory_mcp.rag import RAGPipeline; print("Import successful")' > test.py
+
+CMD ["python", "test.py"]
