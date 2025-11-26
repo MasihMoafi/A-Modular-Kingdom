@@ -4,8 +4,6 @@
 
 Stop rebuilding the same infrastructure. Connect any AI agent to long-term memory, document retrieval, and 8+ powerful tools through the Model Context Protocol.
 
-<img width="2275" height="1183" alt="architecture" src="https://github.com/user-attachments/assets/6e4eaca7-0cae-43b8-a60d-fc8bdfe8c77e" />
-
 ## The Problem
 
 Building AI agents? You keep reinventing:
@@ -31,8 +29,6 @@ Now any agent (Claude Desktop, custom chatbots, multi-agent systems) gets instan
 
 **One foundation. Infinite applications.**
 
-<img width="1672" height="1426" alt="architecture" src="https://github.com/user-attachments/assets/35ed7188-6d55-4ed1-9298-cbb5ac20bbb5" />
-
 ---
 
 ## 📑 Table of Contents
@@ -44,6 +40,7 @@ Now any agent (Claude Desktop, custom chatbots, multi-agent systems) gets instan
 - [🧠 Memory System](#-memory-system)
 - [📦 Package Installation](#-package-installation)
 - [🎯 Integration Examples](#-integration-examples)
+- [🤖 Example Applications](#-example-applications)
 - [🤝 Contributing](#-contributing)
 
 ---
@@ -93,8 +90,6 @@ ollama pull embeddinggemma
 # Start host.py MCP server
 python src/agent/host.py
 ```
-
-<img width="400" height="500" alt="image" src="https://github.com/user-attachments/assets/08959c56-62e4-4067-8510-fddc53a18072" />
 
 ### Connect Your Agent
 
@@ -146,8 +141,6 @@ The MCP server exposes these tools:
 | `analyze_media` | Vision with Ollama | Analyze images/videos |
 | `text_to_speech` | TTS (pyttsx3/kokoro) | Generate audio from text |
 | `speech_to_text` | Whisper STT | Transcribe audio files |
-
-<img width="2556" height="1375" alt="Screenshot from 2025-07-14 17-57-24" src="https://github.com/user-attachments/assets/32e9a3c8-3553-49e4-b106-5fc26d2d946d" />
 
 ---
 
@@ -218,8 +211,6 @@ search_memories(query="coding standards", top_k=5)
 ```
 
 **Storage:** `~/.modular_kingdom/memories/` (global) + project-specific folders
-
-<img width="1785" height="1287" alt="Screenshot from 2025-08-16 01-10-56" src="https://github.com/user-attachments/assets/edfc887b-9f33-4b84-89e2-1113881b38f4" />
 
 ---
 
@@ -323,6 +314,26 @@ with ToolCollection.from_mcp(params) as tools:
 
 ---
 
+## 🤖 Example Applications
+
+This repository includes example multi-agent systems built on the foundation:
+
+### Council Chamber (Hierarchical)
+- 3-tier agent hierarchy (Queen → Teacher → Code Agent)
+- Validation loops and task delegation
+- Uses ACP SDK + smolagents
+- **Location:** `multiagents/council_chamber/`
+
+### Gym (Sequential)
+- Fitness planning workflow (Interview → Plan → Nutrition)
+- CrewAI-powered coordination
+- Web interface included
+- **Location:** `multiagents/gym/`
+
+**Note:** These are demonstration applications, not the core product. The foundation (`host.py`) is the main offering.
+
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -382,7 +393,7 @@ python tests/benchmark_rag.py
 Package verified to work in isolation:
 
 ```bash
-docker build -f docker/Dockerfile.test -t rag-mem-test .
+docker build -f Dockerfile.test -t rag-mem-test .
 docker run --rm rag-mem-test
 ```
 
