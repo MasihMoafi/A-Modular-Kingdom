@@ -350,6 +350,51 @@ This repository includes example multi-agent systems built on the foundation:
 
 ---
 
+## 🧪 Testing & Performance
+
+### Run Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run specific test suites
+pytest tests/test_rag_v2.py -v
+pytest tests/test_rag_v3.py -v
+pytest tests/test_memory_global.py -v
+
+# Run benchmarks
+python tests/benchmark_rag.py
+```
+
+### Performance
+
+**Benchmark Results (GPU/CUDA):**
+
+| Version | Docs | Cold Start | Warm Query |
+|---------|------|------------|------------|
+| V2 | 100 | 26.8s | **0.31s** |
+| V3 | 100 | 13.9s | **0.02s** (15x faster!) |
+
+**Key Features:**
+- ✅ GPU acceleration (CUDA) for embeddings and reranking
+- ✅ Smart caching (warm queries <0.5s)
+- ✅ Tested with .py, .md, .txt, .ipynb files
+- ✅ Global memory access from any directory
+
+**See detailed benchmarks:** [docs/RAG_PERFORMANCE.md](docs/RAG_PERFORMANCE.md)
+
+### Docker Testing
+
+Package verified to work in isolation:
+
+```bash
+docker build -f Dockerfile.test -t rag-mem-test .
+docker run --rm rag-mem-test
+```
+
+---
+
 ## 🤝 Contributing
 
 Contributions welcome! Focus areas:
