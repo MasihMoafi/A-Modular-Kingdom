@@ -2,17 +2,16 @@
 
 This is the main RAG implementation using:
 - Qdrant for vector storage
-- BM25 for lexical search
+- BM25 for lexical search (rank_bm25, no langchain)
 - CrossEncoder for reranking (optional)
 """
 
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-from langchain_core.documents import Document
 
 from memory_mcp.embeddings import get_embedding_provider
 from memory_mcp.rag.chunkers import (
@@ -69,8 +68,10 @@ class RAGPipeline:
             api_key=settings.qdrant_api_key,
         )
 
-        self.all_documents: list[Document] = []
+        self.all_documents: list[dict[str, Any]] = []
         self._reranker = None
+        self._bm25 = None
+        self._bm25_corpus: list[list[str]] = []
 
         if settings.rag_rerank:
             self._init_reranker()
@@ -95,6 +96,20 @@ class RAGPipeline:
         except ImportError:
             pass
 
+    def _tokenize(self, text: str) -> list[str]:
+        """Tokenize text for BM25."""
+        text = (text or "").lower()
+        return [tok for tok in re.split(r"[^a-z0-9]+", text) if tok]
+
+    def _rebuild_bm25(self):
+        """Build BM25 index from documents."""
+        try:
+            from rank_bm25 import BM25Okapi
+            self._bm25_corpus = [self._tokenize(doc["content"]) for doc in self.all_documents]
+            self._bm25 = BM25Okapi(self._bm25_corpus) if self._bm25_corpus else None
+        except ImportError:
+            self._bm25 = None
+
     def index(self, force: bool = False) -> int:
         """Index documents from configured paths.
 
@@ -115,10 +130,10 @@ class RAGPipeline:
 
         if not needs_reindex:
             self._load_documents()
+            self._rebuild_bm25()
             return len(self.all_documents)
 
         all_docs = []
-        all_qdrant_docs = []
 
         for path in self.document_paths:
             if not os.path.exists(path):
@@ -129,31 +144,18 @@ class RAGPipeline:
                     for file in files:
                         file_path = os.path.join(root, file)
                         docs = self._process_file(file_path)
-                        for doc in docs:
-                            all_docs.append(
-                                Document(
-                                    page_content=doc["content"],
-                                    metadata={k: v for k, v in doc.items() if k != "content"},
-                                )
-                            )
-                            all_qdrant_docs.append(doc)
+                        all_docs.extend(docs)
             else:
                 docs = self._process_file(path)
-                for doc in docs:
-                    all_docs.append(
-                        Document(
-                            page_content=doc["content"],
-                            metadata={k: v for k, v in doc.items() if k != "content"},
-                        )
-                    )
-                    all_qdrant_docs.append(doc)
+                all_docs.extend(docs)
 
         if not all_docs:
             return 0
 
         self.vector_db.clear()
-        self.vector_db.add_documents_batch(all_qdrant_docs, batch_size=100)
+        self.vector_db.add_documents_batch(all_docs, batch_size=100)
         self.all_documents = all_docs
+        self._rebuild_bm25()
         self._save_manifest()
         self._save_documents()
 
@@ -200,46 +202,41 @@ class RAGPipeline:
 
         vector_results = self.vector_db.search(query, top_k=top_k)
         vector_docs = [
-            Document(
-                page_content=doc["content"],
-                metadata={k: v for k, v in doc.items() if k not in ["content", "score"]},
-            )
+            {"content": doc["content"], **{k: v for k, v in doc.items() if k not in ["content", "score"]}}
             for doc in vector_results
         ]
 
-        if self.all_documents:
-            try:
-                from langchain_community.retrievers import BM25Retriever
+        bm25_docs = []
+        if self._bm25 is not None and self.all_documents:
+            q_tokens = self._tokenize(query)
+            scores = self._bm25.get_scores(q_tokens)
+            ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+            for idx, score in ranked[:top_k]:
+                if score > 0:
+                    bm25_docs.append(self.all_documents[idx])
 
-                bm25_retriever = BM25Retriever.from_documents(self.all_documents)
-                bm25_retriever.k = top_k
-                bm25_docs = bm25_retriever.invoke(query)
-
-                combined_docs = vector_docs + bm25_docs
-                seen = set()
-                initial_results = []
-                for doc in combined_docs:
-                    if doc.page_content not in seen:
-                        seen.add(doc.page_content)
-                        initial_results.append(doc)
-            except ImportError:
-                initial_results = vector_docs
-        else:
-            initial_results = vector_docs
+        combined_docs = vector_docs + bm25_docs
+        seen = set()
+        initial_results = []
+        for doc in combined_docs:
+            content = doc["content"]
+            if content not in seen:
+                seen.add(content)
+                initial_results.append(doc)
 
         if not initial_results:
             return "No relevant information found."
 
         if self._reranker and len(initial_results) > 1:
-            pairs = [[query, doc.page_content] for doc in initial_results]
+            pairs = [[query, doc["content"]] for doc in initial_results]
             scores = self._reranker.predict(pairs)
-            scored_results = zip(scores, initial_results)
+            scored_results = list(zip(scores, initial_results))
             sorted_results = sorted(scored_results, key=lambda x: x[0], reverse=True)
-            final_results = [doc for score, doc in sorted_results[: top_k]]
+            final_results = [doc for score, doc in sorted_results[:top_k]]
         else:
             final_results = initial_results[:top_k]
 
-        unique_content = list({doc.page_content for doc in final_results})
+        unique_content = list({doc["content"] for doc in final_results})
         return "Document search results:\n\n" + "\n\n---\n\n".join(unique_content)
 
     def _get_file_hash(self, file_path: str) -> str:
@@ -292,12 +289,8 @@ class RAGPipeline:
     def _save_documents(self):
         """Save documents for BM25 reload."""
         try:
-            docs_data = [
-                {"content": doc.page_content, **doc.metadata}
-                for doc in self.all_documents
-            ]
             with open(self._docs_path, "w") as f:
-                json.dump(docs_data, f)
+                json.dump(self.all_documents, f)
         except Exception:
             pass
 
@@ -308,13 +301,6 @@ class RAGPipeline:
 
         try:
             with open(self._docs_path, "r") as f:
-                docs_data = json.load(f)
-            self.all_documents = [
-                Document(
-                    page_content=doc["content"],
-                    metadata={k: v for k, v in doc.items() if k != "content"},
-                )
-                for doc in docs_data
-            ]
+                self.all_documents = json.load(f)
         except Exception:
             pass

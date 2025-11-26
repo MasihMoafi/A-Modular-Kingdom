@@ -1,4 +1,4 @@
-"""Tests for memory store."""
+"""Tests for memory store (Qdrant-based)."""
 
 import tempfile
 from pathlib import Path
@@ -11,14 +11,19 @@ from memory_mcp.memory import MemoryStore
 
 @pytest.fixture
 def temp_settings():
-    """Create settings with temporary storage path."""
+    """Create settings with in-memory Qdrant storage."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        yield Settings(chroma_path=tmpdir)
+        yield Settings(
+            qdrant_mode="memory",
+            qdrant_path=tmpdir,
+            embed_provider="sentence-transformers",
+            embed_model="all-MiniLM-L6-v2",
+        )
 
 
 @pytest.fixture
 def memory_store(temp_settings):
-    """Create a memory store with temporary storage."""
+    """Create a memory store with in-memory storage."""
     return MemoryStore(temp_settings)
 
 

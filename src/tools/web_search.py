@@ -1,10 +1,10 @@
 # tools/web_search.py
 
-import httpx
 from bs4 import BeautifulSoup
 import json
 
 def perform_web_search(query: str) -> str:
+    import httpx  # Lazy import to avoid proxy conflicts at module level
     """
     Searches the web for information using DuckDuckGo.
     Args:

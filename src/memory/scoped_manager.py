@@ -26,7 +26,7 @@ class ScopedMemoryManager:
             storage_path = str(self.config.get_storage_path(scope))
             collection_name = self.config.get_collection_name(scope)
             self._instances[scope] = Mem0(
-                chroma_path=storage_path,
+                storage_path=storage_path,
                 collection_name=collection_name
             )
         return self._instances[scope]
