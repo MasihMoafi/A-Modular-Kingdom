@@ -15,12 +15,10 @@ from pydantic import Field
 from memory.core import Mem0
 from memory.scoped_manager import ScopedMemoryManager
 from memory.memory_config import MemoryScope
-from tools.web_search import perform_web_search
-from tools.browser_agent_playwright import browse_web_playwright
 from tools.code_exec import run_code
 from tools.vision import analyze_media_with_ollama
-from tools.tts import text_to_speech, list_tts_voices
-from tools.stt import speech_to_text, list_stt_models
+from tools.tts import text_to_speech
+from tools.stt import speech_to_text
 import glob
 
 mcp = FastMCP("unified_knowledge_agent_host")
@@ -30,9 +28,11 @@ scoped_memory = None
 try:
     # Initialize scoped memory manager
     scoped_memory = ScopedMemoryManager(project_root=project_root)
-    # Keep legacy for backward compatibility
-    chroma_path = os.path.join(project_root, "agent_chroma_db")
-    memory_database = Mem0(chroma_path=chroma_path)
+    # Legacy memory system with Qdrant backend - use global path
+    from pathlib import Path
+    global_legacy_path = Path.home() / ".modular_kingdom" / "legacy_memories"
+    global_legacy_path.mkdir(parents=True, exist_ok=True)
+    memory_database = Mem0(storage_path=str(global_legacy_path))
 except Exception as e:
     sys.stderr.write(f"[HOST] WARNING: Memory systems disabled: {e}\n")
     memory_database = None
@@ -226,36 +226,6 @@ def list_all_memories() -> str:
         return json.dumps([{"error": f"Error listing memories on host: {str(e)}"}])
 
 @mcp.tool(
-    name="web_search",
-    description="Perform a web search to find current information that may not be available in local memory or knowledge base"
-)
-def web_search(
-    query: str = Field(description="The search query to look up on the web")
-) -> str:
-    """A tool to perform a web search using the Google Search API."""
-    try:
-        results = perform_web_search(query)
-        return results
-    except Exception as e:
-        return json.dumps({"error": f"Error performing web search on host: {str(e)}"})
-
- 
-
-@mcp.tool(
-    name="browser_automation",
-    description="Perform automated browser tasks using natural language instructions."
-)
-def browser_automation(
-    task: str = Field(description="Natural language description of the browser task to perform"),
-    headless: bool = Field(default=True, description="Whether to run browser in headless mode (default: True)")
-) -> str:
-    try:
-        import asyncio as _asyncio
-        return _asyncio.run(browse_web_playwright(task, headless))
-    except Exception as e:
-        return json.dumps({"status": "error", "error": str(e)})
-
-@mcp.tool(
     name="code_execute",
     description="Execute Python code in a sandboxed subprocess and return stdout/stderr"
 )
@@ -369,30 +339,6 @@ def stt_tool(
             kwargs["file_path"] = file_path
             
         return speech_to_text(**kwargs)
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
-
-@mcp.tool(
-    name="list_tts_voices",
-    description="List available voices for text-to-speech engines"
-)
-def list_voices_tool(
-    engine: str = Field(default="pyttsx3", description="TTS engine to query for available voices")
-) -> str:
-    """List available voices for the specified TTS engine."""
-    try:
-        return list_tts_voices(engine)
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
-
-@mcp.tool(
-    name="list_stt_models",
-    description="List available models and languages for speech-to-text engines"
-)
-def list_models_tool() -> str:
-    """List available STT models and supported languages."""
-    try:
-        return list_stt_models()
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 

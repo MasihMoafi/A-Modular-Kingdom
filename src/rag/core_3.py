@@ -13,10 +13,31 @@ clear_proxy_settings()
 import ollama
 from collections import Counter
 from typing import List, Dict, Any, Tuple, Callable, Optional
-from langchain_community.embeddings import SentenceTransformerEmbeddings
-from langchain_core.documents import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer, CrossEncoder
 from .qdrant_backend import QdrantVectorDB
+
+
+def chunk_text(text: str, chunk_size: int = 700, chunk_overlap: int = 100) -> List[str]:
+    """Split text into overlapping chunks without langchain."""
+    if not text or len(text.strip()) < 50:
+        return []
+
+    chunks = []
+    start = 0
+
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+
+        if len(chunk.strip()) > 50:
+            chunks.append(chunk)
+
+        start = end - chunk_overlap if end < len(text) else len(text)
+
+        if len(chunks) > 10000:  # Safety limit
+            break
+
+    return chunks
 
 
 class VectorIndex:
@@ -279,22 +300,18 @@ class RAGPipelineV3:
         # Initialize embedding function based on provider
         embed_provider = self.config.get("embed_provider", "sentencetransformer")
 
-        if embed_provider == "vllm":
-            from .vllm_embeddings import VLLMEmbeddingFunction
-            embeddings_model = VLLMEmbeddingFunction(model=self.config.get("embed_model"))
-            print(f"[RAG V3] Using vLLM embeddings (BATCH MODE) with model: {self.config.get('embed_model')}")
-        elif embed_provider == "ollama":
-            from langchain_community.embeddings import OllamaEmbeddings
-            embeddings_model = OllamaEmbeddings(model=self.config.get("embed_model"))
-            print(f"[RAG V3] Using Ollama embeddings with model: {self.config.get('embed_model')}")
-        else:
-            embeddings_model = SentenceTransformerEmbeddings(
-                model_name=self.config.get("embed_model"),
-                model_kwargs={'device': self.device}
-            )
-            print(f"[RAG V3] Using SentenceTransformer embeddings with model: {self.config.get('embed_model')}")
+        # Use SentenceTransformer for fast GPU-based embeddings
+        model = SentenceTransformer(self.config.get("embed_model"), device=self.device)
+        class STWrapper:
+            def __init__(self, st_model):
+                self.model = st_model
+            def embed_documents(self, texts):
+                return self.model.encode(texts, convert_to_numpy=True).tolist()
+            def embed_query(self, text):
+                return self.model.encode([text], convert_to_numpy=True)[0].tolist()
 
-        self.embedding_fn = embeddings_model  # Pass object directly for batch support
+        self.embedding_fn = STWrapper(model)
+        print(f"[RAG V3] Using SentenceTransformer embeddings with model: {self.config.get('embed_model')}")
 
         # Initialize Qdrant vector DB (replaces custom VectorIndex)
         qdrant_path = os.path.join(self.config.get("persist_dir"), "qdrant_storage")
@@ -320,7 +337,14 @@ class RAGPipelineV3:
             k1=self.config.get("bm25_k1", 1.5),
             b=self.config.get("bm25_b", 0.75)
         )
-        
+
+        # Add CrossEncoder for fast reranking
+        self.reranker = CrossEncoder(
+            self.config.get("reranker_model", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+            device=self.device
+        )
+        print(f"[RAG V3] Using CrossEncoder reranking with model: {self.config.get('reranker_model')}")
+
         # Load or create database
         self._load_or_create_database()
 
@@ -376,7 +400,7 @@ class RAGPipelineV3:
             if os.path.isdir(path):
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
-                    if file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
+                    if file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json', '.ipynb')):
                         content = self._extract_content(file_path)
                         if content:
                             document_contents[file_path] = content
@@ -388,13 +412,13 @@ class RAGPipelineV3:
         # Second pass: chunk and optionally add context
         for file_path, full_content in document_contents.items():
             print(f"[RAG V3] Processing {os.path.basename(file_path)}...")
-            
-            # STEP 1: CHUNKING (same as V2)
-            text_splitter = RecursiveCharacterTextSplitter(
+
+            # STEP 1: CHUNKING (simple overlapping chunks, no langchain)
+            chunks = chunk_text(
+                full_content,
                 chunk_size=self.config.get("chunk_size"),
                 chunk_overlap=self.config.get("chunk_overlap")
             )
-            chunks = text_splitter.split_text(full_content)
             
             for i, chunk in enumerate(chunks):
                 if len(chunk.strip()) > 50:
@@ -434,6 +458,8 @@ class RAGPipelineV3:
             return self._extract_text_from_pdf(file_path)
         elif file_path.lower().endswith(".json"):
             return self._extract_text_from_json(file_path)
+        elif file_path.lower().endswith(".ipynb"):
+            return self._extract_text_from_notebook(file_path)
         else:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -441,6 +467,17 @@ class RAGPipelineV3:
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
                 return ""
+
+    def _extract_text_from_notebook(self, notebook_path: str) -> str:
+        """Extract text from Jupyter notebook (.ipynb)"""
+        try:
+            from .notebook_chunker import extract_cells_from_notebook
+            cells = extract_cells_from_notebook(notebook_path)
+            # Combine all cell contents
+            return "\n\n".join([cell['content'] for cell in cells])
+        except Exception as e:
+            print(f"Error extracting text from {notebook_path}: {e}")
+            return ""
 
     def _extract_text_from_json(self, json_path: str) -> str:
         """Extract text from JSON - handles various structures"""
@@ -543,74 +580,30 @@ class RAGPipelineV3:
         rrf_results.sort(key=lambda x: x[1], reverse=True)
         return [doc for doc, score in rrf_results]
 
-    def _llm_rerank(self, docs: List[Dict], query: str, k: int) -> List[Dict]:
+    def _crossencoder_rerank(self, docs: List[Dict], query: str, k: int) -> List[Dict]:
         """
-        STEP 6: LLM RERANKING
-        
-        Use LLM to select the most relevant documents.
-        This is more contextually aware than CrossEncoder models.
+        STEP 6: CROSSENCODER RERANKING
+
+        Use CrossEncoder to rerank documents by relevance.
+        Fast, GPU-based, task-specialized for passage ranking.
         """
         if len(docs) <= k:
             return docs
 
         try:
-            # Prepare documents for LLM
-            doc_list = []
-            for i, doc in enumerate(docs):
-                doc_list.append(f"""
-<document>
-<document_id>{i}</document_id>
-<document_content>{doc['content'][:500]}...</document_content>
-</document>""")
+            # Prepare query-document pairs for reranking
+            pairs = [[query, doc['content'][:512]] for doc in docs]  # Limit to 512 chars for speed
 
-            joined_docs = "\n".join(doc_list)
-            
-            prompt = f"""You are about to be given a set of documents, along with an id of each.
-Your task is to select the {k} most relevant documents to answer the user's question.
+            # Get relevance scores
+            scores = self.reranker.predict(pairs)
 
-Here is the user's question:
-<question>
-{query}
-</question>
+            # Sort documents by score (higher is better)
+            ranked = sorted(zip(docs, scores), key=lambda x: x[1], reverse=True)
 
-Here are the documents to select from:
-<documents>
-{joined_docs}
-</documents>
+            return [doc for doc, score in ranked[:k]]
 
-Respond in the following format:
-```json
-{{
-    "document_ids": [list of document ids as numbers, {k} elements long, sorted in order of decreasing relevance]
-}}
-```"""
-
-            response = ollama.chat(
-                model=self.config.get("llm_model", "qwen3:8b"),
-                messages=[
-                    {'role': 'user', 'content': prompt},
-                    {'role': 'assistant', 'content': '```json'}
-                ]
-            )
-            
-            # Parse response
-            result_text = response['message']['content']
-            if '```' in result_text:
-                result_text = result_text.split('```')[0]
-            
-            result = json.loads(result_text)
-            selected_ids = result.get("document_ids", [])
-            
-            # Return selected documents in order
-            reranked_docs = []
-            for doc_id in selected_ids:
-                if isinstance(doc_id, int) and 0 <= doc_id < len(docs):
-                    reranked_docs.append(docs[doc_id])
-            
-            return reranked_docs[:k]
-            
         except Exception as e:
-            print(f"[RAG V3] LLM reranking failed: {e}, falling back to original order")
+            print(f"[RAG V3] CrossEncoder reranking failed: {e}, falling back to original order")
             return docs[:k]
 
     def search(self, query: str) -> str:
@@ -647,9 +640,9 @@ Respond in the following format:
             if not fused_docs:
                 return "No relevant information found."
             
-            # STEP 6: LLM RERANKING
-            print("[RAG V3] Step 6: LLM reranking...")
-            final_docs = self._llm_rerank(fused_docs, query, rerank_top_k)
+            # STEP 6: CROSSENCODER RERANKING
+            print("[RAG V3] Step 6: CrossEncoder reranking...")
+            final_docs = self._crossencoder_rerank(fused_docs, query, rerank_top_k)
             
             # Format results
             unique_content = []
