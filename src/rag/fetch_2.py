@@ -35,7 +35,7 @@ RAG_CONFIG = {
     "top_k": 5,
     "chunk_size": 700,
     "chunk_overlap": 100,
-    "ensemble_weights": [0.7, 0.3],
+    "ensemble_weights": [0.5, 0.5],  # Balanced vector + BM25
     "reranker_model": 'cross-encoder/ms-marco-MiniLM-L-6-v2',
     "rerank_top_k": 5,
     "force_reindex": False,
