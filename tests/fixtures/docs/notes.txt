@@ -1,2 +1,0 @@
-TensorFlow and PyTorch are popular frameworks.
-FastAPI is used for building APIs.
