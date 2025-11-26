@@ -31,6 +31,31 @@ Now any agent (Claude Desktop, custom chatbots, multi-agent systems) gets instan
 
 ---
 
+## 🏗️ Architecture
+
+<img width="2275" alt="architecture" src="https://github.com/user-attachments/assets/6e4eaca7-0cae-43b8-a60d-fc8bdfe8c77e" />
+
+```
+┌─────────────────────────────────────┐
+│       Multi-Agent Layer             │
+│  ┌─────────────┐  ┌─────────────┐   │
+│  │   Council   │  │     Gym     │   │
+│  │   Chamber   │  │             │   │
+│  └─────────────┘  └─────────────┘   │
+└─────────────────────────────────────┘
+           │                │
+           ▼                ▼
+┌─────────────────────────────────────┐
+│        Foundation Layer             │
+│  ┌─────────┐ ┌─────────┐ ┌────────┐ │
+│  │   RAG   │ │ Memory  │ │ Tools  │ │
+│  └─────────┘ └─────────┘ └────────┘ │
+│              host.py                │
+└─────────────────────────────────────┘
+```
+
+---
+
 ## 📑 Table of Contents
 
 - [✨ Core Features](#-core-features)
