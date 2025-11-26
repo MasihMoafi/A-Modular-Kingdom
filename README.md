@@ -165,11 +165,21 @@ Three implementations with different trade-offs:
 - **Use Case:** Production apps, large codebases
 - **Features:** Smart reindexing, cloud-ready
 
-### V3 - Advanced
-- **Stack:** Custom vector index + BM25 + RRF fusion + LLM reranking
-- **Speed:** 2-3s (LLM reranking overhead)
-- **Use Case:** Research, maximum accuracy
-- **Features:** Contextual retrieval, custom distance metrics
+### V3 - Advanced (Highest Accuracy)
+- **Stack:** Qdrant + BM25 + RRF fusion + CrossEncoder reranking
+- **Speed:** <1s (cached), 6.7s (cold start)
+- **Use Case:** Maximum accuracy, complex queries
+- **Features:** Contextual retrieval, hybrid fusion
+
+### Benchmark Results
+
+| Metric | V2 | V3 |
+|--------|-----|-----|
+| **Accuracy** | 62% | **80%** |
+| **Latency (cached)** | 1.1s | 0.03s |
+| **Tests Passed** | 3/4 | 3/4 |
+
+*Tested on Napoleon.pdf (3MB), Anthropic prompt engineering tutorial (416KB), and project documentation.*
 
 **Usage:**
 ```python
