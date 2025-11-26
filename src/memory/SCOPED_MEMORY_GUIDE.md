@@ -43,7 +43,7 @@ search_memories(query="preferences", top_k=3, scope_filter="global_preferences")
 ## Storage Locations
 
 ```
-~/.gemini/memories/
+~/.modular_kingdom/memories/
 ├── global/
 │   ├── rules/          # Global coding rules
 │   ├── preferences/    # User preferences  

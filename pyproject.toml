@@ -4,16 +4,16 @@ version = "0.1.0"
 description = "A modular agentic kingdom with memory, RAG, and web search"
 dependencies = [
     "mcp",
-    "fastmcp", 
+    "fastmcp",
     "ollama",
-    "mem0ai",
-    "chromadb",
     "nest-asyncio",
     "pymupdf>=1.26.3",
+    "torch==2.5.1",
+    "torchvision==0.20.1",
+    "torchaudio==2.5.1",
     "sentence-transformers>=5.0.0",
     "langchain>=0.3.27",
     "langchain-community>=0.3.27",
-    "faiss-cpu>=1.11.0.post1",
     "beautifulsoup4>=4.13.4",
     "httpx>=0.28.1",
     "rank-bm25",
@@ -29,8 +29,9 @@ dependencies = [
     # Browser automation
     "browser-use>=0.1.0",
     "playwright>=1.40.0",
-    # PyTorch CPU-only (CUDA 13 driver incompatible with PyTorch pre-built wheels)
-    # Ollama handles GPU for embeddings, PyTorch only used for CPU reranker
+    # PyTorch locked at 2.5.1 to prevent breaking upgrades. After install, upgrade to CUDA variant:
+    # uv pip install torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 --index-url https://download.pytorch.org/whl/cu118 --force-reinstall
+    "qdrant-client>=1.7.0",
 ]
 
 [build-system]

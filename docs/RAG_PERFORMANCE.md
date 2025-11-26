@@ -1,172 +1,155 @@
 # RAG Performance Guide
 
-## Benchmark Results
+## Real-World Benchmark Results
 
-Based on comprehensive testing with GPU acceleration (CUDA):
+Tested with **9 real documents** (3MB total) including:
+- Napoleon.pdf (3MB historical text)
+- Python code files (core_2.py, core_3.py, host.py, memory_core.py, multi_intent_rag.py)
+- Markdown documentation (RAG_PERFORMANCE.md, README_V2.md, forex_docs.md)
+
+**10 challenging queries** testing semantic understanding, keyword matching, and mixed retrieval.
 
 ### Performance Summary
 
-| Version | Docs | Cold Start | Warm Query | Use Case |
-|---------|------|------------|------------|----------|
-| **V2** | 10 | 30.7s | 0.32s | Production, standard retrieval |
-| **V3** | 10 | 13.7s | **0.01s** | High-accuracy, research |
-| **V2** | 100 | 26.8s | 0.31s | Production, standard retrieval |
-| **V3** | 100 | 13.9s | **0.02s** | High-accuracy, research |
+| Metric | V2 (Qdrant + BM25) | V3 (Custom + RRF) |
+|--------|-------------------|-------------------|
+| **Avg Time/Query** | 6.82s | **1.90s** (3.6x faster) |
+| **Overall Accuracy** | **33.3%** | 30.0% |
+| **Semantic Accuracy** | **45.8%** | 37.5% |
+| **Keyword Accuracy** | 25.0% | 25.0% |
+| **Mixed Accuracy** | 25.0% | 25.0% |
+| **Cold Start** | 64.6s | 18.2s |
+| **Warm Query** | 0.39-0.41s | 0.06-0.11s |
 
 ### Key Findings
 
-1. **V3 is faster on warm queries** (0.01-0.02s vs 0.31-0.32s for V2)
-2. **V3 has faster cold starts** (13-14s vs 26-30s for V2)
-3. **Both use GPU acceleration** (CUDA) for embeddings and reranking
-4. **Indexing is one-time cost** - amortized over many queries
+1. **V3 is 3.6x faster** on average (1.90s vs 6.82s)
+2. **V2 is slightly more accurate** (33.3% vs 30.0%)
+3. **Both struggle with keyword-only queries** (25% accuracy)
+4. **V2 better for semantic queries** (45.8% vs 37.5%)
+5. **Warm queries are fast** for both (<0.5s)
 
 ## When to Use Each Version
 
 ### RAG V2 (Qdrant + BM25 + CrossEncoder)
-- **Best for:** Production apps, standard accuracy requirements
-- **Strengths:** Proven, stable, cloud-ready (Qdrant Cloud)
-- **Speed:** 0.31s per query (100 docs)
-- **Supports:** .pdf, .txt, .py, .md, .ipynb, .js, .ts
+- **Best for:** Semantic understanding, production apps
+- **Strengths:** 
+  - Better semantic accuracy (45.8%)
+  - Cloud-ready (Qdrant Cloud)
+  - Proven, stable
+- **Speed:** 0.39s per warm query
+- **Use when:** You need reliable semantic search
 
-### RAG V3 (Custom Vector + BM25 + RRF + LLM Reranking)
-- **Best for:** Research, maximum accuracy, fast queries
-- **Strengths:** Advanced techniques (RRF fusion, contextual retrieval)
-- **Speed:** 0.02s per query (100 docs) - **15x faster than V2!**
-- **Supports:** .pdf, .txt, .py, .md, .ipynb, .json (newly added)
+### RAG V3 (Custom Vector + BM25 + RRF + CrossEncoder)
+- **Best for:** Speed-critical applications
+- **Strengths:**
+  - 3.6x faster overall
+  - Advanced RRF fusion
+  - Local storage
+- **Speed:** 0.08s per warm query
+- **Use when:** Speed is priority over accuracy
 
-## Scale Recommendations
+## Detailed Query Analysis
 
-### Small Projects (< 50 documents)
-- **Use:** Either V2 or V3
-- **Indexing:** < 15s
-- **Query:** < 0.1s
-- **Memory:** ~500MB
+### Semantic Queries (Understanding Context)
+**Example:** "How does the RAG system handle reranking and what models does it use?"
 
-### Medium Projects (50-500 documents)
-- **Use:** V3 for speed, V2 for cloud deployment
-- **Indexing:** 15-60s (one-time)
-- **Query:** < 0.5s
-- **Memory:** ~1-2GB
+- **V2:** 33% accuracy (found core_2.py, missed core_3.py and docs)
+- **V3:** 0% accuracy (missed all expected docs)
+- **Winner:** V2 for semantic understanding
 
-### Large Projects (500-5000 documents)
-- **Use:** V2 with Qdrant Cloud
-- **Indexing:** 1-5min (one-time)
-- **Query:** < 2s
-- **Memory:** ~2-4GB
-- **Note:** Max 100 files enforced by default (configurable)
+### Keyword Queries (Exact Matching)
+**Example:** "CrossEncoder ms-marco-MiniLM"
 
-### Very Large Projects (> 5000 documents)
-- **Use:** V2 with distributed Qdrant cluster
-- **Considerations:**
-  - Batch indexing recommended
-  - Consider document chunking strategy
-  - Monitor memory usage
-  - Use Qdrant Cloud for scalability
+- **V2:** 0% accuracy (missed both code files)
+- **V3:** 0% accuracy (missed both code files)
+- **Winner:** Tie (both need improvement)
 
-## GPU Acceleration
+### Mixed Queries (Semantic + Keywords)
+**Example:** "What GPU acceleration features are available and how do they improve performance?"
 
-### How GPU is Used
-
-Both versions automatically detect and use GPU (CUDA) if available:
-
-**V2:**
-- Embeddings: `SentenceTransformer` on CUDA
-- Reranking: `CrossEncoder` on CUDA
-- Logs: `[RAG V2] Using device: cuda`
-
-**V3:**
-- Embeddings: `SentenceTransformer` on CUDA
-- Reranking: `CrossEncoder` on CUDA
-- Logs: `[RAG V3] Using device: cuda`
-
-### Verifying GPU Usage
-
-Check logs for:
-```
-[RAG V2/V3] Using device: cuda
-```
-
-If GPU not available, falls back to CPU automatically (slower but functional).
-
-### GPU Requirements
-
-- **NVIDIA GPU** with CUDA support
-- **2GB+ VRAM** for small datasets (< 100 docs)
-- **4GB+ VRAM** for medium datasets (100-500 docs)
-- **8GB+ VRAM** for large datasets (> 500 docs)
+- **V2:** 0% accuracy
+- **V3:** 0% accuracy
+- **Winner:** Tie (challenging for both)
 
 ## Performance Tips
 
 ### 1. Warm Up the System
-First query includes model loading (~10-30s). Subsequent queries are fast.
+First query includes model loading and indexing. Subsequent queries are much faster:
+- **V2:** 64.6s cold → 0.39s warm (165x faster)
+- **V3:** 18.2s cold → 0.08s warm (228x faster)
 
-### 2. Use Caching
-Both versions cache loaded pipelines. Reusing same `doc_path` avoids re-indexing.
+### 2. Use Appropriate Version
+- **Semantic-heavy workload?** → Use V2
+- **Speed-critical?** → Use V3
+- **Keyword matching?** → Both need improvement, consider adding more BM25 weight
 
-### 3. Exclude Patterns
-Default excludes: `['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']`
+### 3. GPU Acceleration
+Both versions use CUDA automatically:
+- Embeddings: `SentenceTransformer` on CUDA
+- Reranking: `CrossEncoder` on CUDA
+- Check logs for: `[RAG V2/V3] Using device: cuda`
 
-These patterns prevent test files from being indexed.
+### 4. Document Chunking
+- V2: 1230 chunks from 9 files
+- V3: 1206 chunks from 9 files
+- Similar chunking strategies
 
-### 4. Batch Operations
-For bulk indexing, use the Python API directly instead of repeated MCP calls.
+## Accuracy Challenges
 
-### 5. Monitor Memory
-- V2: Uses Qdrant Cloud (minimal local memory)
-- V3: Uses local Qdrant (stores vectors in `rag_db_v3/`)
+Both versions struggled with:
+1. **Multi-document queries** - Expected 3 docs, found 0-1
+2. **Keyword-only queries** - BM25 not weighted enough
+3. **Code file retrieval** - Python files harder to match
+
+**Potential improvements:**
+- Increase BM25 weight for keyword queries
+- Better chunking for code files
+- Hybrid scoring adjustments
 
 ## Testing
 
-Run benchmarks yourself:
+Run the real-world benchmark yourself:
 
 ```bash
-python tests/benchmark_rag.py
+python tests/benchmark_real.py
 ```
 
-Run unit tests:
-
-```bash
-pytest tests/test_rag_v2.py -v
-pytest tests/test_rag_v3.py -v
-```
-
-## Troubleshooting
-
-### Slow Queries
-- Check if GPU is being used (`cuda` in logs)
-- Verify model cache (`~/.cache/huggingface/`)
-- Check network (V2 uses Qdrant Cloud)
-
-### Memory Issues
-- V3 stores full vector database locally
-- Consider V2 with cloud backend for large datasets
-
-### Indexing Failures
-- Check file permissions
-- Verify supported file types
-- Check exclude patterns aren't blocking your files
+This tests with actual documents from the project and challenging real-world queries.
 
 ## Architecture Comparison
 
-### V2: Production Stack
+### V2 Architecture
 ```
-Query → SentenceTransformer (CUDA) → Qdrant Cloud
-     → BM25 Search → Ensemble
-     → CrossEncoder Reranking (CUDA) → Results
-```
-
-### V3: Advanced Stack
-```
-Query → SentenceTransformer (CUDA) → Custom Vector Index
-     → BM25 Search → RRF Fusion
-     → CrossEncoder Reranking (CUDA)
-     → Contextual Enhancement → Results
+Query → Qdrant Vector Search → BM25 → CrossEncoder Rerank → Results
+        (Cloud/Local)           (Hybrid)  (GPU)
 ```
 
-## Changelog
+### V3 Architecture
+```
+Query → Vector Search → BM25 → RRF Fusion → CrossEncoder → Results
+        (Local Qdrant)  (Hybrid) (Advanced)   (GPU)
+```
 
-**2025-11-26:**
-- Added .ipynb support to V3
-- Fixed exclude patterns (now allows test fixtures)
-- Benchmark results show V3 15x faster on warm queries
-- Both versions verified to use GPU acceleration
+## Recommendations
+
+**For Production:**
+- Use V2 if semantic accuracy is critical
+- Use V3 if speed is priority
+- Both are production-ready with GPU acceleration
+
+**For Development:**
+- V3 faster iteration (3.6x faster)
+- V2 better for testing semantic understanding
+
+**For Research:**
+- V3 has more advanced techniques (RRF fusion)
+- V2 more stable and proven
+
+## Future Improvements
+
+1. **Tune BM25 weights** - Improve keyword matching
+2. **Better code chunking** - Improve Python file retrieval
+3. **Hybrid scoring** - Balance semantic vs keyword
+4. **Query expansion** - Handle multi-document queries better
+5. **Contextual retrieval** - Add document context to chunks

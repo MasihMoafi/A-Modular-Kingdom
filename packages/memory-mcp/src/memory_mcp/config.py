@@ -99,12 +99,6 @@ class Settings(BaseSettings):
         description="Qdrant Cloud API key (required if mode=cloud)",
     )
 
-    # ChromaDB configuration (for memory)
-    chroma_path: str = Field(
-        default="~/.memory-mcp/chroma_data",
-        description="Path for ChromaDB persistent storage",
-    )
-
     # RAG configuration
     rag_chunk_size: int = Field(
         default=700,
@@ -130,7 +124,7 @@ class Settings(BaseSettings):
     # Memory configuration
     memory_collection: str = Field(
         default="memories",
-        description="ChromaDB collection name for memories",
+        description="Qdrant collection name for memories",
     )
 
     # Server configuration
@@ -145,7 +139,7 @@ class Settings(BaseSettings):
         description="Device for local models (cpu, cuda, mps). Auto-detected if not set.",
     )
 
-    @field_validator("qdrant_path", "chroma_path")
+    @field_validator("qdrant_path")
     @classmethod
     def expand_path(cls, v: str) -> str:
         """Expand ~ in paths."""
