@@ -255,7 +255,7 @@ def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
                     all_files = find_all_indexable_files(
                         resolved_path,
                         max_files=max_files,
-                        exclude_patterns=['*test*', '*__pycache__*', '*.pyc']
+                        exclude_patterns=['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
                     )
                 except Exception as e:
                     logger.error(f"File discovery failed: {e}")
