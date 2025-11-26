@@ -7,16 +7,16 @@ RAG_CONFIG_V3 = {
     "version": "v3",
     "persist_dir": "./rag_db_v3",
     "document_paths": ["./files/"],
-    "embed_provider": "ollama",
-    "embed_model": "embeddinggemma",
+    "embed_provider": "sentencetransformer",  # Fast GPU-based embeddings
+    "embed_model": "all-MiniLM-L6-v2",  # Same as V2 for consistency
     "top_k": 5,
     "chunk_size": 700,
     "chunk_overlap": 100,
-    "rrf_k": 60,  # RRF parameter instead of ensemble weights
-    "rerank_top_k": 5,  # Enable LLM reranking
+    "rrf_k": 60,  # RRF parameter for fusion (better than weighted ensemble)
+    "rerank_top_k": 5,
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",  # Fast CrossEncoder reranking
     "force_reindex": False,
     "use_contextual": False,  # Disable contextual retrieval for performance
-    "llm_model": "qwen3:8b",  # For LLM reranking
     "bm25_k1": 1.5,  # BM25 parameters
     "bm25_b": 0.75,
     "distance_metric": "cosine"  # Vector distance metric
@@ -128,6 +128,78 @@ def get_rag_pipeline_v3(doc_path: Optional[str] = None):
 #     pipeline = get_rag_pipeline_v3()
 #     return V3RetrieverAdapter(pipeline)
 
+def find_all_indexable_files(
+    directory: str,
+    max_depth: int = 5,
+    include_patterns: Optional[list] = None,
+    exclude_patterns: Optional[list] = None,
+    max_files: Optional[int] = None
+) -> list:
+    """Recursively find indexable files with selective filtering"""
+    if not os.path.isdir(directory):
+        return []
+
+    indexable_extensions = ('.pdf', '.txt', '.py', '.md', '.ipynb', '.js', '.ts', '.tsx', '.jsx')
+    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build', '.ipynb_checkpoints', 'migrations'}
+
+    all_files = []
+
+    def matches_pattern(path: str, patterns: list) -> bool:
+        """Check if path matches any glob pattern"""
+        import fnmatch
+        for pattern in patterns:
+            if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
+                return True
+        return False
+
+    def walk_dir(path: str, depth: int = 0):
+        if depth > max_depth:
+            return
+        if max_files and len(all_files) >= max_files:
+            return
+
+        try:
+            for entry in os.listdir(path):
+                # Skip hidden files and excluded directories
+                if entry.startswith('.') or entry in exclude_dirs:
+                    continue
+
+                entry_path = os.path.join(path, entry)
+
+                # Apply exclude patterns
+                if exclude_patterns and matches_pattern(entry_path, exclude_patterns):
+                    continue
+
+                if os.path.isfile(entry_path):
+                    if entry.lower().endswith(indexable_extensions):
+                        # Apply include patterns
+                        if include_patterns:
+                            if matches_pattern(entry_path, include_patterns):
+                                all_files.append(entry_path)
+                        else:
+                            all_files.append(entry_path)
+
+                        if max_files and len(all_files) >= max_files:
+                            return
+                elif os.path.isdir(entry_path):
+                    walk_dir(entry_path, depth + 1)
+        except PermissionError:
+            print(f"[RAG] Permission denied: {path}")
+
+    print(f"[RAG] Scanning: {directory}")
+    if include_patterns:
+        print(f"[RAG] Include patterns: {include_patterns}")
+    if exclude_patterns:
+        print(f"[RAG] Exclude patterns: {exclude_patterns}")
+    if max_files:
+        print(f"[RAG] Max files: {max_files}")
+
+    walk_dir(directory)
+    print(f"[RAG] Found {len(all_files)} indexable files")
+
+    return all_files
+
+
 def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
     """Find files in directory whose names match query keywords"""
     if not os.path.isdir(directory):
@@ -179,23 +251,20 @@ def fetchExternalKnowledgeV3(query: str, doc_path: Optional[str] = None) -> str:
                 return f"Error: Path does not exist: {resolved_path}"
 
             if os.path.isdir(resolved_path):
-                # Find ALL indexable files recursively
-                all_files = find_all_indexable_files(resolved_path)
+                # Find ALL indexable files recursively (limit to 100 like v2)
+                all_files = find_all_indexable_files(
+                    resolved_path,
+                    max_files=100,
+                    exclude_patterns=['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
+                )
 
                 if not all_files:
                     return f"No indexable files (.pdf, .txt, .py, .md) found in {resolved_path}"
 
-                # Limit files to prevent excessive indexing
-                max_files = 500
-                if len(all_files) > max_files:
-                    print(f"[RAG V3] Warning: Found {len(all_files)} files, limiting to {max_files}")
-                    all_files = all_files[:max_files]
-
                 print(f"[RAG V3] Indexing {len(all_files)} files from {resolved_path}")
 
-                # Use first file as doc_path (V3 handles single file better)
-                # TODO: Extend V3 to support multiple files like V2
-                doc_path = all_files[0]
+                # Pass directory path - v3 will handle multiple files
+                doc_path = resolved_path
 
         pipeline = get_rag_pipeline_v3(doc_path=doc_path)
         return pipeline.search(query)
