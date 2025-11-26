@@ -8,12 +8,13 @@ This file contains the `RAGPipeline` class, which is the core of the retrieval e
 
 ### Architecture
 
--   **Vector Database**: Uses `Qdrant` for fast and efficient vector search with persistence.
+-   **Vector Database**: Uses `Qdrant Cloud` for fast, scalable vector search with automatic persistence.
 -   **Embeddings**: `embeddinggemma` via Ollama (768-dimensional vectors).
 -   **Hybrid Retrieval**: Combines two search methods for superior results:
     1.  **Vector Search (Qdrant)**: Finds documents that are semantically similar to the query.
     2.  **Lexical Search (BM25)**: Finds documents that contain the exact keywords from the query.
 -   **Re-ranking**: After the initial retrieval, a `CrossEncoder` model (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is used to re-rank the results for the highest possible relevance.
+-   **GPU Acceleration**: Both embeddings and reranking use CUDA when available for faster processing.
 
 ### Configuration
 

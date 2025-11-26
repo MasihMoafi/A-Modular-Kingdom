@@ -10,11 +10,14 @@ This file contains the `RAGPipelineV3` class, implementing all 7 steps of modern
 
 **V3 implements tutorial-grade techniques:**
 
--   **Custom Vector Database**: Built-from-scratch `VectorIndex` class with configurable distance metrics (cosine/euclidean) for educational transparency, vs V2's production-optimized FAISS.
+-   **Vector Database**: Uses `Qdrant Cloud` (same as V2) for production-ready vector search with automatic persistence.
+-   **Embeddings**: `embeddinggemma` via Ollama (768-dimensional vectors) - same as V2.
 -   **Custom BM25 Implementation**: `BM25Index` class with proper IDF calculation using the formula: `log(((N - freq + 0.5) / (freq + 0.5)) + 1)` for precise keyword matching.
--   **RRF Hybrid Fusion**: Uses Reciprocal Rank Fusion (`score = sum(1 / (k + rank))`) for automatic balancing between vector and BM25 results, eliminating the need for manual weight tuning used in V2's `EnsembleRetriever`.
+-   **RRF Hybrid Fusion**: Uses Reciprocal Rank Fusion (`score = sum(1 / (k + rank))`) for automatic balancing between vector and BM25 results, eliminating the need for manual weight tuning.
 -   **LLM-based Reranking**: Employs Ollama with `qwen3:8b` for contextually-aware document selection, providing superior understanding compared to V2's `CrossEncoder` neural model.
 -   **Contextual Retrieval**: Preprocesses chunks by adding situational context using LLM before embedding, significantly improving searchability and relevance.
+-   **GPU Acceleration**: Embeddings and LLM reranking use CUDA when available.
+-   **File Format Support**: Handles .pdf, .txt, .py, .md, .json, and .ipynb files.
 
 ### The 7 RAG Steps Implemented
 
@@ -53,12 +56,14 @@ Comprehensive evaluation framework to compare V2 vs V3 performance:
 
 | Feature | V2 | V3 |
 |---------|----|----|
-| **Vector DB** | FAISS (optimized) | Custom VectorIndex (educational) |
+| **Vector DB** | Qdrant Cloud | Qdrant Cloud (same) |
+| **Embeddings** | embeddinggemma via Ollama | embeddinggemma via Ollama (same) |
 | **BM25** | Langchain BM25Retriever | Custom BM25Index with proper IDF |
 | **Fusion** | Weighted Ensemble [0.7, 0.3] | RRF (automatic balancing) |
 | **Reranking** | CrossEncoder neural model | LLM-based with qwen3:8b |
 | **Context** | None | Contextual chunk preprocessing |
-| **Philosophy** | Production-ready | Learning-focused with transparency |
+| **Chunk Size** | 700 (optimized) | 700 (same) |
+| **Philosophy** | Production-ready speed | Advanced techniques + transparency |
 
 ## Database Structure
 
