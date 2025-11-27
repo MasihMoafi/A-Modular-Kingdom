@@ -175,12 +175,12 @@ Three implementations with different trade-offs:
 
 | Metric | V2 | V3 |
 |--------|-----|-----|
-| **Groundedness** | 99% | 95% |
-| **Relevance** | 100% | 95% |
-| **Completeness** | 88% | 98% |
-| **Average** | **95%** | **96%** |
+| **Groundedness** | 100% | 100% |
+| **Relevance** | 80-98% | 78-88% |
+| **Completeness** | 75-95% | 75-98% |
+| **Average** | **84-98%** | **84-88%** |
 
-*Evaluated with curated queries on Napoleon.pdf (3MB) and RAG documentation. Judge: qwen3:8b.*
+*Evaluated with curated queries on Napoleon.pdf and RAG documentation. Judge: Gemini 2.5 Flash. Results vary based on indexed content.*
 
 **Usage:**
 ```python
