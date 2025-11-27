@@ -1,24 +1,27 @@
 """
-RAG Evaluation with LLM-as-Judge
+RAG Evaluation with LLM-as-Judge (Gemini 2.5 Flash)
 
 Metrics:
 - Groundedness: Is retrieved content factual and from source?
 - Relevance: Does it answer the question?
 - Completeness: Is it comprehensive?
-
-Results (qwen3:8b judge):
-- V2: 95% average (G:99% R:100% C:88%)
-- V3: 96% average (G:95% R:95% C:98%)
 """
 
 import os
+
+# Bypass proxy for Google APIs (keep proxy for Iran internet)
+os.environ['NO_PROXY'] = 'generativelanguage.googleapis.com,googleapis.com'
+
 import sys
 import json
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-import ollama
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'src', '.env'))
+
+from google import genai
 
 # Curated test queries - specific, not general
 EVAL_QUERIES = [
@@ -45,8 +48,10 @@ EVAL_QUERIES = [
 ]
 
 
-def judge_with_llm(query: str, retrieved: str, expected: str) -> dict:
-    """Use qwen3:8b as judge"""
+def judge_with_gemini(query: str, retrieved: str, expected: str) -> dict:
+    """Use Gemini 2.5 Flash as judge"""
+
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     prompt = f"""You are evaluating RAG (Retrieval-Augmented Generation) quality.
 
@@ -65,12 +70,12 @@ Return JSON only:
 {{"groundedness": 0.X, "relevance": 0.X, "completeness": 0.X, "found_answer": true/false, "reasoning": "brief"}}"""
 
     try:
-        response = ollama.chat(
-            model="qwen3:8b",
-            messages=[{"role": "user", "content": prompt}],
-            format="json"
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
         )
-        text = response["message"]["content"]
+
+        text = response.text
         if "```" in text:
             text = text.split("```")[1].replace("json", "").strip()
         return json.loads(text)
@@ -90,7 +95,7 @@ def run_eval(version: str = "v2"):
     md_path = os.path.join(project_root, "src", "rag")
 
     print(f"\n{'='*60}")
-    print(f"RAG {version.upper()} EVALUATION - Judge: qwen3:8b")
+    print(f"RAG {version.upper()} EVALUATION - Judge: Gemini 2.5 Flash")
     print(f"{'='*60}\n")
 
     results = []
@@ -105,7 +110,7 @@ def run_eval(version: str = "v2"):
             retrieved = fetch(item["query"])
         latency = (time.time() - start) * 1000
 
-        scores = judge_with_llm(item["query"], retrieved or "", item["expected"])
+        scores = judge_with_gemini(item["query"], retrieved or "", item["expected"])
 
         if "error" in scores:
             print(f"   ERROR: {scores['error']}")
