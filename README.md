@@ -171,15 +171,16 @@ Three implementations with different trade-offs:
 - **Use Case:** Maximum accuracy, complex queries
 - **Features:** Contextual retrieval, hybrid fusion
 
-### Benchmark Results
+### Benchmark Results (LLM-as-Judge)
 
 | Metric | V2 | V3 |
 |--------|-----|-----|
-| **Accuracy** | 62% | **80%** |
-| **Latency (cached)** | 1.1s | 0.03s |
-| **Tests Passed** | 3/4 | 3/4 |
+| **Groundedness** | 99% | 95% |
+| **Relevance** | 100% | 95% |
+| **Completeness** | 88% | 98% |
+| **Average** | **95%** | **96%** |
 
-*Tested on Napoleon.pdf (3MB), Anthropic prompt engineering tutorial (416KB), and project documentation.*
+*Evaluated with curated queries on Napoleon.pdf (3MB) and RAG documentation. Judge: qwen3:8b.*
 
 **Usage:**
 ```python
