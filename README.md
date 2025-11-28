@@ -219,39 +219,43 @@ search_memories(query="coding standards", top_k=5)
 The MCP server can also be installed as a standalone package:
 
 ```bash
-# Install rag-mem package
-pip install rag-mem
+# Install with sentence-transformers (no Ollama required)
+pip install rag-mem[local]
 
-# Or from source
-cd packages/memory-mcp
-pip install -e .
-```
-
-**CLI Usage:**
-```bash
-# Initialize config
-memory-mcp init
-
-# Start server with documents
-memory-mcp serve --docs ./documents
-
-# Index documents
-memory-mcp index ./path/to/files
+# Set embedding provider (add to your shell profile or script)
+export MEMORY_MCP_EMBED_PROVIDER=sentence-transformers
+export MEMORY_MCP_EMBED_MODEL=all-MiniLM-L6-v2
 ```
 
 **Python API:**
 ```python
-from memory_mcp import Settings, RAGPipeline, MemoryStore
+from memory_mcp.config import Settings
+from memory_mcp.rag import RAGPipeline
+from memory_mcp.memory import MemoryStore
 
-# Use RAG directly
-pipeline = RAGPipeline(document_paths=["./docs"])
+# RAG - index and search any codebase
+pipeline = RAGPipeline(Settings(), document_paths=["./src"])
 pipeline.index()
-results = pipeline.search("query")
+results = pipeline.search("how does authentication work")
 
-# Use memory directly
-memory = MemoryStore()
-memory.add("Important fact")
-results = memory.search("query")
+# Memory - persistent storage across sessions
+store = MemoryStore(Settings())
+store.add("User prefers dark mode")
+results = store.search("preferences")
+```
+
+**CLI Usage:**
+```bash
+memory-mcp init                      # Initialize config
+memory-mcp serve --docs ./documents  # Start MCP server
+memory-mcp index ./path/to/files     # Index documents
+```
+
+**Alternative: Use Ollama (local, private)**
+```bash
+pip install rag-mem
+ollama pull nomic-embed-text
+# No env vars needed - Ollama is the default
 ```
 
 **Package Size:** 58KB code (note: ~2GB dependencies with PyTorch)
@@ -439,7 +443,7 @@ MIT License - See [LICENSE](LICENSE) for details
 
 - **Medium Article:** https://medium.com/@masihmoafi12/a-modular-kingdom-fcaa69a6c1f0
 - **Demo Video:** https://www.youtube.com/watch?v=hWoQnAr6R_E
-- **PyPI Package:** Coming soon (rag-mem)
+- **PyPI Package:** [rag-mem](https://pypi.org/project/rag-mem/)
 
 ---
 
