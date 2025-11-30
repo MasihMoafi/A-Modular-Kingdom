@@ -28,7 +28,7 @@ class OllamaEmbeddings(EmbeddingProvider):
         self.model = model
         self.base_url = base_url.rstrip("/")
         self._dimension = DIMENSION_MAP.get(model, 768)
-        self._client = None
+        self._client: httpx.Client | None = None
 
     @property
     def client(self) -> httpx.Client:
@@ -48,7 +48,7 @@ class OllamaEmbeddings(EmbeddingProvider):
                 json={"model": self.model, "prompt": text},
             )
             response.raise_for_status()
-            return response.json()["embedding"]
+            return response.json()["embedding"]  # type: ignore[no-any-return]
         except httpx.ConnectError:
             raise ConnectionError(
                 f"Cannot connect to Ollama at {self.base_url}.\n\n"

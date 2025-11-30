@@ -193,7 +193,7 @@ class MemoryStore:
         """
         try:
             collection = self._get_collection()
-            return collection.count()
+            return collection.count()  # type: ignore[no-any-return]
         except Exception:
             return 0
 

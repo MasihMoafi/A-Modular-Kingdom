@@ -50,8 +50,8 @@ class AnthropicEmbeddings(EmbeddingProvider):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         result = self.client.embed(texts, model=self.model_name, input_type="document")
-        return result.embeddings
+        return result.embeddings  # type: ignore[no-any-return]
 
     def embed_query(self, text: str) -> list[float]:
         result = self.client.embed([text], model=self.model_name, input_type="query")
-        return result.embeddings[0]
+        return result.embeddings[0]  # type: ignore[no-any-return]

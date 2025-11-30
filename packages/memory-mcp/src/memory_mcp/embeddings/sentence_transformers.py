@@ -55,8 +55,8 @@ class SentenceTransformerEmbeddings(EmbeddingProvider):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         embeddings = self.model.encode(texts, convert_to_numpy=True)
-        return embeddings.tolist()
+        return embeddings.tolist()  # type: ignore[no-any-return]
 
     def embed_query(self, text: str) -> list[float]:
         embedding = self.model.encode(text, convert_to_numpy=True)
-        return embedding.tolist()
+        return embedding.tolist()  # type: ignore[no-any-return]
