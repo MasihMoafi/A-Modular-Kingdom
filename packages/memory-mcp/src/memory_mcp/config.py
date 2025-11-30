@@ -8,7 +8,6 @@ Configuration can be provided via:
 Environment variables take precedence over config file values.
 """
 
-import os
 import sys
 from functools import lru_cache
 from pathlib import Path

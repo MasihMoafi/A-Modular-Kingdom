@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_core.documents import Document
 
-from memory_mcp.embeddings import EmbeddingProvider, get_embedding_provider
+from memory_mcp.embeddings import get_embedding_provider
 from memory_mcp.rag.chunkers import (
     chunk_text,
     extract_text_from_json,

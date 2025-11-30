@@ -34,9 +34,9 @@ def main():
         help="Embedding model name",
     )
 
-    init_parser = subparsers.add_parser("init", help="Initialize configuration directory")
+    subparsers.add_parser("init", help="Initialize configuration directory")
 
-    config_parser = subparsers.add_parser("config", help="Show current configuration")
+    subparsers.add_parser("config", help="Show current configuration")
 
     index_parser = subparsers.add_parser("index", help="Index documents for RAG")
     index_parser.add_argument(
@@ -84,7 +84,7 @@ def run_server(args):
 
     document_paths = args.docs if args.docs else None
 
-    print(f"Starting Memory MCP server...", file=sys.stderr)
+    print("Starting Memory MCP server...", file=sys.stderr)
     print(f"  Embedding provider: {settings.embed_provider}", file=sys.stderr)
     print(f"  Embedding model: {settings.embed_model or '(default)'}", file=sys.stderr)
     if document_paths:
@@ -96,7 +96,7 @@ def run_server(args):
 
 def run_init():
     """Initialize configuration directory."""
-    from memory_mcp.config import init_config_dir, CONFIG_FILE
+    from memory_mcp.config import CONFIG_FILE, init_config_dir
 
     created = init_config_dir()
     if created:
