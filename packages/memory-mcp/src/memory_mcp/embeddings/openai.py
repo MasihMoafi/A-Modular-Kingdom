@@ -51,4 +51,4 @@ class OpenAIEmbeddings(EmbeddingProvider):
             model=self.model_name,
             input=text,
         )
-        return response.data[0].embedding
+        return response.data[0].embedding  # type: ignore[no-any-return]

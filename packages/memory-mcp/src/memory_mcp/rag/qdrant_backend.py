@@ -89,10 +89,11 @@ class QdrantVectorDB:
 
         formatted = []
         for hit in results.points:
+            payload = hit.payload or {}
             doc = {
-                "content": hit.payload.get("content", ""),
+                "content": payload.get("content", ""),
                 "score": hit.score,
-                **{k: v for k, v in hit.payload.items() if k != "content"},
+                **{k: v for k, v in payload.items() if k != "content"},
             }
             formatted.append(doc)
 
@@ -101,7 +102,7 @@ class QdrantVectorDB:
     def count(self) -> int:
         """Get total document count."""
         collection_info = self.client.get_collection(self.collection_name)
-        return collection_info.points_count
+        return collection_info.points_count or 0
 
     def clear(self):
         """Delete all documents from collection."""

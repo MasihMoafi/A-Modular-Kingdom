@@ -46,7 +46,7 @@ class CohereEmbeddings(EmbeddingProvider):
             model=self.model_name,
             input_type="search_document",
         )
-        return response.embeddings
+        return response.embeddings  # type: ignore[no-any-return]
 
     def embed_query(self, text: str) -> list[float]:
         response = self.client.embed(
@@ -54,4 +54,4 @@ class CohereEmbeddings(EmbeddingProvider):
             model=self.model_name,
             input_type="search_query",
         )
-        return response.embeddings[0]
+        return response.embeddings[0]  # type: ignore[no-any-return]

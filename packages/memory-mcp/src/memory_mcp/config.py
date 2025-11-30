@@ -11,7 +11,7 @@ Environment variables take precedence over config file values.
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,11 +26,12 @@ CONFIG_DIR = Path.home() / ".memory-mcp"
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 
 
-def _load_toml_config() -> dict:
+def _load_toml_config() -> dict[str, Any]:
     """Load configuration from TOML file if it exists."""
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, "rb") as f:
-            return tomllib.load(f)
+            result: dict[str, Any] = tomllib.load(f)
+            return result
     return {}
 
 
