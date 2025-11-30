@@ -6,8 +6,7 @@ Provides:
 - Production-grade vector search
 """
 
-from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable
+from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams

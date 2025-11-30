@@ -2,7 +2,6 @@
 
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 
@@ -63,7 +62,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         return re.sub(r"\s+", " ", full_text).strip()
     except ImportError:
         raise ImportError("PDF support requires pymupdf. Install with: pip install pymupdf")
-    except Exception as e:
+    except Exception:
         return ""
 
 
