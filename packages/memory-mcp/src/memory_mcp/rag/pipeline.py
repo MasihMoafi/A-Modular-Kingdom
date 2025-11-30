@@ -278,7 +278,7 @@ class RAGPipeline:
             return True
 
         new_manifest = self._build_manifest()
-        return old_manifest != new_manifest
+        return old_manifest != new_manifest  # type: ignore[no-any-return]
 
     def _save_manifest(self):
         """Save manifest to disk."""
