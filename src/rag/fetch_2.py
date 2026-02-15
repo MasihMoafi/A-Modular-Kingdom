@@ -1,7 +1,17 @@
 import os
+import sys
 import hashlib
 from typing import Optional, Dict
 import logging
+from pathlib import Path
+import re
+import time
+
+# Load .env from src directory
+_env_path = Path(__file__).parent.parent / ".env"
+if _env_path.exists():
+    from dotenv import load_dotenv
+    load_dotenv(_env_path)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -41,15 +51,114 @@ RAG_CONFIG = {
     "force_reindex": False,
     "distance_metric": "cosine",  # Qdrant distance metric
     # Qdrant backend options
-    "qdrant_mode": "cloud",  # "local" or "cloud"
-    "qdrant_url": "https://5c99b123-9ead-4adb-b715-d10743893daf.us-west-2-0.aws.cloud.qdrant.io:6333",
-    "qdrant_api_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.jPT9n6OF6yTtc_nZoL50d8sxA67GM_VDjznulfl87Sg",
+    "qdrant_mode": os.getenv("QDRANT_MODE", "cloud"),
+    "qdrant_url": os.getenv("QDRANT_URL", ""),
+    "qdrant_api_key": os.getenv("QDRANT_API_KEY", ""),
     # Speed optimization
     "batch_size": 500,  # Process 500 chunks at once
     "max_files": 100,  # Limit to prevent massive indexing
 }
 
 _rag_system_instances: Dict[str, RAGPipeline] = {}
+
+_STOPWORDS = {
+    "the","a","an","and","or","but","to","of","in","on","for","with","as","at","by",
+    "is","are","was","were","be","been","being","it","this","that","these","those",
+    "from","into","over","under","not","no","yes","do","does","did","done","can",
+}
+
+
+def _tokenize_query(query: str) -> list[str]:
+    toks = [t.lower() for t in re.findall(r"[a-zA-Z0-9_./-]{2,}", query)]
+    return [t for t in toks if t not in _STOPWORDS]
+
+
+def _fast_search_files(
+    query: str,
+    file_list: list[str],
+    *,
+    top_k: int = 5,
+    max_bytes_per_file: int = 250_000,
+    max_total_bytes: int = 5_000_000,
+) -> str:
+    """Quick lexical search over provided files (no embeddings/Qdrant).
+
+    This is used to keep MCP tool calls responsive when indexing a new scope would
+    require heavyweight model loads or network access.
+    """
+    tokens = _tokenize_query(query)
+    if not tokens:
+        tokens = _tokenize_query(query.strip()[:80]) or [query.strip().lower()[:32]]
+
+    results = []
+    total = 0
+    started = time.monotonic()
+
+    for path in file_list:
+        if not os.path.isfile(path):
+            continue
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            continue
+
+        if size <= 0:
+            continue
+
+        # Cap total bytes scanned to avoid burning CPU.
+        if total >= max_total_bytes:
+            break
+
+        read_n = min(size, max_bytes_per_file, max_total_bytes - total)
+        total += read_n
+
+        try:
+            with open(path, "rb") as f:
+                blob = f.read(read_n)
+        except OSError:
+            continue
+
+        try:
+            text = blob.decode("utf-8", errors="ignore")
+        except Exception:
+            continue
+
+        low = text.lower()
+        score = sum(low.count(t) for t in tokens[:8])
+        if score <= 0:
+            continue
+
+        # Find best matching line.
+        best = None
+        best_ln = None
+        for i, line in enumerate(text.splitlines(), start=1):
+            l = line.lower()
+            ls = sum(l.count(t) for t in tokens[:8])
+            if ls > 0 and (best is None or ls > best):
+                best = ls
+                best_ln = (i, line.strip()[:240])
+                if ls >= 5:
+                    break
+
+        results.append((score, path, best_ln))
+
+        # Keep fast path fast.
+        if time.monotonic() - started > 2.5 and len(results) >= top_k:
+            break
+
+    results.sort(key=lambda x: x[0], reverse=True)
+    out_lines = ["Fast search results (lexical, scoped):"]
+    for score, path, best_ln in results[:top_k]:
+        if best_ln:
+            ln, snippet = best_ln
+            out_lines.append(f"- {path}:{ln} (score={score}): {snippet}")
+        else:
+            out_lines.append(f"- {path} (score={score})")
+
+    if len(out_lines) == 1:
+        return "Fast search: no matches."
+    return "\n".join(out_lines)
+
 
 def resolve_path(path: str) -> str:
     """Resolve user-friendly paths to absolute paths"""
@@ -93,10 +202,10 @@ def get_rag_pipeline(doc_path: Optional[str] = None, file_list: Optional[list] =
 
     # Check if cached instance exists
     if key in _rag_system_instances:
-        print(f"[RAG V2] Using cached instance for {key}")
+        sys.stderr.write(f"[RAG V2] Using cached instance for {key}\n")
         return _rag_system_instances[key]
     
-    print(f"[RAG V2] Creating new instance for {key}...")
+    sys.stderr.write(f"[RAG V2] Creating new instance for {key}...\n")
     try:
         config = RAG_CONFIG.copy()
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -123,10 +232,10 @@ def get_rag_pipeline(doc_path: Optional[str] = None, file_list: Optional[list] =
         
         instance = RAGPipeline(config=config)
         _rag_system_instances[key] = instance
-        print("[RAG V2] Initialization complete")
+        sys.stderr.write("[RAG V2] Initialization complete\n")
         return instance
     except Exception as e:
-        print(f"FATAL ERROR: Could not initialize RAGPipeline: {e}")
+        sys.stderr.write(f"FATAL ERROR: Could not initialize RAGPipeline: {e}\n")
         raise
 
 def find_all_indexable_files(
@@ -196,27 +305,28 @@ def find_all_indexable_files(
                 elif os.path.isdir(entry_path):
                     walk_dir(entry_path, depth + 1)
         except PermissionError:
-            print(f"[RAG] Permission denied: {path}")
+            sys.stderr.write(f"[RAG] Permission denied: {path}\n")
 
-    print(f"[RAG] Scanning: {directory}")
+    sys.stderr.write(f"[RAG] Scanning: {directory}\n")
     if include_patterns:
-        print(f"[RAG] Include patterns: {include_patterns}")
+        sys.stderr.write(f"[RAG] Include patterns: {include_patterns}\n")
     if exclude_patterns:
-        print(f"[RAG] Exclude patterns: {exclude_patterns}")
+        sys.stderr.write(f"[RAG] Exclude patterns: {exclude_patterns}\n")
     if max_files:
-        print(f"[RAG] Max files: {max_files}")
+        sys.stderr.write(f"[RAG] Max files: {max_files}\n")
 
     walk_dir(directory)
-    print(f"[RAG] Found {len(all_files)} indexable files")
+    sys.stderr.write(f"[RAG] Found {len(all_files)} indexable files\n")
 
     return all_files
 
-def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
+def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None, file_list: Optional[list] = None) -> str:
     """Query RAG system with robust error handling
 
     Args:
         query: Search query string
         doc_path: Optional path to documents (file or directory)
+        file_list: Optional list of specific file paths to index
 
     Returns:
         Search results or error message
@@ -234,9 +344,21 @@ def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
             logger.error("Invalid query provided")
             return "Error: Query must be a non-empty string."
 
+        # For ad hoc scopes (explicit file list or doc_path), default to a fast
+        # lexical search to keep MCP tool calls responsive and offline-friendly.
+        # Opt into semantic RAG with `RAG_SEARCH_MODE=semantic`.
+        search_mode = os.getenv("RAG_SEARCH_MODE", "fast").strip().lower()
+
+        # If file_list provided, use it directly
+        if file_list and len(file_list) > 0:
+            # Validate files exist
+            valid_files = [f for f in file_list if os.path.isfile(f)]
+            if not valid_files:
+                return f"Error: No valid files found in provided list"
+            file_list = valid_files
+            doc_path = None
         # If custom path provided, find all indexable files
-        file_list = None
-        if doc_path:
+        elif doc_path:
             try:
                 resolved_path = resolve_path(doc_path)
             except Exception as e:
@@ -270,6 +392,9 @@ def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
                 # Use all found files for indexing
                 file_list = all_files
                 doc_path = None  # Clear doc_path, use file_list instead
+
+        if search_mode != "semantic" and file_list:
+            return _fast_search_files(query, file_list, top_k=RAG_CONFIG.get("top_k", 5))
 
         # Get or create pipeline
         try:

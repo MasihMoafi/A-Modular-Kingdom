@@ -28,8 +28,15 @@ class MemoryConfig:
         Args:
             project_root: Root directory of current project. If None, uses cwd.
         """
-        self.project_root = project_root or os.getcwd()
-        self.global_memory_base = Path.home() / ".gemini" / "memories"
+        self.project_root = os.path.realpath(project_root or os.getcwd())
+        # Prefer explicit base path, then project-local storage for portability/sandbox safety.
+        base_path = os.getenv("MEMORY_BASE_PATH")
+        if base_path:
+            self.global_memory_base = Path(base_path).expanduser()
+        else:
+            self.global_memory_base = (
+                Path(self.project_root) / ".modular_kingdom" / "memories"
+            )
         self.project_hash = self._compute_project_hash(self.project_root)
         
     def _compute_project_hash(self, path: str) -> str:
@@ -38,13 +45,13 @@ class MemoryConfig:
     
     def get_storage_path(self, scope: MemoryScope) -> Path:
         """
-        Get ChromaDB storage path for a given scope.
-        
+        Get Qdrant storage path for a given scope.
+
         Args:
             scope: Memory scope to get path for
-            
+
         Returns:
-            Path object for ChromaDB storage
+            Path object for Qdrant storage
         """
         if scope.name.startswith("GLOBAL_"):
             # Global memories stored in ~/.gemini/memories/global/
@@ -56,7 +63,7 @@ class MemoryConfig:
             return self.global_memory_base / "projects" / self.project_hash / scope_name
     
     def get_collection_name(self, scope: MemoryScope) -> str:
-        """Get ChromaDB collection name for a scope."""
+        """Get Qdrant collection name for a scope."""
         return scope.value
     
     @staticmethod
@@ -92,17 +99,31 @@ class MemoryConfig:
         if ":" not in text:
             return None, text
             
-        prefix_part = text[1:text.index(":")]
-        content_after_first_colon = text[text.index(":") + 1:]
-        
-        # Check if there's a second colon for format like "#global:rule"
+        prefix_part = text[1:text.index(":")].strip()
+        content_after_first_colon = text[text.index(":") + 1:].lstrip()
+
+        # Supported forms:
+        # - "#global:rule <content>" (one colon)
+        # - "#project:context <content>" (one colon)
+        # - "#global:rule:<content>" (two colons, legacy/alternative)
+        full_prefix = None
+        content = ""
+
         if ":" in content_after_first_colon:
-            second_part = content_after_first_colon[:content_after_first_colon.index(":")]
+            # Two-colon variant: "#global:rule:<content>"
+            second_part = content_after_first_colon[:content_after_first_colon.index(":")].strip()
             full_prefix = f"{prefix_part}:{second_part}".lower()
             content = content_after_first_colon[content_after_first_colon.index(":") + 1:].strip()
         else:
-            full_prefix = prefix_part.lower()
-            content = content_after_first_colon.strip()
+            # One-colon variant: "#global:rule <content>"
+            parts = content_after_first_colon.split(None, 1)
+            if parts:
+                second_part = parts[0].strip()
+                full_prefix = f"{prefix_part}:{second_part}".lower()
+                content = parts[1].strip() if len(parts) > 1 else ""
+            else:
+                full_prefix = prefix_part.lower()
+                content = ""
         
         # Map prefix to scope
         prefix_map = {
@@ -114,7 +135,7 @@ class MemoryConfig:
             "project:session": MemoryScope.PROJECT_SESSIONS,
         }
         
-        scope = prefix_map.get(full_prefix)
+        scope = prefix_map.get((full_prefix or "").lower())
         return scope, content
     
     def infer_scope_from_content(self, content: str) -> MemoryScope:

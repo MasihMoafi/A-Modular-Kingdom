@@ -163,16 +163,30 @@ JSON Output:"""
             self._bm25_dirty = True
 
     def direct_add(self, content: str, metadata: Optional[Dict] = None) -> str:
+        """Add content directly without LLM processing."""
         client, collection = self._get_client_and_collection()
         new_id = str(uuid.uuid4())
-        collection.add(ids=[new_id], documents=[content], metadatas=[metadata] if metadata else None)
+        if metadata:
+            collection.add(ids=[new_id], documents=[content], metadatas=[metadata])
+        else:
+            collection.add(ids=[new_id], documents=[content])
         self._bm25_dirty = True
         return new_id
 
-    def direct_delete(self, memory_id: str) -> None:
-        client, collection = self._get_client_and_collection()
-        collection.delete(ids=[memory_id])
-        self._bm25_dirty = True
+    def direct_delete(self, memory_id: str) -> bool:
+        """Delete memory by ID. Returns True if a memory was deleted."""
+        try:
+            client, collection = self._get_client_and_collection()
+            got = collection.get(ids=[memory_id])
+            ids = got.get("ids") or []
+            if not ids:
+                return False
+            collection.delete(ids=[memory_id])
+            self._bm25_dirty = True
+            return True
+        except Exception as e:
+            log_message(f"Delete error: {e}")
+            return False
 
     def add(self, conversation: str):
         log_message(f"Processing conversation: '{conversation}'")
