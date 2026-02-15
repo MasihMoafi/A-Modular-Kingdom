@@ -9,11 +9,11 @@ Key improvements:
 """
 
 import os
+import sys
 
-# Clear proxy settings to avoid SOCKS proxy conflicts with httpx
-for _proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-    if _proxy_var in os.environ:
-        del os.environ[_proxy_var]
+# Central proxy manager — strip SOCKS, keep HTTP(S) for cloud
+from utils.proxy import strip_socks as _strip_socks
+_strip_socks()
 
 from typing import List, Dict, Any, Callable
 from qdrant_client import QdrantClient

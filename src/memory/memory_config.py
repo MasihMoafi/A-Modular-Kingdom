@@ -28,9 +28,15 @@ class MemoryConfig:
         Args:
             project_root: Root directory of current project. If None, uses cwd.
         """
-        self.project_root = project_root or os.getcwd()
-        # Store memories in a distinct global directory, not hidden in agent state
-        self.global_memory_base = Path.home() / ".modular_kingdom" / "memories"
+        self.project_root = os.path.realpath(project_root or os.getcwd())
+        # Prefer explicit base path, then project-local storage for portability/sandbox safety.
+        base_path = os.getenv("MEMORY_BASE_PATH")
+        if base_path:
+            self.global_memory_base = Path(base_path).expanduser()
+        else:
+            self.global_memory_base = (
+                Path(self.project_root) / ".modular_kingdom" / "memories"
+            )
         self.project_hash = self._compute_project_hash(self.project_root)
         
     def _compute_project_hash(self, path: str) -> str:

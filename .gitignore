@@ -7,7 +7,6 @@ __pycache__/
 .modular_kingdom/
 src/.modular_kingdom/
 scratch/
-src/agent_qdrant_db/
 
 # Local debug artifacts
 capture.txt

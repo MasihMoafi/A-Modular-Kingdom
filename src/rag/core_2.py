@@ -1,9 +1,12 @@
 import os
+import sys
 
-# Clear proxy settings to avoid SOCKS proxy conflicts with httpx
-for _proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-    if _proxy_var in os.environ:
-        del os.environ[_proxy_var]
+# Central proxy manager — strip SOCKS (httpx can't handle it), keep HTTP(S) for cloud
+from utils.proxy import strip_all as _strip_all, strip_socks as _strip_socks
+if os.getenv("QDRANT_MODE", "") == "local":
+    _strip_all()
+else:
+    _strip_socks()
 
 import re, string, fitz, json, hashlib
 import torch
