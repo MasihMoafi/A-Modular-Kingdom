@@ -9,11 +9,11 @@ Key improvements:
 """
 
 import os
+import sys
 
-# Clear proxy settings to avoid SOCKS proxy conflicts with httpx
-for _proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-    if _proxy_var in os.environ:
-        del os.environ[_proxy_var]
+# Central proxy manager — strip SOCKS, keep HTTP(S) for cloud
+from utils.proxy import strip_socks as _strip_socks
+_strip_socks()
 
 from typing import List, Dict, Any, Callable
 from qdrant_client import QdrantClient
@@ -40,10 +40,10 @@ class QdrantVectorDB:
 
         # Initialize Qdrant client (local or cloud)
         if mode == "cloud" and url:
-            print(f"[Qdrant] Connecting to cloud: {url}")
-            self.client = QdrantClient(url=url, api_key=api_key)
+            sys.stderr.write(f"[Qdrant] Connecting to cloud: {url}" + "\n")
+            self.client = QdrantClient(url=url, api_key=api_key, timeout=30)
         else:
-            print(f"[Qdrant] Using local storage: {persist_path}")
+            sys.stderr.write(f"[Qdrant] Using local storage: {persist_path}" + "\n")
             self.client = QdrantClient(path=persist_path)
 
         # Map distance metric
@@ -70,9 +70,9 @@ class QdrantVectorDB:
                     distance=self.distance
                 )
             )
-            print(f"[Qdrant] Created collection: {self.collection_name}")
+            sys.stderr.write(f"[Qdrant] Created collection: {self.collection_name}" + "\n")
         else:
-            print(f"[Qdrant] Using existing collection: {self.collection_name}")
+            sys.stderr.write(f"[Qdrant] Using existing collection: {self.collection_name}" + "\n")
 
     def add_documents_batch(self, documents: List[Dict[str, Any]], batch_size: int = 500):
         """
@@ -81,7 +81,7 @@ class QdrantVectorDB:
         Large batch size (500) for maximum embedding throughput.
         """
         total = len(documents)
-        print(f"[Qdrant] Batch indexing {total} documents...")
+        sys.stderr.write(f"[Qdrant] Batch indexing {total} documents..." + "\n")
 
         for i in range(0, total, batch_size):
             batch = documents[i:i + batch_size]
@@ -112,7 +112,7 @@ class QdrantVectorDB:
             )
 
             if (i + batch_size) % 500 == 0 or i + batch_size >= total:
-                print(f"[Qdrant] Indexed {min(i + batch_size, total)}/{total} documents...")
+                sys.stderr.write(f"[Qdrant] Indexed {min(i + batch_size, total)}/{total} documents..." + "\n")
 
     def _batch_embed(self, texts: List[str]) -> List[List[float]]:
         """
@@ -123,7 +123,7 @@ class QdrantVectorDB:
             try:
                 return self.embedding_fn.embed_documents(texts)
             except Exception as e:
-                print(f"[Qdrant] Batch embedding via embed_documents failed: {e}")
+                sys.stderr.write(f"[Qdrant] Batch embedding via embed_documents failed: {e}" + "\n")
 
         # Try calling with list directly (some APIs support this)
         try:
@@ -189,4 +189,4 @@ class QdrantVectorDB:
         """Delete all documents from collection."""
         self.client.delete_collection(self.collection_name)
         self._init_collection()
-        print(f"[Qdrant] Cleared collection: {self.collection_name}")
+        sys.stderr.write(f"[Qdrant] Cleared collection: {self.collection_name}" + "\n")

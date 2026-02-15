@@ -1,18 +1,21 @@
 import os
+import sys
 
-# Clear proxy settings to avoid SOCKS proxy conflicts with httpx
-for _proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-    if _proxy_var in os.environ:
-        del os.environ[_proxy_var]
+# Central proxy manager — strip SOCKS (httpx can't handle it), keep HTTP(S) for cloud
+from utils.proxy import strip_all as _strip_all, strip_socks as _strip_socks
+if os.getenv("QDRANT_MODE", "") == "local":
+    _strip_all()
+else:
+    _strip_socks()
 
 import re, string, fitz, json, hashlib
 import torch
 from sentence_transformers import CrossEncoder
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from langchain_community.retrievers import BM25Retriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from typing import List, Dict, Any
+from typing import List, Dict
 
 # Import Qdrant backend
 from .qdrant_backend import QdrantVectorDB
@@ -26,7 +29,7 @@ class RAGPipeline:
 
         # Determine device (CUDA if available, else CPU)
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print(f"[RAG V2] Using device: {self.device}")
+        sys.stderr.write(f"[RAG V2] Using device: {self.device}" + "\n")
 
         # Use Ollama embeddings if specified
         embed_provider = self.config.get("embed_provider", "sentencetransformer")
@@ -34,13 +37,13 @@ class RAGPipeline:
             from langchain_community.embeddings import OllamaEmbeddings
             # Note: OllamaEmbeddings runs on Ollama server, not local GPU
             embeddings_model = OllamaEmbeddings(model=self.config.get("embed_model"))
-            print(f"[RAG V2] Using Ollama embeddings with model: {self.config.get('embed_model')}")
+            sys.stderr.write(f"[RAG V2] Using Ollama embeddings with model: {self.config.get('embed_model')}" + "\n")
         else:
-            embeddings_model = SentenceTransformerEmbeddings(
+            embeddings_model = HuggingFaceEmbeddings(
                 model_name=self.config.get("embed_model"),
                 model_kwargs={'device': self.device}
             )
-            print(f"[RAG V2] Using SentenceTransformer embeddings with model: {self.config.get('embed_model')}")
+            sys.stderr.write(f"[RAG V2] Using HuggingFace embeddings with model: {self.config.get('embed_model')}" + "\n")
 
         self.embeddings = embeddings_model
 
@@ -49,6 +52,7 @@ class RAGPipeline:
             self.config.get("reranker_model"),
             device=self.device
         )
+
 
         # Initialize Qdrant vector DB (replaces FAISS)
         qdrant_path = os.path.join(self.config.get("persist_dir"), "qdrant_storage")
@@ -94,7 +98,7 @@ class RAGPipeline:
             doc.close()
             return re.sub(r'\s+', ' ', full_text).strip()
         except Exception as e:
-            print(f"Error extracting text from {pdf_path}: {e}")
+            sys.stderr.write(f"Error extracting text from {pdf_path}: {e}" + "\n")
             return ""
 
     def _extract_text_from_json(self, json_path: str) -> str:
@@ -122,7 +126,7 @@ class RAGPipeline:
             text_parts = flatten_json(data)
             return "\n".join(text_parts)
         except Exception as e:
-            print(f"Error extracting text from {json_path}: {e}")
+            sys.stderr.write(f"Error extracting text from {json_path}: {e}" + "\n")
             return ""
 
     def _get_file_hash(self, file_path: str) -> str:
@@ -133,7 +137,7 @@ class RAGPipeline:
             hash_input = f"{file_path}:{stat.st_mtime}:{stat.st_size}"
             return hashlib.md5(hash_input.encode()).hexdigest()
         except Exception as e:
-            print(f"Error hashing file {file_path}: {e}")
+            sys.stderr.write(f"Error hashing file {file_path}: {e}" + "\n")
             return ""
 
     def _get_all_source_files(self) -> list:
@@ -163,7 +167,7 @@ class RAGPipeline:
             with open(manifest_path, 'w') as f:
                 json.dump(manifest, f, indent=2)
         except Exception as e:
-            print(f"Error saving manifest: {e}")
+            sys.stderr.write(f"Error saving manifest: {e}" + "\n")
 
     def _load_manifest(self, persist_dir: str) -> dict:
         """Load manifest from disk"""
@@ -174,7 +178,7 @@ class RAGPipeline:
             with open(manifest_path, 'r') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"Error loading manifest: {e}")
+            sys.stderr.write(f"Error loading manifest: {e}" + "\n")
             return {}
 
     def _files_changed(self, persist_dir: str) -> bool:
@@ -190,16 +194,16 @@ class RAGPipeline:
             added = new_files - old_files
             removed = old_files - new_files
             if added:
-                print(f"[RAG V2] New files detected: {[os.path.basename(f) for f in added]}")
+                sys.stderr.write(f"[RAG V2] New files detected: {[os.path.basename(f) for f in added]}" + "\n")
             if removed:
-                print(f"[RAG V2] Removed files detected: {[os.path.basename(f) for f in removed]}")
+                sys.stderr.write(f"[RAG V2] Removed files detected: {[os.path.basename(f) for f in removed]}" + "\n")
             return True
 
         # Check if any file hashes changed
         for file_path, new_hash in new_manifest.items():
             old_hash = old_manifest.get(file_path)
             if old_hash != new_hash:
-                print(f"[RAG V2] File changed: {os.path.basename(file_path)}")
+                sys.stderr.write(f"[RAG V2] File changed: {os.path.basename(file_path)}" + "\n")
                 return True
 
         return False
@@ -218,7 +222,16 @@ class RAGPipeline:
         )
 
         if needs_reindex:
-            print(f"[RAG V2] Creating new Qdrant database at {persist_dir}...")
+            # Important: Qdrant upserts do not delete old points. If we are reindexing
+            # (as opposed to first index), clear the collection to avoid stale results.
+            if qdrant_count > 0:
+                try:
+                    sys.stderr.write("[RAG V2] Clearing Qdrant collection before reindex..." + "\n")
+                    self.vector_db.clear()
+                except Exception as e:
+                    sys.stderr.write(f"[RAG V2] WARNING: Failed to clear Qdrant collection: {e}" + "\n")
+
+            sys.stderr.write(f"[RAG V2] Creating new Qdrant database at {persist_dir}..." + "\n")
             all_docs = []
             all_qdrant_docs = []  # For Qdrant batch indexing
 
@@ -230,7 +243,7 @@ class RAGPipeline:
 
                         # Handle Jupyter notebooks specially
                         if file.lower().endswith('.ipynb'):
-                            print(f"[RAG V2] Processing notebook: {file}")
+                            sys.stderr.write(f"[RAG V2] Processing notebook: {file}" + "\n")
                             notebook_chunks = process_notebook_for_rag(file_path, max_chunk_size=2000)
                             for cell_data in notebook_chunks:
                                 content = cell_data['content']
@@ -319,9 +332,9 @@ class RAGPipeline:
             with open(docs_file, 'w') as f:
                 json.dump([{"content": doc.page_content, **doc.metadata} for doc in all_docs], f)
 
-            print(f"[RAG V2] Indexed {len(all_docs)} chunks from {len(manifest)} files")
+            sys.stderr.write(f"[RAG V2] Indexed {len(all_docs)} chunks from {len(manifest)} files" + "\n")
         else:
-            print(f"[RAG V2] Loading existing Qdrant database from {persist_dir}...")
+            sys.stderr.write(f"[RAG V2] Loading existing Qdrant database from {persist_dir}..." + "\n")
             # Load documents for BM25
             if os.path.exists(docs_file):
                 with open(docs_file, 'r') as f:
@@ -330,13 +343,13 @@ class RAGPipeline:
                     Document(page_content=doc["content"], metadata={k: v for k, v in doc.items() if k != "content"})
                     for doc in docs_data
                 ]
-                print(f"[RAG V2] Loaded {len(self.all_documents)} documents for BM25")
+                sys.stderr.write(f"[RAG V2] Loaded {len(self.all_documents)} documents for BM25" + "\n")
             else:
-                print("[RAG V2] Warning: No docs.json found, BM25 will be empty")
+                sys.stderr.write("[RAG V2] Warning: No docs.json found, BM25 will be empty" + "\n")
 
     def search(self, query: str) -> str:
         try:
-            print(f"[RAG V2] Searching for: '{query[:50]}...'")
+            sys.stderr.write(f"[RAG V2] Searching for: '{query[:50]}...'" + "\n")
             top_k = self.config.get("top_k", 5)
 
             # Step 1: Qdrant vector search
@@ -349,7 +362,7 @@ class RAGPipeline:
 
             # Step 2: BM25 search
             if not self.all_documents:
-                print("[RAG V2] Warning: No documents loaded for BM25, using vector results only")
+                sys.stderr.write("[RAG V2] Warning: No documents loaded for BM25, using vector results only" + "\n")
                 initial_results = vector_docs
             else:
                 bm25_retriever = BM25Retriever.from_documents(self.all_documents)
@@ -367,23 +380,23 @@ class RAGPipeline:
                         initial_results.append(doc)
 
             if not initial_results:
-                print("[RAG V2] No results found in initial search")
+                sys.stderr.write("[RAG V2] No results found in initial search" + "\n")
                 return "No relevant information found."
 
-            print(f"[RAG V2] Re-ranking {len(initial_results)} initial results...")
+            sys.stderr.write(f"[RAG V2] Re-ranking {len(initial_results)} initial results..." + "\n")
             rerank_top_k = self.config.get("rerank_top_k", 3)
             pairs = [[query, doc.page_content] for doc in initial_results]
-            scores = self.reranker.predict(pairs)
+            scores = self.reranker.predict(pairs, show_progress_bar=False)
             scored_results = zip(scores, initial_results)
             sorted_results = sorted(scored_results, key=lambda x: x[0], reverse=True)
             final_results = [doc for score, doc in sorted_results[:rerank_top_k]]
             unique_content = list({doc.page_content for doc in final_results})
 
-            print(f"[RAG V2] Returning {len(unique_content)} unique results")
+            sys.stderr.write(f"[RAG V2] Returning {len(unique_content)} unique results" + "\n")
             return "Document search results:\n\n" + "\n\n---\n\n".join(unique_content)
         except Exception as e:
             error_msg = f"[RAG V2] Search error: {type(e).__name__}: {str(e)}"
-            print(error_msg)
+            sys.stderr.write(error_msg + "\n")
             import traceback
             traceback.print_exc()
             return f"Search failed: {str(e)}"

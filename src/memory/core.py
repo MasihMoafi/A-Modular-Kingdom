@@ -1,10 +1,9 @@
 # mem0_memory.py - Qdrant-based memory system
 import os
 
-# Clear proxy settings to avoid SOCKS proxy conflicts with httpx
-for _proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-    if _proxy_var in os.environ:
-        del os.environ[_proxy_var]
+# Central proxy manager — strip all proxy for local Qdrant
+from utils.proxy import strip_all as _strip_proxy
+_strip_proxy()
 
 import uuid
 import json
@@ -48,6 +47,26 @@ class Mem0:
         self._bm25_dirty: bool = True
 
         self._init_collection()
+        self._vector_size = self._get_collection_vector_size()
+
+    def _get_collection_vector_size(self) -> int:
+        """Best-effort: read vector size from Qdrant collection config."""
+        try:
+            info = self._client.get_collection(collection_name=self.collection_name)
+            # qdrant-client returns a strongly-typed object; these attributes exist in practice.
+            return int(info.config.params.vectors.size)  # type: ignore[attr-defined]
+        except Exception:
+            return 768  # embeddinggemma default
+
+    def _safe_embedding(self, text: str) -> List[float]:
+        """Return embedding or a zero-vector fallback when Ollama is unavailable.
+
+        This keeps memory tools functional (BM25-based) even if Ollama isn't running.
+        """
+        try:
+            return self._get_embedding(text)
+        except Exception:
+            return [0.0] * int(getattr(self, "_vector_size", 768))
 
     def _init_collection(self):
         """Initialize Qdrant collection."""
@@ -83,7 +102,7 @@ class Mem0:
         try:
             if operation == 'ADD':
                 new_id = str(uuid.uuid4())
-                vector = self._get_embedding(fact)
+                vector = self._safe_embedding(fact)
                 point_id = abs(hash(new_id)) % (2**63)
 
                 self._client.upsert(
@@ -98,7 +117,7 @@ class Mem0:
                 self._bm25_dirty = True
 
             elif operation == 'UPDATE' and memory_id:
-                vector = self._get_embedding(fact)
+                vector = self._safe_embedding(fact)
                 point_id = abs(hash(memory_id)) % (2**63)
 
                 self._client.upsert(
@@ -232,7 +251,7 @@ JSON Output:"""
     def direct_add(self, content: str, metadata: Optional[Dict] = None) -> str:
         """Add content directly without LLM processing."""
         memory_id = str(uuid.uuid4())
-        vector = self._get_embedding(content)
+        vector = self._safe_embedding(content)
         point_id = abs(hash(memory_id)) % (2**63)
 
         payload = {
@@ -248,9 +267,11 @@ JSON Output:"""
         self._bm25_dirty = True
         return memory_id
 
-    def direct_delete(self, memory_id: str) -> None:
-        """Delete memory by ID."""
+    def direct_delete(self, memory_id: str) -> bool:
+        """Delete memory by ID. Returns True if a memory was deleted."""
         try:
+            if self._get_by_id(memory_id) is None:
+                return False
             self._client.delete(
                 collection_name=self.collection_name,
                 points_selector=Filter(
@@ -258,8 +279,10 @@ JSON Output:"""
                 )
             )
             self._bm25_dirty = True
+            return True
         except Exception as e:
             log_message(f"Delete error: {e}")
+            return False
 
     def add(self, conversation: str):
         """Add conversation with LLM fact extraction and deduplication."""
@@ -332,7 +355,7 @@ JSON Output:"""
     def _vector_search(self, query: str, k: int) -> List[Dict]:
         """Fallback vector similarity search."""
         try:
-            query_vector = self._get_embedding(query)
+            query_vector = self._safe_embedding(query)
             results = self._client.query_points(
                 collection_name=self.collection_name,
                 query=query_vector,

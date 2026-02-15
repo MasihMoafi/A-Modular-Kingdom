@@ -3,6 +3,19 @@ __pycache__/
 *.pyc
 .venv/
 
+# Local runtime storage / scratch
+.modular_kingdom/
+src/.modular_kingdom/
+scratch/
+
+# Local debug artifacts
+capture.txt
+stderr.txt
+stdout.txt
+debug_*.py
+Modular-Kingdom_main
+toggle_proxy.sh
+
 # Logs and caches
 *.log
 *.sqlite3

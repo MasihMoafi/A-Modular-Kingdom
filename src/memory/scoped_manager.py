@@ -90,7 +90,8 @@ class ScopedMemoryManager:
     def delete(self, memory_id: str, scope: MemoryScope) -> None:
         """Delete memory from specific scope."""
         instance = self._get_instance(scope)
-        instance.direct_delete(memory_id)
+        if not instance.direct_delete(memory_id):
+            raise KeyError(memory_id)
     
     def list_all(self, scope: MemoryScope) -> List[Dict]:
         """List all memories in a scope."""
