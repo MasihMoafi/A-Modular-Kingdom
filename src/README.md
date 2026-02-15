@@ -220,7 +220,7 @@ result = await browse_web_playwright(
 - Shared memory across multiple agents
 - Common tool access (no rebuilding infrastructure)
 - MCP protocol for reliable communication
-- Examples: Council Chamber (hierarchical), Gym (sequential)
+- Example: Council Chamber (hierarchical)
 
 ## 📊 Performance
 
@@ -271,4 +271,3 @@ Contributions welcome! Focus areas:
 ---
 
 **Built with focus on production-readiness, modularity, and developer experience** 🏰
-
