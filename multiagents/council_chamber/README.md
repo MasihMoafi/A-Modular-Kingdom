@@ -152,4 +152,4 @@ Council Chamber isn't just about getting tasks done - it's about experiencing AI
 
 ---
 
-**Next:** Explore the [Gym system](../gym/) for a completely different approach to multi-agent coordination!
+**Next:** Extend Council Chamber with your own agents/tools, or add a new workflow under `multiagents/`.

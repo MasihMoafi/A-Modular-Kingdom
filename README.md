@@ -324,12 +324,6 @@ This repository includes example multi-agent systems built on the foundation:
 - Uses ACP SDK + smolagents
 - **Location:** `multiagents/council_chamber/`
 
-### Gym (Sequential)
-- Fitness planning workflow (Interview → Plan → Nutrition)
-- CrewAI-powered coordination
-- Web interface included
-- **Location:** `multiagents/gym/`
-
 **Note:** These are demonstration applications, not the core product. The foundation (`host.py`) is the main offering.
 
 ---
