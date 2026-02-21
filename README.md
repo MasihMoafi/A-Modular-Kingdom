@@ -1,4 +1,4 @@
-# 🏰 A-Modular-Kingdom
+# AI Infrastructure Stack
 
 > **Production-ready MCP server with RAG, memory, and tools**
 
@@ -15,7 +15,7 @@ Every project starts from scratch. Every agent rebuilds the wheel.
 
 ## The Solution
 
-**A-Modular-Kingdom** is the infrastructure layer you're missing:
+**MCP AI Infrastructure** is the infrastructure layer you're missing:
 
 ```bash
 # Start the MCP server
@@ -73,8 +73,8 @@ UV package manager (faster than pip)
 
 ```bash
 # Clone the repository
-git clone https://github.com/MasihMoafi/A-Modular-Kingdom.git
-cd A-Modular-Kingdom
+git clone https://github.com/MasihMoafi/rag-mem.git
+cd rag-mem
 
 # Install dependencies
 uv sync
@@ -98,9 +98,9 @@ python src/agent/host.py
 // Add to claude_desktop_config.json
 {
   "mcpServers": {
-    "a-modular-kingdom": {
+    "mcp-infrastructure": {
       "command": "python",
-      "args": ["/full/path/to/A-Modular-Kingdom/src/agent/host.py"]
+      "args": ["/full/path/to/src/agent/host.py"]
     }
   }
 }
@@ -266,12 +266,12 @@ ollama pull nomic-embed-text
 
 ### Claude Desktop
 
-Already using Claude Code? Add A-Modular-Kingdom tools:
+Already using Claude Code? Add MCP AI Infrastructure tools:
 
 ```json
 {
   "mcpServers": {
-    "a-modular-kingdom": {
+    "mcp-infrastructure": {
       "command": "python",
       "args": ["/path/to/src/agent/host.py"]
     }
@@ -330,6 +330,14 @@ This repository includes example multi-agent systems built on the foundation:
 
 ## 🏗️ Architecture
 
+![Architecture Diagram 1](https://raw.githubusercontent.com/MasihMoafi/A-Modular-Kingdom/docs/report-and-presentation/Crawl%20URL%20to%20LLM%20Synthesis-2026-02-21-152729.png)
+
+*Figure 1 — Architecture diagram (please confirm which diagram this represents)*
+
+![Architecture Diagram 2](https://raw.githubusercontent.com/MasihMoafi/A-Modular-Kingdom/docs/report-and-presentation/Crawl%20URL%20to%20LLM%20Synthesis-2026-02-21-153224.png)
+
+*Figure 2 — Architecture diagram (please confirm which diagram this represents)*
+
 ```
 ┌─────────────────────────────────────┐
 │     Your AI Application             │
@@ -337,7 +345,7 @@ This repository includes example multi-agent systems built on the foundation:
 └────────────┬────────────────────────┘
              │ MCP Protocol
 ┌────────────▼────────────────────────┐
-│      A-Modular-Kingdom              │
+│      MCP Infrastructure Layer       │
 │  ┌─────────┐ ┌─────────┐ ┌────────┐│
 │  │   RAG   │ │ Memory  │ │ Tools  ││
 │  │ V1/V2/V3│ │ Scoped  │ │ 8+     ││
@@ -406,8 +414,8 @@ Contributions welcome! Focus areas:
 
 ```bash
 # Fork and clone
-git clone https://github.com/MasihMoafi/A-Modular-Kingdom.git
-cd A-Modular-Kingdom
+git clone https://github.com/MasihMoafi/rag-mem.git
+cd rag-mem
 
 # Create branch
 git checkout -b feature/your-feature
@@ -441,4 +449,4 @@ MIT License - See [LICENSE](LICENSE) for details
 
 ---
 
-*A-Modular-Kingdom: The infrastructure layer AI agents deserve* 🏰
+*MCP AI Infrastructure: The production-ready foundation for AI agents* ⚡
