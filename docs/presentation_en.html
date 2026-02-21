@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Modular Kingdom – Technical Presentation</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --accent: #58a6ff; --accent2: #3fb950; --accent3: #d2a679;
+    --text: #c9d1d9; --text-muted: #8b949e; --heading: #f0f6fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; }
+
+  .slide {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 6rem;
+    border-bottom: 3px solid var(--border);
+    position: relative;
+    page-break-after: always;
+  }
+  .slide-num {
+    position: absolute; top: 1.5rem; right: 2rem;
+    color: var(--text-muted); font-size: 0.8rem;
+  }
+  .slide-tag {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--accent); margin-bottom: 0.8rem; font-weight: 600;
+  }
+  h1 { font-size: 3rem; color: var(--heading); line-height: 1.2; font-weight: 700; }
+  h2 { font-size: 2.2rem; color: var(--heading); margin-bottom: 1.5rem; font-weight: 700; }
+  h3 { font-size: 1.3rem; color: var(--accent); margin-bottom: 0.8rem; }
+  p { font-size: 1.1rem; line-height: 1.7; margin-bottom: 1rem; color: var(--text); }
+  .big { font-size: 1.35rem; color: var(--text); line-height: 1.8; }
+  ul { padding-left: 1.5rem; }
+  li { font-size: 1.1rem; margin-bottom: 0.7rem; line-height: 1.6; }
+  li::marker { color: var(--accent); }
+  code { background: #1f2937; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 0.9em; color: var(--accent3); font-family: 'Cascadia Code', monospace; }
+  pre { background: #0a0e15; border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; font-size: 0.95rem; color: var(--text); overflow-x: auto; font-family: 'Cascadia Code', monospace; line-height: 1.6; }
+  .accent { color: var(--accent); font-weight: 700; }
+  .green { color: var(--accent2); font-weight: 700; }
+  .orange { color: var(--accent3); font-weight: 700; }
+
+  /* layouts */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; margin-top: 1rem; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; margin-top: 1rem; }
+  .col-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; }
+
+  /* stat blocks */
+  .stat-row { display: flex; gap: 2rem; margin: 2rem 0; flex-wrap: wrap; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem 2rem; text-align: center; flex: 1; }
+  .stat .value { font-size: 3rem; font-weight: 700; color: var(--accent); display: block; }
+  .stat .label { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem; }
+
+  /* title slide */
+  .slide.title { background: radial-gradient(ellipse at 20% 50%, #1a2744 0%, var(--bg) 60%); }
+  .slide.title h1 { font-size: 3.5rem; }
+  .slide.title .tagline { font-size: 1.3rem; color: var(--accent); margin-top: 1rem; }
+  .slide.title .author { margin-top: 3rem; color: var(--text-muted); font-size: 1rem; }
+
+  /* dark section headers */
+  .slide.section-break { background: var(--surface); align-items: center; text-align: center; }
+  .slide.section-break h2 { font-size: 3rem; }
+
+  /* flow diagram */
+  .flow { margin: 1.5rem 0; }
+  .flow-step { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; font-size: 1.05rem; }
+  .flow-num { background: var(--accent); color: #000; border-radius: 50%; width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+  .flow-arrow { color: var(--text-muted); font-size: 1.5rem; padding-left: 0.5rem; }
+
+  /* table */
+  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  th { background: var(--surface); color: var(--heading); padding: 0.8rem 1rem; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); font-size: 1rem; }
+  tr:hover td { background: rgba(88,166,255,0.04); }
+
+  /* badge */
+  .badge { display: inline-block; padding: 0.25rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; border: 1px solid; margin-right: 0.5rem; }
+  .badge-blue { background: #1f3a5c; color: var(--accent); border-color: var(--accent); }
+  .badge-green { background: #1a3a1a; color: var(--accent2); border-color: var(--accent2); }
+  .badge-orange { background: #3a2a10; color: var(--accent3); border-color: var(--accent3); }
+
+  @media print {
+    .slide { min-height: 100vh; page-break-after: always; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: Title -->
+<div class="slide title">
+  <span class="slide-num">1 / 12</span>
+  <div>
+    <span class="badge badge-blue">MCP Infrastructure</span>
+    <span class="badge badge-green">Production-Ready</span>
+    <span class="badge badge-orange">v1.0 + Crawler</span>
+  </div>
+  <h1 style="margin-top:1.5rem;">A Modular Kingdom</h1>
+  <div class="tagline">Stop rebuilding AI tools for every project.</div>
+  <p style="margin-top:1.5rem; font-size:1.15rem; max-width:700px;">Production-ready AI infrastructure: RAG with smart reindexing, persistent memory, browser automation, web crawler, and MCP integration — all in one composable toolkit.</p>
+  <div class="author">
+    <strong>Masih Moafi</strong> &nbsp;·&nbsp; February 2026 &nbsp;·&nbsp; github.com/MasihMoafi/A-Modular-Kingdom
+  </div>
+</div>
+
+<!-- SLIDE 2: Problem -->
+<div class="slide">
+  <span class="slide-num">2 / 12</span>
+  <div class="slide-tag">The Problem</div>
+  <h2>You rebuild the same stack every time.</h2>
+  <div class="two-col" style="margin-top:2rem;">
+    <div>
+      <h3>Every AI project, from scratch:</h3>
+      <ul>
+        <li>Build a RAG pipeline</li>
+        <li>Add persistent memory</li>
+        <li>Wire up web search</li>
+        <li>Handle browser automation</li>
+        <li>Integrate with your LLM client</li>
+        <li>Debug dependency conflicts</li>
+      </ul>
+    </div>
+    <div class="col-card" style="border-color: var(--accent);">
+      <h3>The solution:</h3>
+      <p class="big">Build it <span class="accent">once</span>, composable, production-ready, and expose it to <span class="accent">every AI client</span> via a single protocol.</p>
+      <p style="margin-top:1rem; color: var(--text-muted);">That protocol is <strong>MCP</strong>. That toolkit is <strong>A Modular Kingdom</strong>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3: What it is -->
+<div class="slide">
+  <span class="slide-num">3 / 12</span>
+  <div class="slide-tag">System Overview</div>
+  <h2>One server. Six tools. Every LLM client.</h2>
+  <div class="stat-row">
+    <div class="stat"><span class="value">6</span><span class="label">MCP Tools</span></div>
+    <div class="stat"><span class="value">4</span><span class="label">Embedding Providers</span></div>
+    <div class="stat"><span class="value">0.02s</span><span class="label">RAG v3 Query</span></div>
+    <div class="stat"><span class="value">15x</span><span class="label">Faster than v2</span></div>
+  </div>
+  <p class="big">A <strong>FastMCP stdio server</strong> that any MCP-compatible client connects to once, via a JSON config block, and immediately gains access to the full tool suite — RAG, memory, web search, browser automation, and web crawling.</p>
+</div>
+
+<!-- SLIDE 4: Architecture -->
+<div class="slide">
+  <span class="slide-num">4 / 12</span>
+  <div class="slide-tag">Architecture</div>
+  <h2>Full System Architecture</h2>
+  <pre>
+┌──────────────────────────────────────────────┐
+│         MCP CLIENT (Claude / Cursor / Agent) │
+└───────────────────┬──────────────────────────┘
+                    │  stdio (MCP protocol)
+                    ▼
+┌──────────────────────────────────────────────┐
+│             host.py  (FastMCP)               │
+│  search_rag  · save_memory · search_memory   │
+│  search_web  · browser_automate · crawl_web  │
+└────────┬──────────────┬──────────────┬───────┘
+         │              │              │
+         ▼              ▼              ▼
+   RAG v3 Stack    Memory Stack    Web Stack
+   Qdrant Cloud    ChromaDB/Mem0   httpx
+   BM25 + Rerank   Scoped (global  Playwright
+   SentenceXF      / project)      Crawler
+  </pre>
+</div>
+
+<!-- SLIDE 5: Tools -->
+<div class="slide">
+  <span class="slide-num">5 / 12</span>
+  <div class="slide-tag">Tool Inventory</div>
+  <h2>The Six Tools</h2>
+  <table>
+    <tr><th>Tool</th><th>Function</th><th>Backend</th></tr>
+    <tr><td><code>search_rag</code></td><td>Semantic search over indexed documents</td><td>Qdrant + BM25 + Cohere</td></tr>
+    <tr><td><code>search_memory</code></td><td>Retrieve past interactions</td><td>ChromaDB / Mem0</td></tr>
+    <tr><td><code>save_memory</code></td><td>Persist facts, rules, preferences</td><td>ChromaDB / Mem0</td></tr>
+    <tr><td><code>search_web</code></td><td>Real-time web search</td><td>DuckDuckGo / Brave</td></tr>
+    <tr><td><code>browser_automate</code></td><td>JS-rendered page fetch</td><td>Playwright</td></tr>
+    <tr><td><code>crawl_web</code></td><td>Multi-page deep crawl + RAG index</td><td>httpx + Playwright</td></tr>
+  </table>
+</div>
+
+<!-- SLIDE 6: RAG -->
+<div class="slide">
+  <span class="slide-num">6 / 12</span>
+  <div class="slide-tag">Core Component</div>
+  <h2>RAG Pipeline (v3)</h2>
+  <div class="two-col">
+    <div>
+      <h3>Hybrid Retrieval Stack</h3>
+      <div class="flow">
+        <div class="flow-step"><span class="flow-num">1</span>Ingest + hash files (700 tok chunks)</div>
+        <div class="flow-step"><span class="flow-num">2</span>Embed (Ollama / ST / OpenAI / Cohere)</div>
+        <div class="flow-step"><span class="flow-num">3</span>Store in Qdrant Cloud</div>
+        <div class="flow-step"><span class="flow-num">4</span>Query: BM25 + vector, merged</div>
+        <div class="flow-step"><span class="flow-num">5</span>Rerank (Cohere, top-5)</div>
+        <div class="flow-step"><span class="flow-num">6</span>Return JSON with metadata</div>
+      </div>
+    </div>
+    <div>
+      <h3>Key Properties</h3>
+      <ul>
+        <li><span class="green">Incremental</span> — only re-indexes changed files</li>
+        <li><span class="green">Isolated</span> — unique Qdrant collection per path</li>
+        <li><span class="green">Concurrent</span> — Qdrant Cloud, no file locks</li>
+        <li><span class="green">Fast</span> — 0.02s warm query (15x vs v2)</li>
+        <li>Supports <code>.py</code> <code>.md</code> <code>.txt</code> <code>.ipynb</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7: Memory -->
+<div class="slide">
+  <span class="slide-num">7 / 12</span>
+  <div class="slide-tag">Core Component</div>
+  <h2>Hierarchical Memory System</h2>
+  <div class="two-col">
+    <div class="col-card">
+      <h3>🌍 Global Scope</h3>
+      <p>Persistent rules and preferences that apply across <em>all</em> projects. Stored in <code>~/.modular_kingdom</code>.</p>
+      <p style="margin-top:1rem;"><code>#global:rule: always respond in Farsi</code></p>
+      <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.5rem;">Survives project deletion. Set once, enforced everywhere.</p>
+    </div>
+    <div class="col-card">
+      <h3>📁 Project Scope</h3>
+      <p>Facts, decisions, and context tied to a specific codebase or session. Fully isolated per project.</p>
+      <p style="margin-top:1rem;"><code>#project:context: FastAPI v0.110</code></p>
+      <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.5rem;">No cross-contamination between projects.</p>
+    </div>
+  </div>
+  <p style="margin-top:1.5rem;">Built on <strong>Mem0</strong> + <strong>ChromaDB</strong>. Scoped routing via <code>ScopedMemoryManager</code>.</p>
+</div>
+
+<!-- SLIDE 8: Crawler -->
+<div class="slide">
+  <span class="slide-num">8 / 12</span>
+  <div class="slide-tag">New Tool</div>
+  <h2>Web Crawler: <code>crawl_web</code></h2>
+  <div class="two-col">
+    <div>
+      <h3>API</h3>
+      <pre style="font-size:0.85rem;">crawl_web(
+  url: str,
+  depth: int = 1,
+  max_pages: int = 10,
+  index_into_rag: bool = False,
+  same_domain_only: bool = True
+) -> list[dict]</pre>
+      <h3 style="margin-top:1.5rem;">Technology</h3>
+      <ul>
+        <li><strong>httpx</strong> — fast async, static pages</li>
+        <li><strong>Playwright</strong> — JS-rendered fallback</li>
+        <li><strong>BeautifulSoup4</strong> — extraction + link discovery</li>
+        <li>Zero new heavy dependencies</li>
+      </ul>
+    </div>
+    <div>
+      <h3>When to use it</h3>
+      <table>
+        <tr><th>Scenario</th><th>Tool</th></tr>
+        <tr><td>Pre-indexed docs</td><td><code>search_rag</code></td></tr>
+        <tr><td>Quick lookup</td><td><code>search_web</code></td></tr>
+        <tr><td>One JS page</td><td><code>browser_automate</code></td></tr>
+        <tr><td><span class="orange">Entire site</span></td><td><code>crawl_web</code></td></tr>
+        <tr><td><span class="orange">Build KB</span></td><td><code>crawl_web(index_into_rag=True)</code></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: Routing -->
+<div class="slide">
+  <span class="slide-num">9 / 12</span>
+  <div class="slide-tag">Design Decision</div>
+  <h2>Query Routing: Rule-Based, Not Score-Based</h2>
+  <p class="big" style="margin-bottom:2rem;">The LLM decides which tool to call based on <span class="accent">query type</span>, not confidence scores. Predictable. Debuggable. Fast.</p>
+  <div class="flow">
+    <div class="flow-step"><span class="flow-num">1</span><strong>Memory Check</strong> — "Have I seen this?" → <code>search_memory</code></div>
+    <div class="flow-arrow">↓ not found</div>
+    <div class="flow-step"><span class="flow-num">2</span><strong>RAG Search</strong> — "Is it in my docs?" → <code>search_rag</code></div>
+    <div class="flow-arrow">↓ not found / stale</div>
+    <div class="flow-step"><span class="flow-num">3</span><strong>Web Search</strong> — "Quick public lookup" → <code>search_web</code></div>
+    <div class="flow-arrow">↓ needs deep content</div>
+    <div class="flow-step"><span class="flow-num">4</span><strong>Crawl</strong> — "Systematic extraction" → <code>crawl_web</code></div>
+  </div>
+  <p style="color:var(--text-muted); margin-top:1rem; font-size:0.95rem;">Crawling is always <strong>explicit and intentional</strong> — never auto-triggered.</p>
+</div>
+
+<!-- SLIDE 10: MCP + Performance -->
+<div class="slide">
+  <span class="slide-num">10 / 12</span>
+  <div class="slide-tag">Integration + Performance</div>
+  <h2>MCP Config &amp; Benchmarks</h2>
+  <div class="two-col">
+    <div>
+      <h3>Claude Desktop Config</h3>
+      <pre style="font-size:0.85rem;">{
+  "mcpServers": {
+    "modular-kingdom": {
+      "command": "uv",
+      "args": ["run", "python",
+               "-m", "src.host"],
+      "cwd": "/path/to/repo"
+    }
+  }
+}</pre>
+    </div>
+    <div>
+      <h3>RAG Performance</h3>
+      <table>
+        <tr><th>Metric</th><th>v2</th><th>v3</th></tr>
+        <tr><td>Warm query</td><td>0.31s</td><td class="green">0.02s</td></tr>
+        <tr><td>Cold index</td><td>52s</td><td class="green">28s</td></tr>
+        <tr><td>Concurrent</td><td>❌</td><td class="green">✓</td></tr>
+        <tr><td>GPU accel</td><td>✓</td><td>✓</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 11: Install -->
+<div class="slide">
+  <span class="slide-num">11 / 12</span>
+  <div class="slide-tag">Getting Started</div>
+  <h2>Installation</h2>
+  <div class="two-col">
+    <div>
+      <h3>Full Stack (Recommended)</h3>
+      <pre style="font-size:0.9rem;">git clone https://github.com/
+  MasihMoafi/A-Modular-Kingdom
+cd A-Modular-Kingdom
+uv sync
+cp config.example.toml config.toml
+# edit: set embedding provider
+uv run python -m src.host</pre>
+    </div>
+    <div>
+      <h3>Package Only</h3>
+      <pre style="font-size:0.9rem;"><code># No PyTorch (Ollama)
+</code>pip install rag-mem
+
+# With local embeddings
+pip install rag-mem[local]
+
+# OpenAI embeddings
+pip install rag-mem[openai]</pre>
+      <p style="color:var(--text-muted); font-size:0.85rem; margin-top:0.8rem;"><strong>Note:</strong> <code>rag-mem[local]</code> installs PyTorch (~2GB). Ollama provider recommended for production.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 12: Summary -->
+<div class="slide section-break">
+  <span class="slide-num">12 / 12</span>
+  <div class="slide-tag">Summary</div>
+  <h2>What you get</h2>
+  <div class="three-col" style="margin-top:2rem; text-align:left;">
+    <div class="col-card">
+      <h3>🔍 Knowledge</h3>
+      <p>RAG v3 with hybrid BM25 + vector retrieval, smart incremental indexing, and Cohere reranking. 0.02s warm queries.</p>
+    </div>
+    <div class="col-card">
+      <h3>🧠 Memory</h3>
+      <p>Hierarchical global/project scoped memory via Mem0 + ChromaDB. Rules that persist across sessions and projects.</p>
+    </div>
+    <div class="col-card">
+      <h3>🌐 Web</h3>
+      <p>Web search, single-page browser automation (Playwright), and multi-page web crawling with optional RAG indexing.</p>
+    </div>
+  </div>
+  <p style="margin-top:2.5rem; font-size:1.2rem; color: var(--accent);">One MCP server. Connect once. Use everywhere.</p>
+  <p style="margin-top:0.5rem; color: var(--text-muted);">github.com/MasihMoafi/A-Modular-Kingdom &nbsp;·&nbsp; pip install rag-mem</p>
+</div>
+
+</body>
+</html>
