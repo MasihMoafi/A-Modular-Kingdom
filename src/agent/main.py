@@ -21,7 +21,11 @@ def clear_proxy_settings():
             del os.environ[var]
 clear_proxy_settings()
 
-from langchain.memory import ConversationBufferWindowMemory
+try:
+    from langchain.memory import ConversationBufferWindowMemory
+except Exception:
+    # langchain>=1.0 moved legacy memory classes to langchain_classic.
+    from langchain_classic.memory import ConversationBufferWindowMemory
 from mcp import ClientSession, stdio_client, StdioServerParameters
 from dotenv import load_dotenv
 
@@ -34,18 +38,42 @@ HOST_PATH = os.path.join(AGENT_DIR, "host.py")
 
 nest_asyncio.apply()
 
-# Check for Gemini API key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    from google import genai
-    from google.genai import types
-    genai_client = genai.Client(api_key=GEMINI_API_KEY)
-    LLM_MODEL = 'gemini'
-    print("Using Gemini API")
-else:
-    import ollama
-    LLM_MODEL = 'qwen3:8b'
-    print("Using Ollama")
+# Runtime-selected LLM backend (defaults to local Ollama).
+LLM_MODEL = "qwen3:8b"
+genai_client = None
+types = None
+
+
+def initialize_llm(provider: str = "ollama", model: Optional[str] = None):
+    """Initialize LLM backend.
+
+    Defaults to local Ollama to keep CLI usage simple and offline-first.
+    Gemini is available only when explicitly requested.
+    """
+    global LLM_MODEL, genai_client, types
+
+    selected = (provider or "ollama").strip().lower()
+    if selected == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError(
+                "GEMINI_API_KEY is missing. Either set it and use --provider gemini, "
+                "or run with --provider ollama."
+            )
+        from google import genai
+        from google.genai import types as gemini_types
+
+        genai_client = genai.Client(api_key=api_key)
+        types = gemini_types
+        LLM_MODEL = "gemini"
+        print("Using Gemini API")
+        return
+
+    # Default path: local Ollama.
+    import ollama  # noqa: F401 - imported for side effects/availability checks
+
+    LLM_MODEL = (model or os.getenv("OLLAMA_MODEL") or "qwen3:8b").strip()
+    print(f"Using Ollama ({LLM_MODEL})")
 
 class DocumentCompleter(Completer):
     def __init__(self):
@@ -147,7 +175,8 @@ async def main(think_level=None):
                 completer.update_resources(doc_list)
                 print(f"\nLoaded {len(doc_list)} documents for @ completion")
             except Exception as e:
-                print(f"Could not load document list: {e}")
+                if "Unknown resource" not in str(e):
+                    print(f"Could not load document list: {e}")
             
             print("\nAgent is ready. Type 'exit' to quit. Use @ to see document dropdown.")
 
@@ -196,14 +225,14 @@ async def main(think_level=None):
                             continue
                         elif command == 'browser_automation':
                             try:
-                                task = await prompt_session.prompt_async("Task: ")
+                                task = await prompt_session.prompt_async("URL to navigate to: ")
                                 if not task.strip():
-                                    print("Aborted: empty task.")
+                                    print("Aborted: empty URL.")
                                     continue
                                 headless_ans = await prompt_session.prompt_async("Headless? (Y/n): ")
                                 headless = not (headless_ans.strip().lower() == 'n')
                                 print("🚀 Starting browser automation...")
-                                res = await session.call_tool('browser_automation', {'task': task, 'headless': headless})
+                                res = await session.call_tool('browse_web', {'action': 'navigate', 'url': task.strip(), 'headless': headless})
                                 try:
                                     print(res.content[0].text)
                                 except Exception:
@@ -216,25 +245,36 @@ async def main(think_level=None):
                             print("🔍 Inspecting memory...")
                             mems = await session.call_tool('list_all_memories')
                             try:
-                                all_memories = json.loads(mems.content[0].text)
+                                raw = json.loads(mems.content[0].text)
+                                # list_all_memories returns {scope: [mem_dicts]}
+                                all_memories = []
+                                if isinstance(raw, dict):
+                                    for scope_mems in raw.values():
+                                        if isinstance(scope_mems, list):
+                                            all_memories.extend(scope_mems)
+                                elif isinstance(raw, list):
+                                    all_memories = raw
+
                                 print("\n--- AGENT'S CURRENT MEMORY ---")
                                 if all_memories:
                                     for i, mem in enumerate(all_memories):
-                                        print(f"{i+1}. (ID: {mem.get('id', 'N/A')[:8]}) - {mem.get('content', 'N/A')}")
-                                    
+                                        if isinstance(mem, dict):
+                                            print(f"{i+1}. (ID: {mem.get('id', 'N/A')[:8]}) - {mem.get('content', 'N/A')}")
+                                        else:
+                                            print(f"{i+1}. {mem}")
+
                                     # Interactive deletion
                                     delete_input = await prompt_session.prompt_async(
                                         "\nEnter memory ID to delete (or press Enter to skip): "
                                     )
-                                    
+
                                     if delete_input.strip():
-                                        # Find matching memory
                                         matching_mem = None
                                         for mem in all_memories:
-                                            if mem.get('id', '').startswith(delete_input.strip()):
+                                            if isinstance(mem, dict) and mem.get('id', '').startswith(delete_input.strip()):
                                                 matching_mem = mem
                                                 break
-                                        
+
                                         if matching_mem:
                                             confirm = await prompt_session.prompt_async(
                                                 f"Delete '{matching_mem.get('content', '')[:50]}...'? (y/N): "
@@ -262,7 +302,11 @@ async def main(think_level=None):
                                 else:
                                     print("No files found.")
                             except Exception as e:
-                                print(f"Error listing files: {e}")
+                                if "Unknown resource" in str(e):
+                                    print("File listing requires MCP_EXPOSE_RESOURCES=1 when starting the server.")
+                                    print("Run: MCP_EXPOSE_RESOURCES=1 python src/agent/host.py")
+                                else:
+                                    print(f"Error listing files: {e}")
                             continue
 
                         elif user_input.startswith('/rag'):
@@ -548,11 +592,23 @@ User: {user_input}"""
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Juliette - Intelligent Agent with Thinking")
+    parser.add_argument(
+        "--provider",
+        choices=["ollama", "gemini"],
+        default="ollama",
+        help="LLM backend to use (default: ollama)",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Ollama model name (default: OLLAMA_MODEL env or qwen3:8b)",
+    )
     parser.add_argument('--think', choices=['low', 'medium', 'high'], 
                         help='Enable thinking mode for supported models (gpt-oss)')
     args = parser.parse_args()
     
     try:
+        initialize_llm(provider=args.provider, model=args.model)
         asyncio.run(main(think_level=args.think))
     except KeyboardInterrupt:
         print("\nExiting...")
