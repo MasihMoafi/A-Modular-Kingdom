@@ -20,7 +20,10 @@ class MemoryScope(Enum):
 
 class MemoryConfig:
     """Configuration manager for scoped memory system."""
-    
+
+    DEFAULT_EMBED_MODEL = "embeddinggemma"
+    DEFAULT_COLLECTION_NAME = "agent_memories"
+
     def __init__(self, project_root: Optional[str] = None):
         """
         Initialize memory configuration.
@@ -54,11 +57,11 @@ class MemoryConfig:
             Path object for Qdrant storage
         """
         if scope.name.startswith("GLOBAL_"):
-            # Global memories stored in ~/.gemini/memories/global/
+            # Global memories stored in ~/.modular_kingdom/memories/global/
             scope_name = scope.value.replace("global_", "")
             return self.global_memory_base / "global" / scope_name
         else:
-            # Project memories stored in ~/.gemini/memories/projects/{hash}/
+            # Project memories stored in ~/.modular_kingdom/memories/projects/{hash}/
             scope_name = scope.value.replace("project_", "")
             return self.global_memory_base / "projects" / self.project_hash / scope_name
     
@@ -116,14 +119,18 @@ class MemoryConfig:
             content = content_after_first_colon[content_after_first_colon.index(":") + 1:].strip()
         else:
             # One-colon variant: "#global:rule <content>"
-            parts = content_after_first_colon.split(None, 1)
-            if parts:
-                second_part = parts[0].strip()
-                full_prefix = f"{prefix_part}:{second_part}".lower()
-                content = parts[1].strip() if len(parts) > 1 else ""
+            if prefix_part.lower() == "persona":
+                full_prefix = "persona"
+                content = content_after_first_colon.strip()
             else:
-                full_prefix = prefix_part.lower()
-                content = ""
+                parts = content_after_first_colon.split(None, 1)
+                if parts:
+                    second_part = parts[0].strip()
+                    full_prefix = f"{prefix_part}:{second_part}".lower()
+                    content = parts[1].strip() if len(parts) > 1 else ""
+                else:
+                    full_prefix = prefix_part.lower()
+                    content = ""
         
         # Map prefix to scope
         prefix_map = {

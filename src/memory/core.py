@@ -15,9 +15,11 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams, Filter, FieldCondition, MatchValue
 from rank_bm25 import BM25Okapi
 
+from memory.memory_config import MemoryConfig as _MemoryConfig
+
 LLM_MODEL = 'qwen3:8b'
-COLLECTION_NAME = "agent_memories"  # Legacy default
-EMBED_MODEL = "embeddinggemma"
+COLLECTION_NAME = _MemoryConfig.DEFAULT_COLLECTION_NAME
+EMBED_MODEL = _MemoryConfig.DEFAULT_EMBED_MODEL
 
 def log_message(message: str):
     """Disabled debug logging."""

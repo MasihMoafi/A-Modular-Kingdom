@@ -233,49 +233,14 @@ search_memories(query="coding standards", top_k=5)
 
 ## 📦 Package Installation
 
-The MCP server can also be installed as a standalone package:
+> **Coming soon:** `pip install rag-mem` (PyPI release in progress)
+
+Install from source in the meantime:
 
 ```bash
-# Install with sentence-transformers (no Ollama required)
-pip install rag-mem[local]
-
-# Set embedding provider (add to your shell profile or script)
-export MEMORY_MCP_EMBED_PROVIDER=sentence-transformers
-export MEMORY_MCP_EMBED_MODEL=all-MiniLM-L6-v2
+cd packages/memory-mcp
+pip install -e .
 ```
-
-**Python API:**
-```python
-from memory_mcp.config import Settings
-from memory_mcp.rag import RAGPipeline
-from memory_mcp.memory import MemoryStore
-
-# RAG - index and search any codebase
-pipeline = RAGPipeline(Settings(), document_paths=["./src"])
-pipeline.index()
-results = pipeline.search("how does authentication work")
-
-# Memory - persistent storage across sessions
-store = MemoryStore(Settings())
-store.add("User prefers dark mode")
-results = store.search("preferences")
-```
-
-**CLI Usage:**
-```bash
-memory-mcp init                      # Initialize config
-memory-mcp serve --docs ./documents  # Start MCP server
-memory-mcp index ./path/to/files     # Index documents
-```
-
-**Alternative: Use Ollama (local, private)**
-```bash
-pip install rag-mem
-ollama pull nomic-embed-text
-# No env vars needed - Ollama is the default
-```
-
-**Package Size:** 58KB code (note: ~2GB dependencies with PyTorch)
 
 ---
 

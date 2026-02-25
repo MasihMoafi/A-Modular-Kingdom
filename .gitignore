@@ -1,140 +1,76 @@
 # Python
 __pycache__/
-*.pyc
-.venv/
-
-# Local runtime storage / scratch
-.modular_kingdom/
-src/.modular_kingdom/
-scratch/
-
-# Local debug artifacts
-capture.txt
-stderr.txt
-stdout.txt
-debug_*.py
-Modular-Kingdom_main
-toggle_proxy.sh
-
-# Logs and caches
-*.log
-*.sqlite3
-agent_chain.log
-teacher_agent_chain.log
-
-# Chroma/Vector DBs
-agent_chroma_db/
-rag/rag_db/
-rag/rag_db_v2/
-rag/rag_db_v3/
-
-# Temp
-temp/
-
-# OS
-.DS_Store
-# Python
-__pycache__/
 *.py[cod]
-*$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+dist/
+build/
+.eggs/
 
 # Virtual environments
 .venv/
 venv/
-ENV/
 env/
+
+# Environment files (keep .env.example)
 .env
+src/.env
+src/.env.cuda
 
-# Claude Code
-.claude/
+# Lock files
+uv.lock
+src/uv.lock
+package-lock.json
 
-# Databases and storage
-agent_chroma_db/
-rag_db/
-rag_db_v2/
-rag_db_v3/
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs
-*.log
-
-# Temporary files and folders
-temp/
-**/temp/
-**/temp*/
-**/*temp*/
-.tmp/
-*.tmp
-
-# IDE and editor files
+# IDE
 .vscode/
 .idea/
 *.swp
-*.swo
 *~
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Node modules (if any JS components)
-node_modules/
+# Runtime storage / generated DBs
+.modular_kingdom/
+src/.modular_kingdom/
+agent_chroma_db/
+agent_qdrant_db/
+src/agent_chroma_db/
+src/agent_qdrant_db/
+src/data/
+*_qdrant_db/
+*_chroma_db/
+rag_db*/
+src/rag/rag_db_v2/
+src/rag/rag_db_v3/
 
-# Lock files (keep requirements.txt but ignore lock files)
-*.lock
-uv.lock
-package-lock.json
+# Scratch / dev artifacts
+scratch/
+src/fix_cuda.sh
 
-# Global rules (sensitive)
-GLOBAL_RULES.md
+# Logs and caches
+*.log
+*.sqlite3
+*.sqlite
+*.db
+.tmp/
+*.tmp
 
-# Proprietary code
-wiseapp/
-
-# Large files and documents
+# Large binary/media files
 *.pdf
-*.mp4
-*.mov
-*.avi
-*.mkv
-*.mp3
-*.wav
-
-# Generated files
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.svg
-# Database folders
-agent_qdrant_db/
-agent_chroma_db/
-*_qdrant_db/
-*_chroma_db/
-rag_db*/
+*.mp4
+*.mp3
+*.wav
+
+# Claude Code
+.claude/
+
+# Pytest
+.pytest_cache/

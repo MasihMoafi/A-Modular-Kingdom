@@ -3,8 +3,7 @@ Tests for scoped memory system.
 """
 import os
 import sys
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 import pytest
 import tempfile
