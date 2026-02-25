@@ -233,45 +233,14 @@ search_memories(query="coding standards", top_k=5)
 
 ## 📦 Package Installation
 
-The MCP server can also be installed as a standalone package:
+> **Coming soon:** `pip install rag-mem` (PyPI release in progress)
+
+Install from source in the meantime:
 
 ```bash
-# Install rag-mem package
-pip install rag-mem
-
-# Or from source
 cd packages/memory-mcp
 pip install -e .
 ```
-
-**CLI Usage:**
-```bash
-# Initialize config
-memory-mcp init
-
-# Start server with documents
-memory-mcp serve --docs ./documents
-
-# Index documents
-memory-mcp index ./path/to/files
-```
-
-**Python API:**
-```python
-from memory_mcp import Settings, RAGPipeline, MemoryStore
-
-# Use RAG directly
-pipeline = RAGPipeline(document_paths=["./docs"])
-pipeline.index()
-results = pipeline.search("query")
-
-# Use memory directly
-memory = MemoryStore()
-memory.add("Important fact")
-results = memory.search("query")
-```
-
-**Package Size:** 58KB code (note: ~2GB dependencies with PyTorch)
 
 ---
 

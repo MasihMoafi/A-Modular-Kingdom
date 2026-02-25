@@ -11,48 +11,6 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 import sys
 import io
-import types
-from importlib.machinery import ModuleSpec
-
-# Aggressively disable tqdm globally to prevent protocol corruption
-# This must be done BEFORE any other imports that might use tqdm
-class NoOpTqdm:
-    def __init__(self, iterable=None, *args, **kwargs):
-        self.iterable = iterable or []
-    def __iter__(self):
-        return iter(self.iterable)
-    def __enter__(self): return self
-    def __exit__(self, *args): pass
-    def update(self, *args, **kwargs): pass
-    def close(self): pass
-    def set_description(self, *args, **kwargs): pass
-    def set_postfix(self, *args, **kwargs): pass
-    def refresh(self, *args, **kwargs): pass
-    @classmethod
-    def write(cls, *args, **kwargs): pass
-
-def _make_tqdm_module(name):
-    mod = types.ModuleType(name)
-    mod.__spec__ = ModuleSpec(name, None)
-    mod.__file__ = f"<dummy {name}>"
-    mod.__package__ = name.rsplit(".", 1)[0] if "." in name else name
-    return mod
-
-dummy_tqdm = _make_tqdm_module("tqdm")
-dummy_tqdm.tqdm = NoOpTqdm
-dummy_tqdm.trange = lambda *a, **kw: range(*a) if a else range(0)
-
-dummy_contrib = _make_tqdm_module("tqdm.contrib")
-dummy_concurrent = _make_tqdm_module("tqdm.contrib.concurrent")
-dummy_concurrent.thread_map = lambda fn, *args, **kwargs: list(map(fn, *args))
-dummy_contrib.concurrent = dummy_concurrent
-
-sys.modules["tqdm"] = dummy_tqdm
-sys.modules["tqdm.auto"] = dummy_tqdm
-sys.modules["tqdm.autonotebook"] = dummy_tqdm
-sys.modules["tqdm.std"] = dummy_tqdm
-sys.modules["tqdm.contrib"] = dummy_contrib
-sys.modules["tqdm.contrib.concurrent"] = dummy_concurrent
 
 repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.join(repo_root, "src")
