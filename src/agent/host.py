@@ -28,6 +28,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from memory.scoped_manager import ScopedMemoryManager
 from memory.memory_config import MemoryScope
+from memory.path_policy import resolve_memory_base
 from agent.tool_execution import call_in_subprocess as _call_in_subprocess_impl
 from agent.tool_execution import call_tool_safely as _call_tool_safely_impl
 
@@ -36,7 +37,7 @@ from agent.tool_execution import call_tool_safely as _call_tool_safely_impl
 _EXPOSE_EXTRA_TOOLS = os.environ.get("MCP_EXPOSE_EXTRA_TOOLS", "1").lower() in ("1", "true", "yes", "y", "on")
 _EXPOSE_RESOURCES = os.environ.get("MCP_EXPOSE_RESOURCES", "1").lower() in ("1", "true", "yes", "y", "on")
 
-_DEFAULT_MEMORY_BASE = str(Path(repo_root) / ".modular_kingdom" / "memories")
+_DEFAULT_MEMORY_BASE = resolve_memory_base(project_root=repo_root)
 os.environ.setdefault("MEMORY_BASE_PATH", _DEFAULT_MEMORY_BASE)
 
 # Initialize FastMCP

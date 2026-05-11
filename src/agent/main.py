@@ -44,7 +44,9 @@ except Exception:
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOST_PATH = os.path.join(AGENT_DIR, "host.py")
 REPO_ROOT = os.path.dirname(os.path.dirname(AGENT_DIR))
-DEFAULT_MEMORY_BASE = os.path.join(REPO_ROOT, ".modular_kingdom", "memories")
+from memory.path_policy import resolve_memory_base
+
+DEFAULT_MEMORY_BASE = resolve_memory_base(project_root=REPO_ROOT)
 os.environ.setdefault("MEMORY_BASE_PATH", DEFAULT_MEMORY_BASE)
 
 nest_asyncio.apply()
