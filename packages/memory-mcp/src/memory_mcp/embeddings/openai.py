@@ -31,7 +31,7 @@ class OpenAIEmbeddings(EmbeddingProvider):
             except ImportError:
                 raise ImportError(
                     "OpenAI support requires the 'openai' package. "
-                    "Install with: pip install memory-mcp[openai]"
+                    "Install with: pip install rag-mem[openai]"
                 )
         return self._client
 
