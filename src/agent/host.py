@@ -18,19 +18,18 @@ sys.path.insert(0, project_root)
 import json
 import importlib
 import glob
-import subprocess
 import shutil
 import zipfile
 from xml.sax.saxutils import escape as _xml_escape
 from datetime import datetime
 from pathlib import Path
-from contextlib import redirect_stdout, redirect_stderr
-from io import StringIO
 from typing import Dict, List
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from memory.scoped_manager import ScopedMemoryManager
 from memory.memory_config import MemoryScope
+from agent.tool_execution import call_in_subprocess as _call_in_subprocess_impl
+from agent.tool_execution import call_tool_safely as _call_tool_safely_impl
 
 # Default MCP surface area: RAG + scoped memory.
 # Extra tools are optional behind env flags to keep startup/tooling lean.
@@ -192,62 +191,18 @@ def _elog(msg: str) -> None:
         pass
 
 
-def _call_tool_safely(func, *args, **kwargs):
-    """Run tool code while suppressing accidental stdout/stderr writes and catching crashes."""
-    out_buf = StringIO()
-    err_buf = StringIO()
-    try:
-        with redirect_stdout(out_buf), redirect_stderr(err_buf):
-            result = func(*args, **kwargs)
-    except Exception as e:
-        _elog(f"[HOST] Tool {func.__name__} crashed: {e}\n")
-        return json.dumps({"error": f"{func.__name__} failed: {str(e)}"})
-
-    leaked = out_buf.getvalue().strip()
-    if leaked:
-        _elog(f"[HOST] Suppressed stdout leak ({len(leaked)} chars)\n")
-    leaked_err = err_buf.getvalue().strip()
-    if leaked_err:
-        _elog(f"[HOST] Suppressed stderr leak ({len(leaked_err)} chars)\n")
-    return result
-
-
 def _call_in_subprocess(module_name: str, function_name: str, payload: dict, timeout: int = 120) -> str:
-    """Isolate unstable/native tool code so it can't kill the MCP transport."""
-    runner = (
-        "import json, importlib, inspect, asyncio, io\n"
-        "from contextlib import redirect_stdout, redirect_stderr\n"
-        f"module = importlib.import_module({module_name!r})\n"
-        f"func = getattr(module, {function_name!r})\n"
-        f"payload = {repr(payload)}\n"
-        "out_buf = io.StringIO()\n"
-        "err_buf = io.StringIO()\n"
-        "with redirect_stdout(out_buf), redirect_stderr(err_buf):\n"
-        "    result = func(**payload)\n"
-        "    if inspect.iscoroutine(result):\n"
-        "        result = asyncio.run(result)\n"
-        "print(result if isinstance(result, str) else json.dumps(result))\n"
+    return _call_in_subprocess_impl(
+        module_name=module_name,
+        function_name=function_name,
+        payload=payload,
+        project_root=project_root,
+        timeout=timeout,
     )
-    env = os.environ.copy()
-    env["HF_HUB_OFFLINE"] = "1"  # Use cached models, don't hit huggingface.co
-    existing_pp = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = f"{project_root}:{existing_pp}" if existing_pp else project_root
 
-    proc = subprocess.run(
-        [sys.executable, '-c', runner],
-        cwd=project_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=timeout
-    )
-    if proc.returncode != 0:
-        return json.dumps({
-            'success': False,
-            'error': f'{module_name}.{function_name} failed',
-            'stderr': proc.stderr[-1000:]
-        })
-    return proc.stdout.strip() or json.dumps({'success': False, 'error': 'No output from subprocess'})
+
+def _call_tool_safely(func, *args, **kwargs):
+    return _call_tool_safely_impl(func, _elog, *args, **kwargs)
 
 
 try:
