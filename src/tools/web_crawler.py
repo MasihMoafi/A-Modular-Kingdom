@@ -8,7 +8,7 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from tools.web_search import perform_web_search
+from tools.web_acquisition import DuckDuckGoSearchProvider, create_http_client
 
 
 def _safe_text(text: str) -> str:
@@ -82,17 +82,8 @@ def _write_page_markdown(path: Path, url: str, title: str, text: str) -> None:
 
 
 def _seed_urls_from_query(query: str, limit: int) -> list[str]:
-    raw = perform_web_search(query=query, limit=limit)
-    payload = json.loads(raw)
-    items = payload.get("items", []) if isinstance(payload, dict) else []
-    urls = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        url = (item.get("url") or "").strip()
-        if url:
-            urls.append(url)
-    return urls
+    provider = DuckDuckGoSearchProvider()
+    return [item.url for item in provider.search(query=query, limit=limit) if item.url]
 
 
 def crawl_webpages(
@@ -103,8 +94,6 @@ def crawl_webpages(
     same_domain_only: bool = True,
     output_dir: str = "/tmp/web_crawl",
 ) -> str:
-    import httpx  # Lazy import
-
     try:
         max_pages = max(1, min(int(max_pages), 30))
         max_depth = max(0, min(int(max_depth), 3))
@@ -119,18 +108,11 @@ def crawl_webpages(
         run_dir = Path(output_dir).expanduser().resolve() / datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         run_dir.mkdir(parents=True, exist_ok=True)
 
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-            )
-        }
-
         visited = set()
         queue = deque((seed, 0) for seed in seeds)
         pages = []
 
-        with httpx.Client(headers=headers, follow_redirects=True, timeout=20) as client:
+        with create_http_client(timeout=20) as client:
             while queue and len(pages) < max_pages:
                 url, depth = queue.popleft()
                 if url in visited:
