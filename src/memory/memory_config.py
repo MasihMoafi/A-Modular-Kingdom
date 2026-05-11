@@ -7,6 +7,7 @@ import hashlib
 from enum import Enum
 from typing import Optional
 from pathlib import Path
+from memory.path_policy import resolve_memory_base
 
 
 class MemoryScope(Enum):
@@ -32,14 +33,7 @@ class MemoryConfig:
             project_root: Root directory of current project. If None, uses cwd.
         """
         self.project_root = os.path.realpath(project_root or os.getcwd())
-        # Prefer explicit base path, then project-local storage for portability/sandbox safety.
-        base_path = os.getenv("MEMORY_BASE_PATH")
-        if base_path:
-            self.global_memory_base = Path(base_path).expanduser()
-        else:
-            self.global_memory_base = (
-                Path(self.project_root) / ".modular_kingdom" / "memories"
-            )
+        self.global_memory_base = Path(resolve_memory_base(project_root=self.project_root))
         self.project_hash = self._compute_project_hash(self.project_root)
         
     def _compute_project_hash(self, path: str) -> str:
