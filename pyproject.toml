@@ -50,4 +50,5 @@ packages = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.1",
+    "pytest-asyncio>=0.23.0",
 ]

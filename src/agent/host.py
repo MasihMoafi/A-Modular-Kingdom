@@ -19,6 +19,11 @@ import json
 import importlib
 import glob
 import subprocess
+import shutil
+import zipfile
+from xml.sax.saxutils import escape as _xml_escape
+from datetime import datetime
+from pathlib import Path
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 from typing import Dict, List
@@ -29,8 +34,11 @@ from memory.memory_config import MemoryScope
 
 # Default MCP surface area: RAG + scoped memory.
 # Extra tools are optional behind env flags to keep startup/tooling lean.
-_EXPOSE_EXTRA_TOOLS = os.environ.get("MCP_EXPOSE_EXTRA_TOOLS", "0").lower() in ("1", "true", "yes", "y", "on")
-_EXPOSE_RESOURCES = os.environ.get("MCP_EXPOSE_RESOURCES", "0").lower() in ("1", "true", "yes", "y", "on")
+_EXPOSE_EXTRA_TOOLS = os.environ.get("MCP_EXPOSE_EXTRA_TOOLS", "1").lower() in ("1", "true", "yes", "y", "on")
+_EXPOSE_RESOURCES = os.environ.get("MCP_EXPOSE_RESOURCES", "1").lower() in ("1", "true", "yes", "y", "on")
+
+_DEFAULT_MEMORY_BASE = str(Path(repo_root) / ".modular_kingdom" / "memories")
+os.environ.setdefault("MEMORY_BASE_PATH", _DEFAULT_MEMORY_BASE)
 
 # Initialize FastMCP
 mcp = FastMCP("unified_knowledge_agent_host")
@@ -39,6 +47,137 @@ scoped_memory = None
 _LOG_STDERR = os.environ.get("MCP_LOG_STDERR", "0").lower() in ("1", "true", "yes", "y", "on")
 _LOG_FILE = os.environ.get("MCP_LOG_FILE", "").strip()
 _DEBUG_PROTOCOL = os.environ.get("MCP_DEBUG_PROTOCOL", "0").lower() in ("1", "true", "yes", "y", "on")
+
+
+def _memory_counts(manager: ScopedMemoryManager) -> dict[str, int]:
+    counts = {}
+    for scope in MemoryScope:
+        try:
+            counts[scope.value] = len(manager.list_all(scope))
+        except Exception:
+            counts[scope.value] = 0
+    return counts
+
+
+def _legacy_project_roots() -> list[str]:
+    candidates = [project_root]
+    roots: list[str] = []
+    seen = set()
+    for root in candidates:
+        rr = os.path.realpath(root)
+        if rr in seen:
+            continue
+        seen.add(rr)
+        legacy_dir = Path(rr) / ".modular_kingdom" / "memories"
+        if legacy_dir.exists():
+            roots.append(rr)
+    return roots
+
+
+def _legacy_extra_dirs() -> list[str]:
+    return [
+        str(Path(project_root) / ".modular_kingdom"),
+        str(Path(project_root) / "agent_chroma_db"),
+        str(Path(project_root) / "data" / "agent_chroma_db"),
+        str(Path(project_root) / "agent_qdrant_db"),
+    ]
+
+
+def _scoped_manager_for_root(project_root_value: str, force_project_local: bool = False) -> ScopedMemoryManager:
+    if not force_project_local:
+        return ScopedMemoryManager(project_root=project_root_value)
+
+    previous = os.environ.pop("MEMORY_BASE_PATH", None)
+    try:
+        return ScopedMemoryManager(project_root=project_root_value)
+    finally:
+        if previous is not None:
+            os.environ["MEMORY_BASE_PATH"] = previous
+
+
+def _resolve_target_path(path_str: str) -> Path:
+    p = Path(path_str.strip()).expanduser()
+    if not p.is_absolute():
+        p = Path(repo_root) / p
+    return p.resolve()
+
+
+def _is_safe_target(path: Path) -> bool:
+    allowed = [Path(repo_root).resolve(), Path("/tmp").resolve()]
+    rp = path.resolve()
+    for root in allowed:
+        if rp == root or str(rp).startswith(str(root) + os.sep):
+            return True
+    return False
+
+
+def _write_simple_docx(path: Path, title: str, body: str) -> None:
+    title = (title or "").strip()
+    body = (body or "").replace("\r\n", "\n").strip()
+    paragraphs = []
+    if title:
+        paragraphs.append(f'<w:p><w:r><w:t>{_xml_escape(title)}</w:t></w:r></w:p>')
+    if body:
+        for line in body.split("\n"):
+            txt = _xml_escape(line) if line else ""
+            if txt:
+                paragraphs.append(f'<w:p><w:r><w:t xml:space="preserve">{txt}</w:t></w:r></w:p>')
+            else:
+                paragraphs.append("<w:p/>")
+    if not paragraphs:
+        paragraphs.append("<w:p/>")
+
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" '
+        'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+        'xmlns:o="urn:schemas-microsoft-com:office:office" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+        'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" '
+        'xmlns:v="urn:schemas-microsoft-com:vml" '
+        'xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" '
+        'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+        'xmlns:w10="urn:schemas-microsoft-com:office:word" '
+        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+        'xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" '
+        'xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" '
+        'xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" '
+        'xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" '
+        'xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" '
+        'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '
+        'mc:Ignorable="w14 w15 wp14">'
+        "<w:body>"
+        + "".join(paragraphs)
+        + '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" '
+        'w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>'
+        '<w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr>'
+        "</w:body></w:document>"
+    )
+
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    )
+
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="word/document.xml"/>'
+        "</Relationships>"
+    )
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", rels)
+        zf.writestr("word/document.xml", document_xml)
 
 
 def _elog(msg: str) -> None:
@@ -76,11 +215,17 @@ def _call_tool_safely(func, *args, **kwargs):
 def _call_in_subprocess(module_name: str, function_name: str, payload: dict, timeout: int = 120) -> str:
     """Isolate unstable/native tool code so it can't kill the MCP transport."""
     runner = (
-        "import json, importlib\n"
+        "import json, importlib, inspect, asyncio, io\n"
+        "from contextlib import redirect_stdout, redirect_stderr\n"
         f"module = importlib.import_module({module_name!r})\n"
         f"func = getattr(module, {function_name!r})\n"
         f"payload = {repr(payload)}\n"
-        "result = func(**payload)\n"
+        "out_buf = io.StringIO()\n"
+        "err_buf = io.StringIO()\n"
+        "with redirect_stdout(out_buf), redirect_stderr(err_buf):\n"
+        "    result = func(**payload)\n"
+        "    if inspect.iscoroutine(result):\n"
+        "        result = asyncio.run(result)\n"
         "print(result if isinstance(result, str) else json.dumps(result))\n"
     )
     env = os.environ.copy()
@@ -394,9 +539,347 @@ def health_check() -> str:
         status["rag"] = f"error: {str(e)}"
     return json.dumps(status)
 
+
+@mcp.tool(
+    name="web_search",
+    description="Search the web using DuckDuckGo and return relevant results."
+)
+def web_search(
+    query: str = Field(description="The search query")
+) -> str:
+    """Always-available web search tool."""
+    try:
+        return _call_in_subprocess("tools.web_search", "perform_web_search", {"query": query}, timeout=60)
+    except Exception as e:
+        return json.dumps({"error": f"Web search failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="crawl_web",
+    description="Crawl web pages from a query or URL list, clean content, and save local markdown files for downstream RAG."
+)
+def crawl_web(
+    query: str = Field(default="", description="Search query used to find seed pages"),
+    urls: List[str] = Field(default=[], description="Explicit seed URLs (optional)"),
+    max_pages: int = Field(default=5, description="Maximum pages to crawl"),
+    max_depth: int = Field(default=1, description="Link-follow depth from seed pages"),
+    same_domain_only: bool = Field(default=True, description="Follow only same-domain links when crawling"),
+    output_dir: str = Field(default="/tmp/web_crawl", description="Directory for crawled markdown files")
+) -> str:
+    """Crawl and normalize web content into local files."""
+    try:
+        payload = {
+            "query": query,
+            "urls": urls,
+            "max_pages": max_pages,
+            "max_depth": max_depth,
+            "same_domain_only": same_domain_only,
+            "output_dir": output_dir,
+        }
+        return _call_in_subprocess("tools.web_crawler", "crawl_webpages", payload, timeout=240)
+    except Exception as e:
+        return json.dumps({"error": f"crawl_web failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="read_file",
+    description="Read a local text file from the repo or /tmp."
+)
+def read_file(
+    path: str = Field(description="Absolute or relative file path"),
+    max_chars: int = Field(default=12000, description="Max chars to return")
+) -> str:
+    try:
+        target = _resolve_target_path(path)
+        if not _is_safe_target(target):
+            return json.dumps({"error": "Path blocked. Allowed roots: repo root and /tmp."})
+        if not target.is_file():
+            return json.dumps({"error": f"Not a file: {str(target)}"})
+        text = target.read_text(encoding="utf-8", errors="replace")
+        truncated = False
+        if len(text) > max_chars:
+            text = text[:max_chars]
+            truncated = True
+        return json.dumps(
+            {
+                "status": "success",
+                "path": str(target),
+                "content": text,
+                "truncated": truncated,
+            }
+        )
+    except Exception as e:
+        return json.dumps({"error": f"read_file failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="write_file",
+    description="Create or overwrite a local text file under repo or /tmp."
+)
+def write_file(
+    path: str = Field(description="Absolute or relative file path"),
+    content: str = Field(description="File content"),
+    overwrite: bool = Field(default=True, description="Allow overwrite when file exists")
+) -> str:
+    try:
+        target = _resolve_target_path(path)
+        if not _is_safe_target(target):
+            return json.dumps({"error": "Path blocked. Allowed roots: repo root and /tmp."})
+        if target.exists() and not overwrite:
+            return json.dumps({"error": f"File exists and overwrite is false: {str(target)}"})
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content or "", encoding="utf-8")
+        return json.dumps(
+            {
+                "status": "success",
+                "path": str(target),
+                "bytes": len((content or "").encode("utf-8")),
+            }
+        )
+    except Exception as e:
+        return json.dumps({"error": f"write_file failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="create_markdown",
+    description="Create a Markdown file (.md)."
+)
+def create_markdown(
+    path: str = Field(description="Target .md path"),
+    title: str = Field(default="", description="Optional title for H1"),
+    body: str = Field(default="", description="Markdown body"),
+    overwrite: bool = Field(default=True, description="Allow overwrite")
+) -> str:
+    try:
+        target = _resolve_target_path(path)
+        if target.suffix.lower() not in (".md", ".markdown"):
+            return json.dumps({"error": "Path must end with .md or .markdown"})
+        parts = []
+        if title.strip():
+            parts.append(f"# {title.strip()}")
+            parts.append("")
+        if body:
+            parts.append(body)
+        content = "\n".join(parts).strip() + "\n"
+        return write_file(path=str(target), content=content, overwrite=overwrite)
+    except Exception as e:
+        return json.dumps({"error": f"create_markdown failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="create_docx",
+    description="Create a .docx document without external APIs."
+)
+def create_docx(
+    path: str = Field(description="Target .docx path"),
+    title: str = Field(default="", description="Optional document title"),
+    body: str = Field(default="", description="Document body text"),
+    overwrite: bool = Field(default=True, description="Allow overwrite")
+) -> str:
+    try:
+        target = _resolve_target_path(path)
+        if target.suffix.lower() != ".docx":
+            return json.dumps({"error": "Path must end with .docx"})
+        if not _is_safe_target(target):
+            return json.dumps({"error": "Path blocked. Allowed roots: repo root and /tmp."})
+        if target.exists() and not overwrite:
+            return json.dumps({"error": f"File exists and overwrite is false: {str(target)}"})
+        try:
+            from docx import Document  # type: ignore
+
+            doc = Document()
+            if (title or "").strip():
+                doc.add_heading((title or "").strip(), level=1)
+            text = (body or "").replace("\r\n", "\n")
+            if text.strip():
+                blocks = [b for b in text.split("\n\n")]
+                for block in blocks:
+                    doc.add_paragraph(block)
+            doc.save(str(target))
+        except Exception:
+            # Fallback for offline/minimal environments where python-docx is unavailable.
+            _write_simple_docx(target, title=title, body=body)
+        return json.dumps(
+            {
+                "status": "success",
+                "path": str(target),
+                "bytes": target.stat().st_size if target.exists() else 0,
+            }
+        )
+    except Exception as e:
+        return json.dumps({"error": f"create_docx failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="memory_storage_info",
+    description="Show active memory path, per-scope counts, and detected legacy memory locations."
+)
+def memory_storage_info() -> str:
+    if not scoped_memory:
+        return json.dumps({"error": "Memory system not initialized"})
+    try:
+        active_root = os.environ.get("MEMORY_BASE_PATH", _DEFAULT_MEMORY_BASE)
+        legacy_roots = _legacy_project_roots()
+        legacy_details = []
+        for root in legacy_roots:
+            try:
+                mgr = _scoped_manager_for_root(root, force_project_local=True)
+                legacy_details.append({
+                    "project_root": root,
+                    "counts": _memory_counts(mgr),
+                })
+            except Exception as e:
+                legacy_details.append({"project_root": root, "error": str(e)})
+
+        extra_legacy_dirs = _legacy_extra_dirs()
+
+        return json.dumps(
+            {
+                "active_memory_base": active_root,
+                "active_project_root": repo_root,
+                "active_counts": _memory_counts(scoped_memory),
+                "legacy_project_roots": legacy_details,
+                "legacy_extra_dirs": [
+                    {"path": p, "exists": Path(p).exists()} for p in extra_legacy_dirs
+                ],
+            },
+            indent=2,
+        )
+    except Exception as e:
+        return json.dumps({"error": f"Failed to inspect memory storage: {str(e)}"})
+
+
+@mcp.tool(
+    name="migrate_legacy_memories",
+    description="Migrate memories from legacy src/.modular_kingdom storage into the active memory store."
+)
+def migrate_legacy_memories(
+    dry_run: bool = Field(default=True, description="Preview only when true; write changes when false")
+) -> str:
+    if not scoped_memory:
+        return json.dumps({"error": "Memory system not initialized"})
+    report = {"dry_run": dry_run, "migrated": 0, "skipped_duplicates": 0, "sources": []}
+    try:
+        legacy_roots = _legacy_project_roots()
+        for root in legacy_roots:
+            source_entry = {"project_root": root, "scopes": {}}
+            try:
+                src_mgr = _scoped_manager_for_root(root, force_project_local=True)
+                for scope in MemoryScope:
+                    src_items = src_mgr.list_all(scope)
+                    dst_items = scoped_memory.list_all(scope)
+                    existing_content = {
+                        (x.get("content") or "").strip()
+                        for x in dst_items
+                        if isinstance(x, dict) and (x.get("content") or "").strip()
+                    }
+                    moved = 0
+                    skipped = 0
+                    for item in src_items:
+                        if not isinstance(item, dict):
+                            continue
+                        content = (item.get("content") or "").strip()
+                        if not content:
+                            continue
+                        if content in existing_content:
+                            skipped += 1
+                            continue
+                        if not dry_run:
+                            scoped_memory.save(content, scope=scope)
+                            existing_content.add(content)
+                        moved += 1
+                    source_entry["scopes"][scope.value] = {
+                        "source_count": len(src_items),
+                        "to_migrate": moved,
+                        "duplicates": skipped,
+                    }
+                    report["migrated"] += moved
+                    report["skipped_duplicates"] += skipped
+            except Exception as e:
+                source_entry["error"] = str(e)
+            report["sources"].append(source_entry)
+        if not legacy_roots:
+            report["note"] = "No legacy src/.modular_kingdom storage found."
+        return json.dumps(report, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Legacy migration failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="cleanup_legacy_memory_paths",
+    description="Archive legacy memory directories under .modular_kingdom/legacy_backups after migration."
+)
+def cleanup_legacy_memory_paths(
+    confirm: bool = Field(default=False, description="Set true to perform archive move")
+) -> str:
+    try:
+        candidates = [Path(p) for p in _legacy_extra_dirs() if Path(p).exists()]
+        if not candidates:
+            return json.dumps({"status": "nothing_to_cleanup", "paths": []}, indent=2)
+
+        sizes = {}
+        for p in candidates:
+            total = 0
+            for fp in p.rglob("*"):
+                if fp.is_file():
+                    try:
+                        total += fp.stat().st_size
+                    except Exception:
+                        pass
+            sizes[str(p)] = total
+
+        if not confirm:
+            return json.dumps(
+                {
+                    "status": "preview",
+                    "paths": [str(p) for p in candidates],
+                    "bytes": sizes,
+                    "hint": "Call with confirm=true to archive these paths.",
+                },
+                indent=2,
+            )
+
+        backup_root = Path(repo_root) / ".modular_kingdom" / "legacy_backups" / datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        backup_root.mkdir(parents=True, exist_ok=True)
+        moved = []
+        for p in candidates:
+            target = backup_root / p.name
+            suffix = 1
+            while target.exists():
+                target = backup_root / f"{p.name}_{suffix}"
+                suffix += 1
+            shutil.move(str(p), str(target))
+            moved.append({"from": str(p), "to": str(target)})
+
+        return json.dumps(
+            {"status": "archived", "backup_root": str(backup_root), "moved": moved},
+            indent=2,
+        )
+    except Exception as e:
+        return json.dumps({"error": f"Cleanup failed: {str(e)}"})
+
+
+@mcp.tool(
+    name="browser_automation",
+    description="Run one-shot browser automation using Playwright based on a natural-language task."
+)
+def browser_automation(
+    task: str = Field(description="Task description, e.g. 'open example.com and get title'"),
+    headless: bool = Field(default=True, description="Run browser in headless mode")
+) -> str:
+    """Compatibility wrapper expected by the CLI."""
+    try:
+        return _call_in_subprocess(
+            "tools.browser_agent_playwright",
+            "browse_web",
+            {"task": task, "headless": headless},
+            timeout=180,
+        )
+    except Exception as e:
+        return json.dumps({"status": "error", "error": f"Browser automation failed: {str(e)}"})
+
 if _EXPOSE_EXTRA_TOOLS:
     from tools.code_exec import run_code
-    from tools.web_search import perform_web_search
 
     @mcp.tool(
         name="code_execute",
@@ -424,18 +907,6 @@ if _EXPOSE_EXTRA_TOOLS:
             return _call_tool_safely(analyze_media_with_ollama, model=model, paths=paths)
         except Exception as e:
             return json.dumps({"status": "error", "error": str(e)})
-
-    @mcp.tool(
-        name="web_search",
-        description="Search the web using DuckDuckGo and return relevant results"
-    )
-    def web_search(
-        query: str = Field(description="The search query")
-    ) -> str:
-        try:
-            return _call_tool_safely(perform_web_search, query)
-        except Exception as e:
-            return json.dumps({"error": f"Web search failed: {str(e)}"})
 
     @mcp.tool(
         name="browse_web",

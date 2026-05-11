@@ -84,7 +84,7 @@ cd A-Modular-Kingdom
 
 # Install dependencies
 uv sync
-# or: pip install -r requirements.txt
+# or: pip install -e .
 
 # Pull required Ollama model
 ollama pull embeddinggemma

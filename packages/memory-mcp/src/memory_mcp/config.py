@@ -145,6 +145,17 @@ class Settings(BaseSettings):
         """Expand ~ in paths."""
         return str(Path(v).expanduser())
 
+    @field_validator("qdrant_mode", mode="before")
+    @classmethod
+    def normalize_qdrant_mode(cls, v):
+        """Normalize legacy mode names from older configs."""
+        if isinstance(v, str):
+            normalized = v.strip().lower()
+            if normalized == "server":
+                return "cloud"
+            return normalized
+        return v
+
     @classmethod
     def from_toml(cls, overrides: dict | None = None) -> "Settings":
         """Create settings from TOML config file with optional overrides."""

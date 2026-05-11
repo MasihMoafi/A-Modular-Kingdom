@@ -11,12 +11,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from memory.core import Mem0
 
 
-def test_memory_uses_global_path():
+@pytest.fixture
+def isolated_home(tmp_path, monkeypatch):
+    """Use a writable fake HOME so tests don't touch real user dirs."""
+    fake_home = tmp_path / "home"
+    fake_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+    return fake_home
+
+
+def test_memory_uses_global_path(isolated_home):
     """Verify memory uses ~/.modular_kingdom and not project-relative path"""
     global_path = Path.home() / ".modular_kingdom" / "legacy_memories"
 
     # Initialize memory
-    memory = Mem0(storage_path=str(global_path))
+    Mem0(storage_path=str(global_path))
 
     # Verify the path exists and is in home directory
     assert global_path.exists()
@@ -24,16 +33,18 @@ def test_memory_uses_global_path():
     assert ".modular_kingdom" in str(global_path)
 
 
-def test_memory_accessible_from_any_dir(tmp_path):
+def test_memory_accessible_from_any_dir(tmp_path, isolated_home, monkeypatch):
     """Test memory can be accessed from different working directories"""
     global_path = Path.home() / ".modular_kingdom" / "legacy_memories"
 
     # Change to temp directory
-    os.chdir(tmp_path)
+    work_dir = tmp_path / "workdir"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(work_dir)
 
     # Memory should still work
     memory = Mem0(storage_path=str(global_path))
-    memory.add("Test fact from different directory")
+    memory.direct_add("Test fact from different directory")
 
     # Verify it was saved globally
     all_memories = memory.get_all_memories()

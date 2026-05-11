@@ -1,12 +1,42 @@
 """Tests for memory store (Qdrant-based)."""
 
 import tempfile
-from pathlib import Path
 
 import pytest
 
 from memory_mcp.config import Settings
 from memory_mcp.memory import MemoryStore
+
+
+class _FakeEmbeddings:
+    """Deterministic local embedding stub for offline tests."""
+
+    @property
+    def dimension(self) -> int:
+        return 8
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [self.embed_query(text) for text in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        # Simple deterministic vector: character histogram in 8 bins.
+        vec = [0.0] * 8
+        for ch in text.lower():
+            vec[ord(ch) % 8] += 1.0
+        total = sum(vec) or 1.0
+        return [v / total for v in vec]
+
+
+@pytest.fixture(autouse=True)
+def fake_embedding_provider(monkeypatch):
+    """Prevent network/model downloads during tests."""
+    import memory_mcp.embeddings as embeddings_module
+
+    monkeypatch.setattr(
+        embeddings_module,
+        "get_embedding_provider",
+        lambda _settings: _FakeEmbeddings(),
+    )
 
 
 @pytest.fixture
@@ -16,8 +46,8 @@ def temp_settings():
         yield Settings(
             qdrant_mode="memory",
             qdrant_path=tmpdir,
-            embed_provider="sentence-transformers",
-            embed_model="all-MiniLM-L6-v2",
+            embed_provider="ollama",
+            embed_model="nomic-embed-text",
         )
 
 

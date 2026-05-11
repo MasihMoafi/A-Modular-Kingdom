@@ -32,7 +32,7 @@ class CohereEmbeddings(EmbeddingProvider):
             except ImportError:
                 raise ImportError(
                     "Cohere support requires the 'cohere' package. "
-                    "Install with: pip install memory-mcp[cohere]"
+                    "Install with: pip install rag-mem[cohere]"
                 )
         return self._client
 

@@ -33,7 +33,8 @@ class OllamaEmbeddings(EmbeddingProvider):
     @property
     def client(self) -> httpx.Client:
         if self._client is None:
-            self._client = httpx.Client(timeout=60.0)
+            # Local Ollama calls should not inherit ambient proxy settings.
+            self._client = httpx.Client(timeout=60.0, trust_env=False)
         return self._client
 
     @property
