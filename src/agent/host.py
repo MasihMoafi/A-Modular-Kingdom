@@ -823,25 +823,6 @@ def cleanup_legacy_memory_paths(
         return json.dumps({"error": f"Cleanup failed: {str(e)}"})
 
 
-@mcp.tool(
-    name="browser_automation",
-    description="Run one-shot browser automation using Playwright based on a natural-language task."
-)
-def browser_automation(
-    task: str = Field(description="Task description, e.g. 'open example.com and get title'"),
-    headless: bool = Field(default=True, description="Run browser in headless mode")
-) -> str:
-    """Compatibility wrapper expected by the CLI."""
-    try:
-        return _call_in_subprocess(
-            "tools.browser_agent_playwright",
-            "browse_web",
-            {"task": task, "headless": headless},
-            timeout=180,
-        )
-    except Exception as e:
-        return json.dumps({"status": "error", "error": f"Browser automation failed: {str(e)}"})
-
 if _EXPOSE_EXTRA_TOOLS:
     from tools.code_exec import run_code
 
@@ -857,43 +838,6 @@ if _EXPOSE_EXTRA_TOOLS:
             return _call_tool_safely(run_code, code=code, timeout_seconds=timeout_seconds)
         except Exception as e:
             return json.dumps({"status": "error", "error": str(e)})
-
-    @mcp.tool(
-        name="analyze_media",
-        description="Analyze image/video files with a local multimodal model via Ollama (e.g., gemma3:4b)"
-    )
-    def analyze_media(
-        model: str = Field(default="gemma3:4b", description="Ollama model id to use"),
-        paths: list[str] = Field(description="List of absolute file paths to media files")
-    ) -> str:
-        try:
-            from tools.vision import analyze_media_with_ollama
-            return _call_tool_safely(analyze_media_with_ollama, model=model, paths=paths)
-        except Exception as e:
-            return json.dumps({"status": "error", "error": str(e)})
-
-    @mcp.tool(
-        name="browse_web",
-        description="Control a persistent browser. Actions: navigate (open URL), click (by CSS selector or x,y coords), type (text into selector or focused element), press (key like Enter/Tab), screenshot (capture current page), wait (wait ms for page to load), get_text (extract page text), close. Browser stays open between calls."
-    )
-    def browse_web(
-        action: str = Field(description="Action: navigate, click, type, press, screenshot, wait, get_text, close"),
-        url: str = Field(default="", description="URL for navigate action"),
-        selector: str = Field(default="", description="CSS selector for click/type"),
-        text: str = Field(default="", description="Text for type action"),
-        x: int = Field(default=None, description="X coordinate for click"),
-        y: int = Field(default=None, description="Y coordinate for click"),
-        key: str = Field(default="", description="Key for press action (e.g. Enter, Tab)"),
-        ms: int = Field(default=2000, description="Milliseconds for wait action"),
-        headless: bool = Field(default=False, description="Run browser headless")
-    ) -> str:
-        """Control browser with discrete actions. Browser persists between calls."""
-        try:
-            from tools.browser_agent_playwright import browser_action
-            return browser_action(action=action, url=url, selector=selector,
-                                  text=text, x=x, y=y, key=key, headless=headless, ms=ms)
-        except Exception as e:
-            return json.dumps({"error": f"Browser action failed: {str(e)}"})
 
     @mcp.tool(
         name="text_to_speech",

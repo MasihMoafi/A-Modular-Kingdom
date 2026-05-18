@@ -3,7 +3,7 @@ import sys
 
 # Central proxy manager — strip SOCKS (httpx can't handle it), keep HTTP(S) for cloud
 from utils.proxy import strip_all as _strip_all, strip_socks as _strip_socks
-if os.getenv("QDRANT_MODE", "") == "local":
+if os.getenv("QDRANT_MODE", "local") == "local":
     _strip_all()
 else:
     _strip_socks()
@@ -101,6 +101,14 @@ class RAGPipeline:
             sys.stderr.write(f"Error extracting text from {pdf_path}: {e}" + "\n")
             return ""
 
+    def _read_text_file(self, file_path: str) -> str:
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        except Exception as e:
+            sys.stderr.write(f"Error reading text file {file_path}: {e}" + "\n")
+            return ""
+
     def _extract_text_from_json(self, json_path: str) -> str:
         """Extract text from JSON - handles various structures"""
         try:
@@ -149,7 +157,7 @@ class RAGPipeline:
             if os.path.isdir(path):
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
-                    if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json', '.ipynb')):
+                    if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.html', '.htm', '.json', '.ipynb')):
                         all_files.append(file_path)
             else:
                 all_files.append(path)
@@ -270,13 +278,13 @@ class RAGPipeline:
                                     })
 
                         # Handle other file types
-                        elif file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json')):
+                        elif file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.html', '.htm', '.json')):
                             if file.lower().endswith(".pdf"):
                                 text = self._extract_text_from_pdf(file_path)
                             elif file.lower().endswith(".json"):
                                 text = self._extract_text_from_json(file_path)
                             else:
-                                text = open(file_path, 'r', encoding='utf-8').read()
+                                text = self._read_text_file(file_path)
                             if text:
                                 text_splitter = RecursiveCharacterTextSplitter(
                                     chunk_size=self.config.get("chunk_size"),
@@ -297,7 +305,7 @@ class RAGPipeline:
                                             "chunk_id": i
                                         })
                 else:
-                    text = self._extract_text_from_pdf(path) if path.lower().endswith(".pdf") else open(path, 'r', encoding='utf-8').read()
+                    text = self._extract_text_from_pdf(path) if path.lower().endswith(".pdf") else self._read_text_file(path)
                     if not text: continue
                     text_splitter = RecursiveCharacterTextSplitter(
                         chunk_size=self.config.get("chunk_size"),
