@@ -7,9 +7,10 @@ from pathlib import Path
 import re
 import time
 
-# Load .env from src directory
+# Offline/local-first by default. Loading src/.env is opt-in because stale
+# Qdrant Cloud credentials can break local RAG when cloud projects are gone.
 _env_path = Path(__file__).parent.parent / ".env"
-if _env_path.exists():
+if os.getenv("AMK_LOAD_DOTENV", "0").lower() in ("1", "true", "yes", "y", "on") and _env_path.exists():
     from dotenv import load_dotenv
     load_dotenv(_env_path)
 
@@ -51,7 +52,7 @@ RAG_CONFIG = {
     "force_reindex": False,
     "distance_metric": "cosine",  # Qdrant distance metric
     # Qdrant backend options
-    "qdrant_mode": os.getenv("QDRANT_MODE", "cloud"),
+    "qdrant_mode": os.getenv("QDRANT_MODE", "local"),
     "qdrant_url": os.getenv("QDRANT_URL", ""),
     "qdrant_api_key": os.getenv("QDRANT_API_KEY", ""),
     # Speed optimization
@@ -260,7 +261,7 @@ def find_all_indexable_files(
     if not os.path.isdir(directory):
         return []
 
-    indexable_extensions = ('.pdf', '.txt', '.py', '.md', '.ipynb', '.js', '.ts', '.tsx', '.jsx')
+    indexable_extensions = ('.pdf', '.txt', '.py', '.md', '.html', '.htm', '.ipynb', '.js', '.ts', '.tsx', '.jsx')
     exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build', '.ipynb_checkpoints', 'migrations'}
 
     all_files = []

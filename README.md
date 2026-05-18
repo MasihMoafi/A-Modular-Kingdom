@@ -9,7 +9,7 @@ Stop rebuilding the same infrastructure. Connect any AI agent to long-term memor
 Building AI agents? You keep reinventing:
 - **Long-term memory** that persists across sessions
 - **Document retrieval (RAG)** for knowledge access
-- **Tool integration** (web search, vision, code execution, browser automation)
+- **Tool integration** (memory, RAG, web search, and code execution)
 
 Every project starts from scratch. Every agent rebuilds the wheel.
 
@@ -142,9 +142,7 @@ The MCP server exposes these tools:
 | `save_memory` | Scoped memory storage | Save global rules or project context |
 | `search_memories` | Semantic memory search | Retrieve past decisions/preferences |
 | `web_search` | DuckDuckGo search | Current events, latest docs |
-| `browser_automation` | Playwright web scraping | Extract text/screenshot from URLs |
 | `code_execute` | Safe Python sandbox | Run code in isolated environment |
-| `analyze_media` | Vision with Ollama | Analyze images/videos |
 | `text_to_speech` | TTS (pyttsx3/kokoro) | Generate audio from text |
 | `speech_to_text` | Whisper STT | Transcribe audio files |
 

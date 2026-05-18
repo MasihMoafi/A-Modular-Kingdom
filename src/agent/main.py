@@ -95,7 +95,7 @@ class DocumentCompleter(Completer):
     def __init__(self):
         self.resources = []
         self.commands = [
-            '/memory', '/help', '/tools', '/files', '/browser_automation', '/rag',
+            '/memory', '/help', '/tools', '/files', '/rag',
             '/read', '/write', '/mkmd', '/mkdocx', '/exec', '/web', '/crawl',
             '/memory_status', '/memory_migrate', '/memory_cleanup', '/quit'
         ]
@@ -271,7 +271,6 @@ def _capabilities_hint() -> str:
         "- /web <query>                 (web search)\n"
         "- /crawl <query>               (search + crawl + RAG)\n"
         "- /rag \"<query>\" [path] [v2]  (local RAG search)\n"
-        "- /browser_automation          (browser task)\n"
         "- /memory_status               (see memory stores)\n"
         "- /memory_migrate              (migrate legacy memories)\n"
         "- /memory_cleanup              (archive legacy stores)\n"
@@ -624,7 +623,6 @@ async def main(think_level=None):
  - /rag "<query>" [path] [version] - Search documents with RAG
  - /web <query> - Force web search tool
  - /crawl <query> - Search web, crawl pages, then run RAG over crawled pages
- - /browser_automation <task> [--headed] - Run a browser task
  - /read <path> - Read a local file
  - /write <path> <content> - Write/create a file
  - /mkmd <path> <content> - Create markdown file
@@ -645,47 +643,6 @@ async def main(think_level=None):
                             else:
                                 print("Could not retrieve tool list from server.")
                             continue
-                        elif command == 'browser_automation':
-                            try:
-                                task_arg = command_arg.strip()
-                                task = task_arg
-                                headless = True
-                                if "--headed" in task:
-                                    headless = False
-                                    task = task.replace("--headed", "").strip()
-                                if "--headless" in task:
-                                    headless = True
-                                    task = task.replace("--headless", "").strip()
-                                if not task:
-                                    if not interactive_input:
-                                        print("Usage: /browser_automation <task>")
-                                        continue
-                                    task = await prompt_session.prompt_async("Task: ")
-                                if not task.strip():
-                                    print("Aborted: empty task.")
-                                    continue
-                                if interactive_input and not task_arg:
-                                    headless_ans = await prompt_session.prompt_async("Headless? (Y/n): ")
-                                    headless = not (headless_ans.strip().lower() == 'n')
-                                print("🚀 Starting browser automation...")
-                                tool_name = "browser_automation" if "browser_automation" in available_tools else None
-                                if not tool_name and "browse_web" in available_tools:
-                                    # Best-effort compatibility path.
-                                    tool_name = "browse_web"
-                                    res = await session.call_tool(tool_name, {'action': 'navigate', 'url': task.strip(), 'headless': headless})
-                                elif tool_name:
-                                    res = await session.call_tool(tool_name, {'task': task, 'headless': headless})
-                                else:
-                                    print("Browser tool is not exposed by host. Enable MCP_EXPOSE_EXTRA_TOOLS=1.")
-                                    continue
-                                try:
-                                    print(res.content[0].text)
-                                except Exception:
-                                    print(res)
-                            except Exception as e:
-                                print(f"Browser automation error: {e}")
-                            continue
-
                         elif command == 'memory_status':
                             if "memory_storage_info" not in available_tools and available_tools:
                                 print("memory_storage_info tool is unavailable on this host.")
@@ -1224,7 +1181,7 @@ You have access to your personal memory, external knowledge base, web search, an
 You are running inside a local operator CLI that supports real actions via slash commands.
 Never claim you cannot create/read files, run code, or use tools.
 If asked to do those actions, provide exact command-oriented guidance using:
-/write, /mkmd, /mkdocx, /read, /exec, /web, /crawl, /rag, /browser_automation, /memory_status, /memory_migrate, /memory_cleanup.
+/write, /mkmd, /mkdocx, /read, /exec, /web, /crawl, /rag, /memory_status, /memory_migrate, /memory_cleanup.
 
 Your primary source of truth is your memory. If the user contradicts it, you MUST correct them.
 Use the provided information sources to answer questions when appropriate.

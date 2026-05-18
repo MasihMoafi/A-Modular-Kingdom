@@ -26,9 +26,6 @@ dependencies = [
     "openai-whisper>=20231117",
     "speechrecognition>=3.10.0",
     "pygame>=2.0.0",
-    # Browser automation
-    "browser-use>=0.1.0",
-    "playwright>=1.40.0",
     # PyTorch locked at 2.5.1 to prevent breaking upgrades. After install, upgrade to CUDA variant:
     # uv pip install torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 --index-url https://download.pytorch.org/whl/cu118 --force-reinstall
     "qdrant-client>=1.7.0",
