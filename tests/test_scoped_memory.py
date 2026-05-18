@@ -70,8 +70,10 @@ class TestScopedMemoryManager:
         shutil.rmtree(temp_dir)
     
     @pytest.fixture
-    def manager(self, temp_project):
+    def manager(self, temp_project, monkeypatch, tmp_path):
         """Create scoped memory manager."""
+        monkeypatch.setenv("MEMORY_BASE_PATH", str(tmp_path / "memories"))
+        monkeypatch.delenv("AMK_MEMORY_VECTOR_BACKEND", raising=False)
         return ScopedMemoryManager(project_root=temp_project)
     
     def test_save_to_global_rules(self, manager):
@@ -100,6 +102,22 @@ class TestScopedMemoryManager:
         results = manager.search("coding", k=5)
         assert len(results) > 0
         assert any("scope" in r.get("metadata", {}) for r in results)
+
+    def test_markdown_memory_returns_citations(self, manager):
+        """Test markdown store returns cited memory results."""
+        memory_id = manager.save(
+            "Project uses FastMCP for cited memory search",
+            scope=MemoryScope.PROJECT_CONTEXT,
+        )
+
+        results = manager.search("cited memory", k=5, scopes=[MemoryScope.PROJECT_CONTEXT])
+        result = next(r for r in results if r["id"] == memory_id)
+        metadata = result.get("metadata", {})
+
+        assert metadata["scope"] == MemoryScope.PROJECT_CONTEXT.value
+        assert metadata["source"].endswith("MEMORY.md")
+        assert metadata["start_line"] > 0
+        assert metadata["end_line"] >= metadata["start_line"]
     
     def test_scope_isolation(self, manager):
         """Test that scopes are isolated."""
@@ -136,6 +154,8 @@ class TestScopedMemoryManager:
         # Verify it's gone
         all_prefs = manager.list_all(MemoryScope.GLOBAL_PREFERENCES)
         assert not any(m["id"] == memory_id for m in all_prefs)
+        search_results = manager.search("delete", k=5, scopes=[MemoryScope.GLOBAL_PREFERENCES])
+        assert not any(m["id"] == memory_id for m in search_results)
 
 
 if __name__ == "__main__":

@@ -2,8 +2,11 @@
 Scoped memory manager for hierarchical memory organization.
 Provides unified interface to global and project-scoped memories.
 """
+import os
+import uuid
 from typing import List, Dict, Optional
 from memory.core import Mem0
+from memory.markdown_store import MarkdownMemoryStore
 from memory.memory_config import MemoryConfig, MemoryScope
 
 
@@ -19,6 +22,8 @@ class ScopedMemoryManager:
         """
         self.config = MemoryConfig(project_root)
         self._instances: Dict[MemoryScope, Mem0] = {}
+        self.markdown_store = MarkdownMemoryStore(self.config)
+        self.use_qdrant = os.getenv("AMK_MEMORY_VECTOR_BACKEND", "").lower() == "qdrant"
         
     def _get_instance(self, scope: MemoryScope) -> Mem0:
         """Get or create Mem0 instance for a scope."""
@@ -45,8 +50,15 @@ class ScopedMemoryManager:
         if scope is None:
             scope = self.config.infer_scope_from_content(content)
         
-        instance = self._get_instance(scope)
-        memory_id = instance.direct_add(content, metadata={"scope": scope.value})
+        memory_id = str(uuid.uuid4())
+        self.markdown_store.append(memory_id, content, scope)
+
+        if self.use_qdrant:
+            try:
+                instance = self._get_instance(scope)
+                instance.direct_add(content, metadata={"scope": scope.value, "markdown_id": memory_id})
+            except Exception:
+                pass
         return memory_id
     
     def search(
@@ -72,8 +84,18 @@ class ScopedMemoryManager:
         all_results = []
         for scope in scopes:
             try:
-                instance = self._get_instance(scope)
-                results = instance.search(query, k=k)
+                results = self.markdown_store.search(query, k=k, scopes=[scope])
+
+                if self.use_qdrant:
+                    try:
+                        instance = self._get_instance(scope)
+                        qdrant_results = instance.search(query, k=k)
+                    except Exception:
+                        qdrant_results = []
+                    by_id = {result["id"]: result for result in results}
+                    for result in qdrant_results:
+                        by_id.setdefault(result.get("id"), result)
+                    results = list(by_id.values())
                 
                 # Add scope to metadata
                 for result in results:
@@ -89,11 +111,25 @@ class ScopedMemoryManager:
     
     def delete(self, memory_id: str, scope: MemoryScope) -> None:
         """Delete memory from specific scope."""
-        instance = self._get_instance(scope)
-        if not instance.direct_delete(memory_id):
+        deleted_markdown = self.markdown_store.delete(memory_id)
+        deleted_qdrant = False
+        if self.use_qdrant:
+            try:
+                instance = self._get_instance(scope)
+                deleted_qdrant = instance.direct_delete(memory_id)
+            except Exception:
+                deleted_qdrant = False
+        if not (deleted_markdown or deleted_qdrant):
             raise KeyError(memory_id)
     
     def list_all(self, scope: MemoryScope) -> List[Dict]:
         """List all memories in a scope."""
-        instance = self._get_instance(scope)
-        return instance.get_all_memories()
+        items = {item["id"]: item for item in self.markdown_store.list_all(scope)}
+        if self.use_qdrant:
+            try:
+                instance = self._get_instance(scope)
+                for item in instance.get_all_memories():
+                    items.setdefault(item["id"], item)
+            except Exception:
+                pass
+        return list(items.values())
