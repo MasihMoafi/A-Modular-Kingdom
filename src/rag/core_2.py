@@ -1,6 +1,10 @@
 import os
 import sys
 
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
 # Central proxy manager — strip SOCKS (httpx can't handle it), keep HTTP(S) for cloud
 from utils.proxy import strip_all as _strip_all, strip_socks as _strip_socks
 if os.getenv("QDRANT_MODE", "local") == "local":

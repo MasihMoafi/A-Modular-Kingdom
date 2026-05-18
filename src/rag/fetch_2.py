@@ -7,6 +7,10 @@ from pathlib import Path
 import re
 import time
 
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
 # Offline/local-first by default. Loading src/.env is opt-in because stale
 # Qdrant Cloud credentials can break local RAG when cloud projects are gone.
 _env_path = Path(__file__).parent.parent / ".env"
