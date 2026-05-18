@@ -87,12 +87,18 @@ def _scoped_manager_for_root(project_root_value: str, force_project_local: bool 
     if not force_project_local:
         return ScopedMemoryManager(project_root=project_root_value)
 
-    previous = os.environ.pop("MEMORY_BASE_PATH", None)
+    previous_memory_base = os.environ.pop("MEMORY_BASE_PATH", None)
+    previous_backend = os.environ.get("AMK_MEMORY_VECTOR_BACKEND")
+    os.environ["AMK_MEMORY_VECTOR_BACKEND"] = "qdrant"
     try:
         return ScopedMemoryManager(project_root=project_root_value)
     finally:
-        if previous is not None:
-            os.environ["MEMORY_BASE_PATH"] = previous
+        if previous_memory_base is not None:
+            os.environ["MEMORY_BASE_PATH"] = previous_memory_base
+        if previous_backend is None:
+            os.environ.pop("AMK_MEMORY_VECTOR_BACKEND", None)
+        else:
+            os.environ["AMK_MEMORY_VECTOR_BACKEND"] = previous_backend
 
 
 def _resolve_target_path(path_str: str) -> Path:
@@ -215,12 +221,6 @@ try:
         _elog(f"[HOST] Removed stale lock: {_lock}\n")
 
     scoped_memory = ScopedMemoryManager(project_root=repo_root)
-    # Pre-initialize all scopes to avoid race conditions on first access
-    for _scope in MemoryScope:
-        try:
-            scoped_memory._get_instance(_scope)
-        except Exception:
-            pass
     _elog("[HOST] Scoped memory initialized successfully\n")
 except Exception as e:
     _elog(f"[HOST] WARNING: Memory system disabled: {e}\n")
@@ -343,14 +343,20 @@ def search_memories(
                 pass
         
         results = scoped_memory.search(query, k=top_k, scopes=scopes_to_search)
-        formatted = [
-            {
+        formatted = []
+        for res in results:
+            metadata = res.get("metadata", {})
+            formatted.append({
                 "content": res["content"],
-                "scope": res.get("metadata", {}).get("scope", "unknown"),
-                "id": res["id"]
-            }
-            for res in results
-        ]
+                "scope": metadata.get("scope", "unknown"),
+                "id": res["id"],
+                "source": metadata.get("source"),
+                "start_line": metadata.get("start_line"),
+                "end_line": metadata.get("end_line"),
+                "score": metadata.get("score"),
+                "text_score": metadata.get("text_score"),
+                "vector_score": metadata.get("vector_score"),
+            })
         return json.dumps(formatted)
     except Exception as e:
         return json.dumps([{"error": f"Error searching scoped memories: {str(e)}"}])
@@ -693,7 +699,9 @@ def memory_storage_info() -> str:
             {
                 "active_memory_base": active_root,
                 "active_project_root": repo_root,
+                "active_backend": "markdown",
                 "active_counts": _memory_counts(scoped_memory),
+                "active_markdown_files": scoped_memory.markdown_store.storage_files(),
                 "legacy_project_roots": legacy_details,
                 "legacy_extra_dirs": [
                     {"path": p, "exists": Path(p).exists()} for p in extra_legacy_dirs
