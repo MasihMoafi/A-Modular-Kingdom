@@ -2,45 +2,47 @@
 
 > **High-Performance MCP Foundation for RAG, Scoped Memory, and Agentic Tools**
 
-**[✨ New: Check out the Next-Gen Agent Harness →](https://github.com/MasihMoafi/harness)**
+**[✨ New: Automated Local Agent Setup Harness Integrated →](#-automated-local-setup-harness)**
 
 ---
 
-## 🏛️ Project Status: Stable Foundation
+## 🏛️ Project Status: Setup Harness Integrated
 
-**A-Modular-Kingdom (AMK)** is now maintained as a **Stable Infrastructure Layer**. While it remains a powerful standalone MCP server, it is optimized to serve as the "Engine" for modern agent harnesses. 
+**A-Modular-Kingdom (AMK)** is equipped with an automated local setup harness that auto-configures your local coding environments (such as Codex and Claude Code) to run this MCP server.
 
-If you are looking for a natural-language way to orchestrate multiple agents and generate complex teams, please visit:
-👉 **[Harness: The Team-Architecture Factory](https://github.com/MasihMoafi/harness)**
+To connect your local agents instantly, just run:
+```bash
+./scripts/setup_mcp.sh
+```
 
 ---
 
 ## The Solution
 
-**A-Modular-Kingdom** is the infrastructure layer you're missing:
-
-```bash
-# Start the MCP server
-python src/agent/host.py
-```
-
-Now any agent (Claude Desktop, **[Harness](https://github.com/MasihMoafi/harness)**, custom chatbots) gets instant access to:
+**A-Modular-Kingdom** is the infrastructure layer you're missing. Now any agent (Claude Desktop, Codex, custom chatbots) gets instant access to:
 - ✅ **Hierarchical Scoped Memory** (Global Rules, Project Context, Persona)
 - ✅ **Advanced V3 RAG** (Hybrid Fusion + Cross-Encoder Reranking)
 - ✅ **27+ Production Tools** (Vision, Code Exec, Web Search, TTS/STT)
 
 ---
 
-## 🏗️ Next-Gen Integration: Harness + Kingdom
+## 🏗️ Automated Local Setup Harness
 
-A-Modular-Kingdom provides the "Batteries," and **Harness** provides the "Body."
+To get up and running immediately, we provide a unified local setup script that handles the configuration path gymnastics and thermal throttling safety checks:
 
-By connecting AMK as an MCP server to a **Harness-generated team**, you get:
-1. **Precision Retrieval:** Use AMK's V3 RAG to feed huge codebases into Harness agents without context pollution.
-2. **Durable Rules:** Save global engineering standards in AMK's `global_rules` scope so every Harness team follows them.
-3. **Tool Isolation:** Use AMK's local Python sandbox for code execution triggered by your Harness team.
+```bash
+# Clone the repository
+git clone https://github.com/MasihMoafi/A-Modular-Kingdom.git
+cd A-Modular-Kingdom
 
-**[Build your first Harness team now →](https://github.com/MasihMoafi/harness)**
+# Run the automated setup script
+./scripts/setup_mcp.sh
+```
+
+This script will automatically:
+1. Register `modular_kingdom_host` in your Codex configuration (`~/.codex/config.toml`).
+2. Register the server with Claude Code (`claude mcp add`) if the CLI is active.
+3. Use a lightweight **Thermal Safety Runner** (`scripts/thermal_runner.py`) as a wrapper to monitor your CPU core temperatures and throttle execution if the temperature exceeds a safe threshold (85°C), preventing agent processes from causing workspace lag.
 
 ---
 
@@ -57,7 +59,6 @@ By connecting AMK as an MCP server to a **Harness-generated team**, you get:
 - [🛠️ Available Tools](#️-available-tools)
 - [📚 RAG System](#-rag-system)
 - [🧠 Memory System](#-memory-system)
-- [📦 Package Installation](#-package-installation)
 - [🎯 Integration Examples](#-integration-examples)
 - [🤖 Example Applications](#-example-applications)
 - [🤝 Contributing](#-contributing)
@@ -240,20 +241,7 @@ search_memories(query="coding standards", top_k=5)
 
 **Storage:** `~/.modular_kingdom/memories/` (global) + project-specific folders
 
----
 
-## 📦 Package Installation
-
-> **Coming soon:** `pip install rag-mem` (PyPI release in progress)
-
-Install from source in the meantime:
-
-```bash
-cd packages/memory-mcp
-pip install -e .
-```
-
----
 
 ## 🎯 Integration Examples
 
@@ -436,7 +424,6 @@ MIT License - See [LICENSE](LICENSE) for details
 
 - **Medium Article:** https://medium.com/@masihmoafi12/a-modular-kingdom-fcaa69a6c1f0
 - **Demo Video:** https://www.youtube.com/watch?v=hWoQnAr6R_E
-- **PyPI Package:** [rag-mem](https://pypi.org/project/rag-mem/)
 
 ---
 
