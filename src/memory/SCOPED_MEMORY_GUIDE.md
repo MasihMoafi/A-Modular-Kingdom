@@ -114,7 +114,7 @@ These persist across projects and sessions automatically.
 Run comprehensive tests:
 
 ```bash
-cd /home/masih/Desktop/projects/A-Modular-Kingdom
+cd /home/masih/Desktop/p/A-Modular-Kingdom
 uv run python -m pytest src/memory/test_scoped_memory.py -v
 ```
 
