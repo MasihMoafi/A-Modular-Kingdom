@@ -1,10 +1,13 @@
+# 📦 rag-mem (Legacy Package)
+
+> **⚠️ Note: This package is currently in a Stable/Legacy state.**
+> For the latest features, high-performance RAG V3, and full MCP tool support, please use the **[A-Modular-Kingdom Main Repository](https://github.com/MasihMoafi/A-Modular-Kingdom)**.
+
+**rag-mem** is the PyPI-distributed version of the Modular Kingdom infrastructure. While it provides basic RAG and Memory tools, it is **highly recommended** to clone the main repository for a production-grade experience with local vector databases and advanced reranking.
+
+---
+
 # rag-mem
-
-> **RAG and Memory tools exposed via Model Context Protocol (MCP)**
-
-Add document retrieval and persistent memory to any AI agent. One `pip install`, zero vendor lock-in.
-
-## Why?
 
 Every AI agent needs:
 - Document search (RAG) for knowledge access

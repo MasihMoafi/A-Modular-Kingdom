@@ -1,17 +1,19 @@
 # 🏰 A-Modular-Kingdom
 
-> **Production-ready MCP server with RAG, memory, and tools**
+> **High-Performance MCP Foundation for RAG, Scoped Memory, and Agentic Tools**
 
-Stop rebuilding the same infrastructure. Connect any AI agent to long-term memory, document retrieval, and 8+ powerful tools through the Model Context Protocol.
+**[✨ New: Check out the Next-Gen Agent Harness →](https://github.com/MasihMoafi/harness)**
 
-## The Problem
+---
 
-Building AI agents? You keep reinventing:
-- **Long-term memory** that persists across sessions
-- **Document retrieval (RAG)** for knowledge access
-- **Tool integration** (memory, RAG, web search, and code execution)
+## 🏛️ Project Status: Stable Foundation
 
-Every project starts from scratch. Every agent rebuilds the wheel.
+**A-Modular-Kingdom (AMK)** is now maintained as a **Stable Infrastructure Layer**. While it remains a powerful standalone MCP server, it is optimized to serve as the "Engine" for modern agent harnesses. 
+
+If you are looking for a natural-language way to orchestrate multiple agents and generate complex teams, please visit:
+👉 **[Harness: The Team-Architecture Factory](https://github.com/MasihMoafi/harness)**
+
+---
 
 ## The Solution
 
@@ -22,12 +24,23 @@ Every project starts from scratch. Every agent rebuilds the wheel.
 python src/agent/host.py
 ```
 
-Now any agent (Claude Desktop, custom chatbots, multi-agent systems) gets instant access to:
-- ✅ Hierarchical memory (global rules, project context)
-- ✅ 3 RAG implementations (v1/v2/v3) for document search
-- ✅ 8 production-ready tools via MCP protocol
+Now any agent (Claude Desktop, **[Harness](https://github.com/MasihMoafi/harness)**, custom chatbots) gets instant access to:
+- ✅ **Hierarchical Scoped Memory** (Global Rules, Project Context, Persona)
+- ✅ **Advanced V3 RAG** (Hybrid Fusion + Cross-Encoder Reranking)
+- ✅ **27+ Production Tools** (Vision, Code Exec, Web Search, TTS/STT)
 
-**One foundation. Infinite applications.**
+---
+
+## 🏗️ Next-Gen Integration: Harness + Kingdom
+
+A-Modular-Kingdom provides the "Batteries," and **Harness** provides the "Body."
+
+By connecting AMK as an MCP server to a **Harness-generated team**, you get:
+1. **Precision Retrieval:** Use AMK's V3 RAG to feed huge codebases into Harness agents without context pollution.
+2. **Durable Rules:** Save global engineering standards in AMK's `global_rules` scope so every Harness team follows them.
+3. **Tool Isolation:** Use AMK's local Python sandbox for code execution triggered by your Harness team.
+
+**[Build your first Harness team now →](https://github.com/MasihMoafi/harness)**
 
 ---
 
