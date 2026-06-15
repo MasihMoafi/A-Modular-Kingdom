@@ -14,11 +14,14 @@ import io
 
 repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.join(repo_root, "src")
+workspace_root = os.path.realpath(os.environ.get("AMK_WORKSPACE_ROOT", os.getcwd()))
 sys.path.insert(0, project_root)
 import json
 import importlib
+import importlib.util
 import glob
 import shutil
+import subprocess
 import zipfile
 from xml.sax.saxutils import escape as _xml_escape
 from datetime import datetime
@@ -37,7 +40,16 @@ from agent.tool_execution import call_tool_safely as _call_tool_safely_impl
 _EXPOSE_EXTRA_TOOLS = os.environ.get("MCP_EXPOSE_EXTRA_TOOLS", "1").lower() in ("1", "true", "yes", "y", "on")
 _EXPOSE_RESOURCES = os.environ.get("MCP_EXPOSE_RESOURCES", "1").lower() in ("1", "true", "yes", "y", "on")
 
-_DEFAULT_MEMORY_BASE = resolve_memory_base(project_root=repo_root)
+_DOC_EXTENSIONS = {
+    ".md", ".markdown", ".txt", ".py", ".json", ".yaml", ".yml", ".toml",
+    ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".ipynb", ".pdf", ".docx",
+}
+_DOC_SKIP_DIRS = {
+    ".git", ".venv", "__pycache__", ".pytest_cache", "agent_chroma_db",
+    "agent_qdrant_db", "rag_db_v2", "rag_db_v3", "qdrant_storage",
+}
+
+_DEFAULT_MEMORY_BASE = resolve_memory_base(project_root=workspace_root)
 os.environ.setdefault("MEMORY_BASE_PATH", _DEFAULT_MEMORY_BASE)
 
 # Initialize FastMCP
@@ -104,12 +116,12 @@ def _scoped_manager_for_root(project_root_value: str, force_project_local: bool 
 def _resolve_target_path(path_str: str) -> Path:
     p = Path(path_str.strip()).expanduser()
     if not p.is_absolute():
-        p = Path(repo_root) / p
+        p = Path(workspace_root) / p
     return p.resolve()
 
 
 def _is_safe_target(path: Path) -> bool:
-    allowed = [Path(repo_root).resolve(), Path("/tmp").resolve()]
+    allowed = [Path(workspace_root).resolve(), Path(repo_root).resolve(), Path("/tmp").resolve()]
     rp = path.resolve()
     for root in allowed:
         if rp == root or str(rp).startswith(str(root) + os.sep):
@@ -215,12 +227,12 @@ def _call_tool_safely(func, *args, **kwargs):
 try:
     # Clear stale Qdrant lock files from previous crashes
     import glob as _glob
-    _mem_root = os.path.join(repo_root, ".modular_kingdom")
+    _mem_root = os.path.join(workspace_root, ".modular_kingdom")
     for _lock in _glob.glob(os.path.join(_mem_root, "**", ".lock"), recursive=True):
         os.remove(_lock)
         _elog(f"[HOST] Removed stale lock: {_lock}\n")
 
-    scoped_memory = ScopedMemoryManager(project_root=repo_root)
+    scoped_memory = ScopedMemoryManager(project_root=workspace_root)
     _elog("[HOST] Scoped memory initialized successfully\n")
 except Exception as e:
     _elog(f"[HOST] WARNING: Memory system disabled: {e}\n")
@@ -250,7 +262,7 @@ def save_fact(
 
 @mcp.tool(
     name="save_memory",
-    description="Save content to scoped memory (global or project). Prefix with #global:rule, #global:pref, #persona, #project:context, or let system infer scope."
+    description="Persist a user-approved memory. Use for explicit save requests only; supports global, persona, and project scopes."
 )
 def save_direct_memory(
     content: str = Field(description="Text to save (with optional #scope:type prefix)"),
@@ -325,7 +337,7 @@ def delete_memory(
 
 @mcp.tool(
     name="search_memories",
-    description="Search scoped memories with priority (global rules → preferences → personas → project). Returns scope metadata."
+    description="Search durable scoped memory for relevant rules, preferences, persona notes, and project context. Returns content plus scope/source metadata."
 )
 def search_memories(
     query: str = Field(description="Search query"),
@@ -363,7 +375,7 @@ def search_memories(
 
 @mcp.tool(
     name="query_knowledge_base",
-    description="Use RAG to explore codebases efficiently without loading entire files into context. Answers 'how does X work?', 'what's in folder Y?', architectural questions. Works on .py, .md, .ipynb, .js, .ts, etc. 98% less context than reading files. Use BEFORE reading files for exploration tasks. Supports v1, v2, v3 (v2 recommended)."
+    description="Run local RAG over the launch workspace or supplied files/dir. Use for broad exploration; read exact files with read_file when the user names them."
 )
 def query_knowledge_base(
     query: str = Field(description="The search query for the knowledge base"),
@@ -378,9 +390,10 @@ def query_knowledge_base(
 
     try:
         # Smart defaults:
-        # - If neither `doc_path` nor `files` were provided, index this repo by default.
-        # - Treat relative paths as relative to the repo root (not process CWD).
-        repo_default = repo_root
+        # - If neither `doc_path` nor `files` were provided, index the launch
+        #   workspace by default.
+        # - Treat relative paths as relative to that launch workspace.
+        repo_default = workspace_root
         shortcut_words = {"desktop", "documents", "downloads"}
 
         if (not doc_path) and (not files):
@@ -493,10 +506,10 @@ def health_check() -> str:
         "server": "ok",
         "memory": "ok" if scoped_memory else "disabled",
     }
-    # Test RAG import
+    # Keep health checks cheap. Importing rag.fetch_2 pulls heavier retrieval
+    # dependencies and made simple health probes take several seconds.
     try:
-        from rag.fetch_2 import _DEPENDENCIES_OK
-        status["rag"] = "ok" if _DEPENDENCIES_OK else "deps_missing"
+        status["rag"] = "available" if importlib.util.find_spec("rag.fetch_2") else "missing"
     except Exception as e:
         status["rag"] = f"error: {str(e)}"
     return json.dumps(status)
@@ -504,7 +517,7 @@ def health_check() -> str:
 
 @mcp.tool(
     name="web_search",
-    description="Search the web using DuckDuckGo and return relevant results."
+    description="Search the public web for current or unavailable local information. Prefer local files/memory first unless the user asks for web/current info."
 )
 def web_search(
     query: str = Field(description="The search query")
@@ -518,7 +531,7 @@ def web_search(
 
 @mcp.tool(
     name="crawl_web",
-    description="Crawl web pages from a query or URL list, clean content, and save local markdown files for downstream RAG."
+    description="Fetch a small set of web pages, convert them to local markdown, and return files for downstream RAG. Use after web_search when page content is needed."
 )
 def crawl_web(
     query: str = Field(default="", description="Search query used to find seed pages"),
@@ -545,7 +558,7 @@ def crawl_web(
 
 @mcp.tool(
     name="read_file",
-    description="Read a local text file from the repo or /tmp."
+    description="Read a local file or list a directory. Relative paths resolve under AMK_WORKSPACE_ROOT, the directory where the user launched the agent."
 )
 def read_file(
     path: str = Field(description="Absolute or relative file path"),
@@ -554,7 +567,20 @@ def read_file(
     try:
         target = _resolve_target_path(path)
         if not _is_safe_target(target):
-            return json.dumps({"error": "Path blocked. Allowed roots: repo root and /tmp."})
+            return json.dumps({"error": "Path blocked. Allowed roots: workspace, AMK repo, and /tmp."})
+        if target.is_dir():
+            entries = []
+            for child in sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+                entries.append(child.name + ("/" if child.is_dir() else ""))
+            return json.dumps(
+                {
+                    "status": "success",
+                    "path": str(target),
+                    "content": "\n".join(entries) if entries else "(empty directory)",
+                    "is_directory": True,
+                    "truncated": False,
+                }
+            )
         if not target.is_file():
             return json.dumps({"error": f"Not a file: {str(target)}"})
         text = target.read_text(encoding="utf-8", errors="replace")
@@ -576,7 +602,7 @@ def read_file(
 
 @mcp.tool(
     name="write_file",
-    description="Create or overwrite a local text file under repo or /tmp."
+    description="Create or overwrite a local text file. Relative paths resolve under AMK_WORKSPACE_ROOT; writes are limited to allowed local roots."
 )
 def write_file(
     path: str = Field(description="Absolute or relative file path"),
@@ -586,7 +612,7 @@ def write_file(
     try:
         target = _resolve_target_path(path)
         if not _is_safe_target(target):
-            return json.dumps({"error": "Path blocked. Allowed roots: repo root and /tmp."})
+            return json.dumps({"error": "Path blocked. Allowed roots: workspace, AMK repo, and /tmp."})
         if target.exists() and not overwrite:
             return json.dumps({"error": f"File exists and overwrite is false: {str(target)}"})
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -643,7 +669,7 @@ def create_docx(
         if target.suffix.lower() != ".docx":
             return json.dumps({"error": "Path must end with .docx"})
         if not _is_safe_target(target):
-            return json.dumps({"error": "Path blocked. Allowed roots: repo root and /tmp."})
+            return json.dumps({"error": "Path blocked. Allowed roots: workspace, AMK repo, and /tmp."})
         if target.exists() and not overwrite:
             return json.dumps({"error": f"File exists and overwrite is false: {str(target)}"})
         try:
@@ -698,7 +724,7 @@ def memory_storage_info() -> str:
         return json.dumps(
             {
                 "active_memory_base": active_root,
-                "active_project_root": repo_root,
+                "active_project_root": workspace_root,
                 "active_backend": "markdown",
                 "active_counts": _memory_counts(scoped_memory),
                 "active_markdown_files": scoped_memory.markdown_store.storage_files(),
@@ -840,6 +866,40 @@ if _EXPOSE_EXTRA_TOOLS:
             return json.dumps({"status": "error", "error": str(e)})
 
     @mcp.tool(
+        name="shell_execute",
+        description="Run a bounded local shell command in AMK_WORKSPACE_ROOT and return stdout/stderr/cwd. Use for explicit terminal-style tasks."
+    )
+    def shell_execute(
+        command: str = Field(description="Shell command to run"),
+        timeout_seconds: int = Field(default=15, description="Execution timeout in seconds")
+    ) -> str:
+        if not isinstance(command, str) or not command.strip():
+            return json.dumps({"status": "error", "error": "Empty command"})
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=workspace_root,
+                shell=True,
+                executable="/bin/bash",
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+            return json.dumps(
+                {
+                    "status": "success" if proc.returncode == 0 else "error",
+                    "returncode": proc.returncode,
+                    "stdout": proc.stdout,
+                    "stderr": proc.stderr,
+                    "cwd": workspace_root,
+                }
+            )
+        except subprocess.TimeoutExpired:
+            return json.dumps({"status": "error", "error": f"Command timed out after {timeout_seconds}s"})
+        except Exception as e:
+            return json.dumps({"status": "error", "error": str(e)})
+
+    @mcp.tool(
         name="text_to_speech",
         description="Convert text to speech using various TTS engines. Can play audio directly or save to file."
     )
@@ -891,20 +951,87 @@ if _EXPOSE_EXTRA_TOOLS:
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)})
 
+@mcp.prompt(
+    name="local_file_answer",
+    title="Answer From Local Files",
+    description="Use when the user mentioned local files with @ or by exact filename."
+)
+def local_file_answer(user_request: str, document_context: str = "") -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": (
+                "Answer the user's request from the provided local file context. "
+                "Do not claim the file is missing if document_context is non-empty.\n\n"
+                f"User request:\n{user_request}\n\n"
+                f"DOCUMENTS:\n{document_context}"
+            ),
+        }
+    ]
+
+
+@mcp.prompt(
+    name="juliette_mode_select",
+    title="Juliette Mode Selection",
+    description="Start Juliette by asking for the mode before persona behavior."
+)
+def juliette_mode_select() -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": (
+                "Juliette wake-up: read ./Juliette/protocol.md first when available, "
+                "then ask which mode the user wants: Learn, Intimate, or Anchor. "
+                "Do not invent missing local files."
+            ),
+        }
+    ]
+
+
+@mcp.prompt(
+    name="local_first_agent",
+    title="Local-First Agent",
+    description="Default behavior for AMK/July: local files and memory before web."
+)
+def local_first_agent(task: str = "") -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": (
+                "Work local-first. Treat AMK_WORKSPACE_ROOT as the user's cwd. "
+                "Use exact local files when named, use memory for durable context, "
+                "and use web only when local sources are insufficient or current information is needed.\n\n"
+                f"Task:\n{task}"
+            ),
+        }
+    ]
+
 if _EXPOSE_RESOURCES:
     # --- RESOURCES for @ functionality ---
     @mcp.resource("docs://documents", mime_type="application/json")
     def list_documents() -> str:
-        """Returns list of available document IDs for @ mentions."""
+        """Returns workspace document paths for @ mentions."""
         try:
-            files_dir = os.path.join(project_root, "rag", "files")
-            if not os.path.exists(files_dir):
-                return json.dumps([])
-
-            pattern = os.path.join(files_dir, "*")
-            files = glob.glob(pattern)
-            doc_ids = [os.path.basename(f) for f in files if os.path.isfile(f)]
-            return json.dumps(doc_ids)
+            doc_ids = []
+            for root, dirs, files in os.walk(workspace_root):
+                dirs[:] = [
+                    d for d in dirs
+                    if d not in _DOC_SKIP_DIRS and not d.startswith(".")
+                ]
+                for name in files:
+                    if name.startswith("."):
+                        continue
+                    suffix = os.path.splitext(name)[1].lower()
+                    if suffix not in _DOC_EXTENSIONS:
+                        continue
+                    path = os.path.join(root, name)
+                    try:
+                        if os.path.getsize(path) > 2_000_000:
+                            continue
+                    except OSError:
+                        continue
+                    doc_ids.append(os.path.relpath(path, workspace_root))
+            return json.dumps(sorted(dict.fromkeys(doc_ids))[:500])
         except Exception:
             return json.dumps([])
 
@@ -912,22 +1039,20 @@ if _EXPOSE_RESOURCES:
     def get_document_content(doc_id: str) -> str:
         """Returns the content of a specific document."""
         try:
-            files_dir = os.path.join(project_root, "rag", "files")
-            file_path = os.path.join(files_dir, doc_id)
+            file_path = _resolve_target_path(doc_id)
 
-            if not os.path.exists(file_path):
+            if not file_path.exists():
                 raise ValueError(f"Document {doc_id} not found")
 
             if doc_id.lower().endswith(".pdf"):
                 import fitz
 
-                doc = fitz.open(file_path)
+                doc = fitz.open(str(file_path))
                 text = "".join(page.get_text() for page in doc)
                 doc.close()
                 return text
 
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read()
+            return file_path.read_text(encoding="utf-8", errors="replace")
         except Exception as e:
             return f"Error: Could not retrieve content for {doc_id}: {str(e)}"
 

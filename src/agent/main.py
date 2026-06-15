@@ -10,6 +10,7 @@ import json
 import argparse
 import warnings
 import re
+import subprocess
 from typing import List, Optional
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
@@ -44,10 +45,38 @@ except Exception:
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOST_PATH = os.path.join(AGENT_DIR, "host.py")
 REPO_ROOT = os.path.dirname(os.path.dirname(AGENT_DIR))
+SRC_ROOT = os.path.join(REPO_ROOT, "src")
+if SRC_ROOT not in sys.path:
+    sys.path.insert(0, SRC_ROOT)
+
+
+def _initial_workspace_root() -> str:
+    for var in ("AMK_WORKSPACE_ROOT", "INIT_CWD", "PWD"):
+        value = os.environ.get(var, "").strip()
+        if value and os.path.isdir(os.path.expanduser(value)):
+            return os.path.realpath(os.path.expanduser(value))
+    return os.path.realpath(os.getcwd())
+
+
+WORKSPACE_ROOT = _initial_workspace_root()
 from memory.path_policy import resolve_memory_base
 
-DEFAULT_MEMORY_BASE = resolve_memory_base(project_root=REPO_ROOT)
+DEFAULT_MEMORY_BASE = resolve_memory_base(project_root=WORKSPACE_ROOT)
 os.environ.setdefault("MEMORY_BASE_PATH", DEFAULT_MEMORY_BASE)
+
+_DOC_EXTENSIONS = {
+    ".md", ".markdown", ".txt", ".py", ".json", ".yaml", ".yml", ".toml",
+    ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".ipynb", ".pdf", ".docx",
+}
+_DOC_SKIP_DIRS = {
+    ".git", ".venv", "__pycache__", ".pytest_cache", "agent_chroma_db",
+    "agent_qdrant_db", "rag_db_v2", "rag_db_v3", "qdrant_storage",
+    "venv", "env", "node_modules", "site-packages", "dist", "build",
+}
+_NON_PATH_REFERENTS = {
+    "it", "this", "that", "there", "here", "file", "folder", "directory", "dir",
+    "our", "my", "your", "their", "his", "her", "its", "the",
+}
 
 nest_asyncio.apply()
 
@@ -92,16 +121,47 @@ def initialize_llm(provider: str = "ollama", model: Optional[str] = None):
     print(f"Using Ollama ({LLM_MODEL})")
 
 class DocumentCompleter(Completer):
-    def __init__(self):
-        self.resources = []
+    def __init__(self, workspace_root: str):
+        self.workspace_root = workspace_root
         self.commands = [
-            '/memory', '/help', '/tools', '/files', '/rag',
-            '/read', '/write', '/mkmd', '/mkdocx', '/exec', '/web', '/crawl',
-            '/memory_status', '/memory_migrate', '/memory_cleanup', '/quit'
+            '/help', '/quit', '/status', '/tools', '/memory'
         ]
     
     def update_resources(self, resources: List[str]):
-        self.resources = resources
+        pass
+
+    def _file_matches(self, query: str, limit: int = 20) -> list[str]:
+        q = query.strip().lower()
+        matches: list[tuple[int, str]] = []
+        for root, dirs, files in os.walk(self.workspace_root):
+            dirs[:] = [d for d in dirs if d not in _DOC_SKIP_DIRS and not d.startswith(".")]
+            for name in files:
+                if name.startswith("."):
+                    continue
+                suffix = os.path.splitext(name)[1].lower()
+                if suffix not in _DOC_EXTENSIONS:
+                    continue
+                path = os.path.join(root, name)
+                rel = os.path.relpath(path, self.workspace_root)
+                if not q:
+                    matches.append((0, rel))
+                    continue
+                rel_l = rel.lower()
+                base_l = name.lower()
+                if q not in rel_l and q not in base_l:
+                    continue
+                score = 0
+                if base_l.startswith(q):
+                    score = 100
+                elif rel_l.startswith(q):
+                    score = 80
+                elif q in base_l:
+                    score = 60
+                else:
+                    score = 40
+                matches.append((score, rel))
+        matches.sort(key=lambda x: (-x[0], len(x[1]), x[1].lower()))
+        return [rel for _, rel in matches[:limit]]
     
     def get_completions(self, document, complete_event):
         text_before_cursor = document.text_before_cursor
@@ -124,14 +184,13 @@ class DocumentCompleter(Completer):
             last_at_pos = text_before_cursor.rfind("@")
             prefix = text_before_cursor[last_at_pos + 1:]
             
-            for resource_id in self.resources:
-                if resource_id.lower().startswith(prefix.lower()):
-                    yield Completion(
-                        resource_id,
-                        start_position=-len(prefix),
-                        display=resource_id,
-                        display_meta="Document",
-                    )
+            for resource_id in self._file_matches(prefix):
+                yield Completion(
+                    resource_id,
+                    start_position=-len(prefix),
+                    display=resource_id,
+                    display_meta="Document",
+                )
 
 
 def _extract_text_content(result) -> str:
@@ -200,13 +259,26 @@ async def _list_docs_from_resource(session: ClientSession) -> list[str]:
 
 
 def _list_docs_from_filesystem() -> list[str]:
-    files_dir = os.path.join(os.path.dirname(AGENT_DIR), "rag", "files")
-    if not os.path.isdir(files_dir):
-        return []
-    return sorted(
-        name for name in os.listdir(files_dir)
-        if os.path.isfile(os.path.join(files_dir, name))
-    )
+    docs: list[str] = []
+    for root, dirs, files in os.walk(WORKSPACE_ROOT):
+        dirs[:] = [
+            d for d in dirs
+            if d not in _DOC_SKIP_DIRS and not d.startswith(".")
+        ]
+        for name in files:
+            if name.startswith("."):
+                continue
+            suffix = os.path.splitext(name)[1].lower()
+            if suffix not in _DOC_EXTENSIONS:
+                continue
+            path = os.path.join(root, name)
+            try:
+                if os.path.getsize(path) > 2_000_000:
+                    continue
+            except OSError:
+                continue
+            docs.append(os.path.relpath(path, WORKSPACE_ROOT))
+    return sorted(dict.fromkeys(docs))[:500]
 
 
 async def _list_documents(session: ClientSession) -> list[str]:
@@ -221,8 +293,7 @@ async def _read_document_content(session: ClientSession, doc_id: str) -> str:
         doc_resource = await session.read_resource(f"docs://documents/{doc_id}")
         return _extract_text_content(doc_resource)
     except Exception:
-        files_dir = os.path.join(os.path.dirname(AGENT_DIR), "rag", "files")
-        file_path = os.path.join(files_dir, doc_id)
+        file_path = _resolve_user_path(doc_id)
         if not os.path.isfile(file_path):
             return ""
         try:
@@ -236,12 +307,330 @@ def _resolve_user_path(path_str: str) -> str:
     expanded = os.path.expanduser(path_str.strip())
     if os.path.isabs(expanded):
         return os.path.realpath(expanded)
-    return os.path.realpath(os.path.join(REPO_ROOT, expanded))
+    return os.path.realpath(os.path.join(WORKSPACE_ROOT, expanded))
+
+
+def _resolve_nl_local_path(path_str: str) -> str:
+    raw = path_str.strip().strip("'\"`.,;:")
+    if raw.startswith("/") and not os.path.exists(os.path.expanduser(raw)):
+        cwd_relative = os.path.realpath(os.path.join(WORKSPACE_ROOT, raw.lstrip("/")))
+        return cwd_relative
+    return _resolve_user_path(raw)
+
+
+def _workspace_name_matches(name: str, limit: int = 20) -> list[str]:
+    needle = name.strip().strip("'\"`.,;:@").lower()
+    if not needle or needle in _NON_PATH_REFERENTS:
+        return []
+    matches: list[str] = []
+    for root, dirs, files in os.walk(WORKSPACE_ROOT):
+        dirs[:] = [d for d in dirs if d not in _DOC_SKIP_DIRS and not d.startswith(".")]
+        for candidate in sorted(dirs + files):
+            if candidate.startswith("."):
+                continue
+            candidate_l = candidate.lower()
+            stem_l = os.path.splitext(candidate_l)[0]
+            if needle in {candidate_l, stem_l} or needle in candidate_l:
+                matches.append(os.path.join(root, candidate))
+                if len(matches) >= limit:
+                    return matches
+    return matches
+
+
+def _broader_name_matches(name: str, limit: int = 20) -> list[str]:
+    matches = _workspace_name_matches(name, limit=limit)
+    if matches:
+        return matches
+    if os.path.realpath(WORKSPACE_ROOT) != os.path.realpath(REPO_ROOT):
+        return matches
+
+    # Last-resort repair for wrappers that accidentally launch from the AMK
+    # source repo: search nearby user work areas, but only after workspace search
+    # failed. This keeps normal @/read behavior scoped and avoids eager indexing.
+    needle = name.strip().strip("'\"`.,;:@").lower()
+    if not needle or needle in _NON_PATH_REFERENTS:
+        return []
+    roots = ["/home/masih/Desktop/f/context", "/home/masih/Desktop/u", "/home/masih/Desktop/p"]
+    found: list[str] = []
+    for base in roots:
+        if not os.path.isdir(base):
+            continue
+        for root, dirs, files in os.walk(base):
+            dirs[:] = [d for d in dirs if d not in _DOC_SKIP_DIRS and not d.startswith(".")]
+            for candidate in sorted(files):
+                candidate_l = candidate.lower()
+                stem_l = os.path.splitext(candidate_l)[0]
+                if needle in {candidate_l, stem_l}:
+                    found.append(os.path.join(root, candidate))
+                    if len(found) >= limit:
+                        return found
+    return found
+
+
+def _best_single_match(name: str) -> str:
+    matches = _broader_name_matches(name)
+    if not matches:
+        return ""
+    needle = name.strip().strip("'\"`.,;:@").lower()
+    exact = [
+        p for p in matches
+        if os.path.basename(p).lower() == needle
+        or os.path.splitext(os.path.basename(p).lower())[0] == needle
+    ]
+    if len(exact) == 1:
+        return exact[0]
+    markdown_exact = [p for p in exact if os.path.basename(p).lower().endswith((".md", ".markdown"))]
+    if len(markdown_exact) == 1:
+        return markdown_exact[0]
+    if len(matches) == 1:
+        return matches[0]
+    return ""
+
+
+def _workspace_document_matches(name: str, limit: int = 50) -> list[str]:
+    cleaned = name.strip().strip("'\"`.,;:")
+    if not cleaned:
+        return []
+
+    direct_path = _resolve_user_path(cleaned)
+    if os.path.isfile(direct_path):
+        return [os.path.relpath(direct_path, WORKSPACE_ROOT)]
+
+    needle = cleaned.lower()
+    needle_stem = os.path.splitext(needle)[0]
+    matches: list[str] = []
+    for root, dirs, files in os.walk(WORKSPACE_ROOT):
+        dirs[:] = [d for d in dirs if d not in _DOC_SKIP_DIRS and not d.startswith(".")]
+        for filename in sorted(files):
+            if filename.startswith("."):
+                continue
+            suffix = os.path.splitext(filename)[1].lower()
+            if suffix not in _DOC_EXTENSIONS:
+                continue
+            path = os.path.join(root, filename)
+            rel = os.path.relpath(path, WORKSPACE_ROOT)
+            rel_l = rel.lower()
+            base_l = filename.lower()
+            stem_l = os.path.splitext(base_l)[0]
+            if needle in {rel_l, base_l, stem_l} or (
+                os.sep not in cleaned and "/" not in cleaned and needle_stem == stem_l
+            ):
+                matches.append(rel)
+                if len(matches) >= limit:
+                    return sorted(dict.fromkeys(matches))
+    return sorted(dict.fromkeys(matches))
+
+
+def _resolve_document_mention(mention: str, documents: list[str]) -> tuple[str, str]:
+    cleaned = mention.strip().strip("'\"`.,;:")
+    matches = _workspace_document_matches(cleaned)
+    if len(matches) == 1:
+        return matches[0], ""
+    if len(matches) > 1:
+        preview = ", ".join(matches[:10])
+        suffix = " ..." if len(matches) > 10 else ""
+        return "", f"Ambiguous local @ mention @{cleaned} under workspace {WORKSPACE_ROOT}. Matches: {preview}{suffix}"
+    return "", f"No local file match for @{cleaned} under workspace {WORKSPACE_ROOT}."
+
+
+def _extract_local_document_references(text: str) -> list[str]:
+    refs: list[str] = []
+    pattern = r"(?<!@)(?<![A-Za-z0-9_./-])([A-Za-z0-9_./-]+\.(?:md|markdown|txt|py|json|yaml|yml|toml|html|css|js|ts|tsx|jsx|ipynb|pdf|docx))"
+    for match in re.finditer(pattern, text, re.IGNORECASE):
+        candidate = match.group(1).strip().strip("'\"`.,;:")
+        if candidate and candidate not in refs:
+            refs.append(candidate)
+    return refs
+
+
+def _extract_local_find_path(text: str) -> str:
+    match = re.search(r"\bfind\s+(?:the\s+)?([~./A-Za-z0-9_\-][^\s,;]*)", text, re.IGNORECASE)
+    if not match:
+        return ""
+    candidate = match.group(1).strip().strip("'\"`.,;:")
+    return "" if candidate.lower() in _NON_PATH_REFERENTS else candidate
+
+
+def _find_local_path_for_user(path_str: str) -> str:
+    if not path_str or path_str.strip().lower() in _NON_PATH_REFERENTS:
+        return "I need a filename or clue to search for. For example: `find sessions`."
+
+    target = _resolve_nl_local_path(path_str)
+    if os.path.exists(target):
+        kind = "directory" if os.path.isdir(target) else "file"
+        return f"I found the {kind} here: {target}"
+
+    parent = os.path.dirname(target) or WORKSPACE_ROOT
+    basename = os.path.basename(target)
+    if os.path.isdir(parent):
+        matches = []
+        for root, dirs, files in os.walk(parent):
+            dirs[:] = [d for d in dirs if d not in _DOC_SKIP_DIRS and not d.startswith(".")]
+            for name in dirs + files:
+                if name == basename:
+                    matches.append(os.path.join(root, name))
+            if len(matches) >= 20:
+                break
+        if matches:
+            best = _best_single_match(path_str)
+            if best:
+                return f"I found the file here: {best}"
+            preview = ", ".join(os.path.basename(p) for p in matches[:3])
+            return f"I found {len(matches)} possible matches ({preview}). Please give me one more clue."
+    fuzzy = _broader_name_matches(path_str)
+    if fuzzy:
+        best = _best_single_match(path_str)
+        if best:
+            return f"I found the file here: {best}"
+        preview = ", ".join(os.path.basename(p) for p in fuzzy[:3])
+        return f"I found {len(fuzzy)} possible matches ({preview}). Please give me one more clue."
+    return f"I couldn't find `{path_str}` under the active workspace."
+
+
+def _extract_shell_command(text: str) -> str:
+    stripped = text.strip()
+    code_match = re.search(r"\b(?:run|execute)\b.*?`([^`]+)`", stripped, re.IGNORECASE)
+    if code_match:
+        return code_match.group(1).strip()
+    terse_match = re.search(r"\b(?:do|run|execute)\s+(?:an?\s+)?(ls|pwd)\b", stripped, re.IGNORECASE)
+    if terse_match:
+        return terse_match.group(1).lower()
+    match = re.match(
+        r"^(?:please\s+)?(?:run|execute)\s+(?:the\s+)?(?:(?:shell|terminal)\s+)?(?:command\s+)?(.+)$",
+        stripped,
+        re.IGNORECASE,
+    )
+    if not match:
+        return ""
+    command = match.group(1).strip().strip("'\"")
+    if command.lower() in {"command", "shell command", "terminal command"}:
+        return ""
+    return command
+
+
+def _run_shell_local(command: str, timeout_seconds: int = 30) -> dict:
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=WORKSPACE_ROOT,
+            shell=True,
+            executable="/bin/bash",
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+        return {
+            "status": "success" if proc.returncode == 0 else "error",
+            "returncode": proc.returncode,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "cwd": WORKSPACE_ROOT,
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "error": f"Command timed out after {timeout_seconds}s", "cwd": WORKSPACE_ROOT}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "cwd": WORKSPACE_ROOT}
+
+
+async def _run_shell_command(session: ClientSession, available_tools: set[str], command: str, timeout_seconds: int = 30) -> dict:
+    if "shell_execute" in available_tools:
+        result = await session.call_tool(
+            "shell_execute",
+            {"command": command, "timeout_seconds": timeout_seconds},
+        )
+        return _parse_json_dict(_extract_tool_text(result))
+    return _run_shell_local(command, timeout_seconds=timeout_seconds)
+
+
+def _print_shell_payload(payload: dict) -> None:
+    print(f"cwd: {payload.get('cwd', WORKSPACE_ROOT)}")
+    if "returncode" in payload:
+        print(f"returncode: {payload.get('returncode')}")
+    stdout = str(payload.get("stdout", ""))
+    stderr = str(payload.get("stderr", ""))
+    if stdout:
+        print("\n--- stdout ---")
+        print(stdout.rstrip())
+    if stderr:
+        print("\n--- stderr ---")
+        print(stderr.rstrip())
+    if payload.get("error") and not stderr:
+        print(f"\n--- error ---\n{payload.get('error')}")
+
+
+def _strip_think_blocks(text: str) -> str:
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+
+
+def _extract_local_read_path(text: str) -> str:
+    if "@" in text:
+        return ""
+    lower = text.lower()
+    if not any(word in lower for word in ("read", "show", "list", "open", "inspect")):
+        return ""
+
+    patterns = [
+        r"(?:content|contents)\s+of\s+(?:the\s+)?([~./A-Za-z0-9_\-][^\s,;]*)",
+        r"(?:read|show|list|inspect|open)\s+(?:the\s+)?(?:content|contents\s+)?(?:of\s+)?(?:the\s+)?([~./A-Za-z0-9_\-][^\s,;]*)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            continue
+        candidate = match.group(1).strip()
+        if candidate.lower().strip("'\"`.,;:") in _NON_PATH_REFERENTS | {"content", "contents"}:
+            continue
+        return candidate
+    return ""
+
+
+def _format_directory_listing(path: str, max_entries: int = 200) -> str:
+    rows = []
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if d not in _DOC_SKIP_DIRS and not d.startswith(".")]
+        rel_root = os.path.relpath(root, path)
+        depth = 0 if rel_root == "." else rel_root.count(os.sep) + 1
+        if depth > 2:
+            dirs[:] = []
+            continue
+        for dirname in sorted(dirs):
+            rel = os.path.normpath(os.path.join(rel_root, dirname)) if rel_root != "." else dirname
+            rows.append(f"{rel}/")
+        for filename in sorted(files):
+            rel = os.path.normpath(os.path.join(rel_root, filename)) if rel_root != "." else filename
+            rows.append(rel)
+        if len(rows) >= max_entries:
+            break
+    rows = rows[:max_entries]
+    suffix = "\n... [truncated]" if len(rows) == max_entries else ""
+    return "\n".join(rows) + suffix if rows else "(empty directory)"
+
+
+def _read_local_path_for_user(path: str, max_chars: int = 12000) -> str:
+    original = path
+    if not os.path.exists(path):
+        basename = os.path.basename(path) or path
+        best = _best_single_match(basename)
+        if best:
+            path = best
+        else:
+            matches = _broader_name_matches(basename)
+            if len(matches) > 1:
+                return "Multiple matches:\n" + "\n".join(matches)
+    if os.path.isdir(path):
+        return f"Directory: {path}\n\n{_format_directory_listing(path)}"
+    if not os.path.isfile(path):
+        return f"Path not found: {original}"
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        data = f.read()
+    if len(data) > max_chars:
+        return data[:max_chars] + f"\n\n... [truncated {len(data) - max_chars} chars]"
+    return data
 
 
 def _is_safe_write_target(path_str: str) -> bool:
     target = os.path.realpath(path_str)
-    allowed_roots = [os.path.realpath(REPO_ROOT), os.path.realpath("/tmp")]
+    allowed_roots = [os.path.realpath(WORKSPACE_ROOT), os.path.realpath(REPO_ROOT), os.path.realpath("/tmp")]
     return any(target == root or target.startswith(root + os.sep) for root in allowed_roots)
 
 
@@ -262,19 +651,8 @@ async def _prompt_multiline(prompt_session: PromptSession, header: str) -> str:
 
 def _capabilities_hint() -> str:
     return (
-        "I can do that here. Use:\n"
-        "- /write <path> <content>      (create/overwrite files)\n"
-        "- /mkmd <path> <content>       (create markdown)\n"
-        "- /mkdocx <path> <content>     (create docx)\n"
-        "- /read <path>                 (read files)\n"
-        "- /exec <python>               (run Python in sandbox)\n"
-        "- /web <query>                 (web search)\n"
-        "- /crawl <query>               (search + crawl + RAG)\n"
-        "- /rag \"<query>\" [path] [v2]  (local RAG search)\n"
-        "- /memory_status               (see memory stores)\n"
-        "- /memory_migrate              (migrate legacy memories)\n"
-        "- /memory_cleanup              (archive legacy stores)\n"
-        "You can also say: create docs/notes.md with content ... or create report.docx with content ..."
+        "I can read/edit files, run shell/Python, search local docs, and use memory. "
+        "Ask in normal language, or mention files with @."
     )
 
 
@@ -455,10 +833,12 @@ async def _web_crawl_rag_context(
 
 async def main(think_level=None):
     print("--- Intelligent Agent ---")
+    host_env = dict(os.environ)
+    host_env["AMK_WORKSPACE_ROOT"] = WORKSPACE_ROOT
     params = StdioServerParameters(
         command=sys.executable,
         args=["-u", HOST_PATH],
-        env=dict(os.environ),
+        env=host_env,
     )
     
     async with stdio_client(params) as (read, write):
@@ -472,7 +852,7 @@ async def main(think_level=None):
                 available_tools = set()
             
             # Setup prompt_toolkit with dropdown
-            completer = DocumentCompleter()
+            completer = DocumentCompleter(WORKSPACE_ROOT)
             kb = KeyBindings()
             
             @kb.add("@")
@@ -519,13 +899,8 @@ async def main(think_level=None):
             # Short-term memory (windowed) with fixed k=50
             stm = ConversationBufferWindowMemory(k=50, return_messages=False)
             
-            # Load available documents for dropdown
-            try:
-                doc_list = await _list_documents(session)
-                completer.update_resources(doc_list)
-                print(f"\nLoaded {len(doc_list)} documents for @ completion")
-            except Exception as e:
-                print(f"Could not load document list: {e}")
+            print(f"\nWorkspace: {WORKSPACE_ROOT}")
+            print("File @ search is ready. Type @ plus part of a filename.")
             
             print("\nAgent is ready. Type 'exit' to quit. Use @ to see document dropdown.")
 
@@ -542,6 +917,34 @@ async def main(think_level=None):
                         continue
                     if _is_capability_question(user_input):
                         print(_capabilities_hint())
+                        continue
+
+                    local_read_path = _extract_local_read_path(user_input)
+                    if local_read_path:
+                        target = _resolve_nl_local_path(local_read_path)
+                        try:
+                            print(_read_local_path_for_user(target))
+                        except Exception as e:
+                            print(f"Read error: {e}")
+                        continue
+
+                    local_find_path = _extract_local_find_path(user_input)
+                    if local_find_path:
+                        print(_find_local_path_for_user(local_find_path))
+                        continue
+                    if re.search(r"\bfind\b", user_input, re.IGNORECASE) and re.search(
+                        r"\b(it|this|that|here|cwd|directory|dir)\b", user_input, re.IGNORECASE
+                    ):
+                        print("I need a filename or clue to search for. For example: `find sessions`.")
+                        continue
+
+                    shell_command = _extract_shell_command(user_input)
+                    if shell_command:
+                        try:
+                            payload = await _run_shell_command(session, available_tools, shell_command)
+                            _print_shell_payload(payload)
+                        except Exception as e:
+                            print(f"Shell error: {e}")
                         continue
 
                     nl_file_req = None if user_input.startswith('/') else _parse_nl_file_request(user_input)
@@ -614,20 +1017,9 @@ async def main(think_level=None):
                             print("""Available commands:
  - /help - Show this help
  - /quit - Exit
- - /tools - List all available tools  
+ - /status - Show workspace, model, and memory status
+ - /tools - Inspect available MCP tools
  - /memory - List and manage memories
- - /memory_status - Show active and legacy memory stores
- - /memory_migrate - Preview/apply legacy memory migration
- - /memory_cleanup - Archive legacy memory directories (safe cleanup)
- - /files - List available files
- - /rag "<query>" [path] [version] - Search documents with RAG
- - /web <query> - Force web search tool
- - /crawl <query> - Search web, crawl pages, then run RAG over crawled pages
- - /read <path> - Read a local file
- - /write <path> <content> - Write/create a file
- - /mkmd <path> <content> - Create markdown file
- - /mkdocx <path> <content> - Create docx file
- - /exec - Execute Python via MCP code_execute
  - @filename - Access file content (e.g., @Napoleon.pdf)
  - #message - Save message directly to memory""")
                             continue
@@ -642,6 +1034,21 @@ async def main(think_level=None):
                                     print(f"{i}. {name}")
                             else:
                                 print("Could not retrieve tool list from server.")
+                            continue
+                        elif command == 'status':
+                            print(f"Workspace: {WORKSPACE_ROOT}")
+                            print(f"Repo: {REPO_ROOT}")
+                            print(f"Provider/model: {LLM_MODEL}")
+                            print(f"Memory base: {os.environ.get('MEMORY_BASE_PATH', DEFAULT_MEMORY_BASE)}")
+                            if "memory_storage_info" in available_tools or not available_tools:
+                                try:
+                                    result = await session.call_tool('memory_storage_info')
+                                    payload = _parse_json_dict(_extract_tool_text(result))
+                                    counts = payload.get("active_counts")
+                                    if counts:
+                                        print("Memory counts: " + json.dumps(counts, sort_keys=True))
+                                except Exception as e:
+                                    print(f"Memory status error: {e}")
                             continue
                         elif command == 'memory_status':
                             if "memory_storage_info" not in available_tools and available_tools:
@@ -738,26 +1145,15 @@ async def main(think_level=None):
                                 print(f"Could not parse memory response: {e}")
                             continue
                             
-                        elif command == 'files':
-                            print("📁 Available files:")
-                            try:
-                                files = await _list_documents(session)
-                                if files:
-                                    for i, file in enumerate(files, 1):
-                                        print(f"{i}. {file}")
-                                else:
-                                    print("No files found.")
-                            except Exception as e:
-                                print(f"Error listing files: {e}")
-                            continue
-
                         elif command == 'read':
                             target = _resolve_user_path(command_arg) if command_arg else ""
                             if not target:
                                 print("Usage: /read <path>")
                                 continue
                             try:
-                                if "read_file" in available_tools:
+                                if os.path.isdir(target):
+                                    print(_read_local_path_for_user(target))
+                                elif "read_file" in available_tools:
                                     result = await session.call_tool("read_file", {"path": command_arg, "max_chars": 12000})
                                     payload = json.loads(_extract_tool_text(result))
                                     if payload.get("error"):
@@ -831,7 +1227,7 @@ async def main(think_level=None):
                                 continue
                             target = _resolve_user_path(path_part)
                             if not _is_safe_write_target(target):
-                                print("Write blocked. Allowed roots: repo root and /tmp.")
+                                print("Write blocked. Allowed roots: workspace, AMK repo, and /tmp.")
                                 continue
                             if not content_part:
                                 if not interactive_input:
@@ -889,6 +1285,23 @@ async def main(think_level=None):
                                     print(f"\n--- error ---\n{payload.get('error')}")
                             except Exception as e:
                                 print(f"Execution error: {e}")
+                            continue
+
+                        elif command in ('sh', 'shell'):
+                            shell_command = command_arg.strip()
+                            if not shell_command:
+                                if not interactive_input:
+                                    print("Usage: /sh <command>")
+                                    continue
+                                shell_command = await _prompt_multiline(prompt_session, "Enter shell command")
+                            if not shell_command:
+                                print("Aborted: empty command.")
+                                continue
+                            try:
+                                payload = await _run_shell_command(session, available_tools, shell_command)
+                                _print_shell_payload(payload)
+                            except Exception as e:
+                                print(f"Shell error: {e}")
                             continue
 
                         elif command == 'web':
@@ -966,7 +1379,6 @@ async def main(think_level=None):
                             continue
 
                         elif command == 'rag':
-                            import re
                             # Extract quoted query: /rag "query text" [path] [version]
                             match = re.search(r'"([^"]+)"', user_input)
                             if not match:
@@ -1028,38 +1440,53 @@ async def main(think_level=None):
 
                     # --- Step 1: Process @ mentions for document references ---
                     document_context = ""
-                    mentions = [word[1:] for word in user_input.split() if word.startswith("@")]
+                    mentions = re.findall(r"@([^\s]+)", user_input)
+                    bare_doc_refs = _extract_local_document_references(user_input)
+                    for ref in bare_doc_refs:
+                        if ref not in mentions:
+                            mentions.append(ref)
                     
                     if mentions:
                         print(f"Found document mentions: {mentions}")
                         try:
                             # Get list of available documents
                             doc_list = await _list_documents(session)
+                            mention_errors = []
                             
                             for mention in mentions:
-                                if mention in doc_list:
-                                    print(f"Fetching content for: {mention}")
-                                    content = await _read_document_content(session, mention)
-                                    document_context += f'\n<document id="{mention}">\n{content}\n</document>\n'
+                                doc_id, mention_error = _resolve_document_mention(mention, doc_list)
+                                if doc_id:
+                                    print(f"Fetching content for: {doc_id}")
+                                    content = await _read_document_content(session, doc_id)
+                                    document_context += f'\n<document id="{doc_id}">\n{content}\n</document>\n'
+                                else:
+                                    mention_errors.append(mention_error)
+                            if mention_errors:
+                                print("\n".join(mention_errors))
+                                continue
                         except Exception as e:
                             print(f"Could not fetch document resources: {e}")
+                            continue
 
                     # --- Step 2: Search Internal Memory ---
-                    print("🧠 Searching memories...")
-                    memories = []
-                    if "search_memories" in available_tools or not available_tools:
-                        search_result = await session.call_tool('search_memories', {'query': user_input, 'top_k': 3})
-                        try:
-                            memories = json.loads(search_result.content[0].text)
-                        except (json.JSONDecodeError, IndexError, TypeError):
-                            memories = []
-                    
-                    memory_context = "--- Relevant Memories ---\n"
-                    if memories and isinstance(memories, list):
-                        valid_mems = [mem.get('content') for mem in memories if mem and 'content' in mem]
-                        memory_context += "\n".join([f"- {mem}" for mem in valid_mems]) if valid_mems else "No relevant memories found."
+                    if document_context:
+                        memory_context = "--- Relevant Memories ---\nSkipped for local @ file mention."
                     else:
-                        memory_context += "No relevant memories found."
+                        print("🧠 Searching memories...")
+                        memories = []
+                        if "search_memories" in available_tools or not available_tools:
+                            search_result = await session.call_tool('search_memories', {'query': user_input, 'top_k': 3})
+                            try:
+                                memories = json.loads(search_result.content[0].text)
+                            except (json.JSONDecodeError, IndexError, TypeError):
+                                memories = []
+                        
+                        memory_context = "--- Relevant Memories ---\n"
+                        if memories and isinstance(memories, list):
+                            valid_mems = [mem.get('content') for mem in memories if mem and 'content' in mem]
+                            memory_context += "\n".join([f"- {mem}" for mem in valid_mems]) if valid_mems else "No relevant memories found."
+                        else:
+                            memory_context += "No relevant memories found."
 
                     # --- Step 3: Decide which tool to use (if any) ---
                     # Skip tool decision if we already have document context from @ mentions
@@ -1175,15 +1602,22 @@ JSON Response:"""
 
                     # --- Step 4: Synthesize and Respond ---
                     short_term_context = stm.buffer
+                    source_instruction = (
+                        "Your primary source of truth for this turn is the local cwd file content provided in DOCUMENTS. "
+                        "Each <document> block contains exact file content between its tags. "
+                        "Never say that a document's content is not provided when a <document> block is present. "
+                        "Do not use memory, RAG, web search, or crawl to reinterpret unresolved @ references."
+                        if document_context
+                        else "Your primary source of truth is your memory. If the user contradicts it, you MUST correct them."
+                    )
 
                     final_prompt = f"""You are a hyper-intelligent assistant. Your single most important duty is to maintain factual accuracy.
-You have access to your personal memory, external knowledge base, web search, and can reference specific documents.
-You are running inside a local operator CLI that supports real actions via slash commands.
-Never claim you cannot create/read files, run code, or use tools.
-If asked to do those actions, provide exact command-oriented guidance using:
-/write, /mkmd, /mkdocx, /read, /exec, /web, /crawl, /rag, /memory_status, /memory_migrate, /memory_cleanup.
+You are running inside a local operator CLI. The slash surface is for user-facing control commands only.
+File reading, editing, shell execution, memory, RAG, and web research are internal capabilities handled by the runtime.
+Never tell the user to use hidden slash tool commands. If the runtime has already provided file/tool output below, answer from it directly.
+If the user asks for an action that has already been performed by the runtime, report the result. If it has not been performed, answer with the next concrete step.
 
-Your primary source of truth is your memory. If the user contradicts it, you MUST correct them.
+{source_instruction}
 Use the provided information sources to answer questions when appropriate.
 
 --- CONVERSATION HISTORY ---
@@ -1196,8 +1630,8 @@ Use the provided information sources to answer questions when appropriate.
 {document_context if document_context else external_context}
 ---
 
-Note: If the user's query contains references to documents like "@Napoleon.pdf", the "@" is only a way of mentioning the doc. 
-The actual document content (if available) is provided above. Answer directly and concisely using the provided information.
+Note: If the user's query contains references to documents like "@Napoleon.pdf", the "@" is only a way of mentioning the doc.
+When <document id="...">...</document> appears above, the inner text is the actual file content. Answer directly and concisely from it.
 
 User: {user_input}"""
                     
@@ -1223,7 +1657,7 @@ User: {user_input}"""
                             model='gemini-2.0-flash-exp',
                             contents=final_prompt
                         )
-                        answer = response.text.strip()
+                        answer = _strip_think_blocks(response.text.strip())
                         print(f"\nJuliette: {answer}\n")
                         assistant_output = answer
                     else:
@@ -1231,7 +1665,6 @@ User: {user_input}"""
                             raise RuntimeError("Ollama backend not initialized.")
                         stream = ollama.chat(**chat_params)
                         thinking_started = False
-                        response_started = False
                         
                         for chunk in stream:
                             # Handle thinking output FIRST
@@ -1248,19 +1681,12 @@ User: {user_input}"""
                             
                             # Handle regular content AFTER thinking
                             elif chunk.message.content:
-                                if thinking_started and not response_started and think_level:
-                                    print("\n" + "=" * 50)
-                                    print(f"\nJuliette: ", end="", flush=True)
-                                    response_started = True
-                                elif not response_started:
-                                    print(f"\nJuliette: ", end="", flush=True)
-                                    response_started = True
-                                    
-                                content = chunk.message.content
-                                print(content, end="", flush=True)
-                                assistant_output += content
-                        
-                        print()  # New line after streaming
+                                assistant_output += chunk.message.content
+
+                        assistant_output = _strip_think_blocks(assistant_output)
+                        if thinking_started and think_level:
+                            print("\n" + "=" * 50)
+                        print(f"\nJuliette: {assistant_output}\n")
                     
                     try:
                         stm.chat_memory.add_ai_message(assistant_output)
