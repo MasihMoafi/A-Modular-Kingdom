@@ -24,7 +24,7 @@ def test_rag_system():
 
     from rag.fetch_2 import fetchExternalKnowledge
 
-    result = fetchExternalKnowledge("web search duckduckgo", doc_path="tools")
+    result = fetchExternalKnowledge("web search duckduckgo", doc_path="docs")
     assert not result.startswith("Error:"), result
 
 
