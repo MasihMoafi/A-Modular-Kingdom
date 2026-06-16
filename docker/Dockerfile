@@ -45,7 +45,6 @@ CMD ["python", "src/agent/host.py"]
 FROM base as production
 
 COPY src/ ./src/
-COPY packages/ ./packages/
 
 # Create directory for global memories
 RUN mkdir -p /root/.modular_kingdom/legacy_memories

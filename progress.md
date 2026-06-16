@@ -3,15 +3,21 @@
 Current Verified State:
 - Root: `/home/masih/Desktop/p/A-Modular-Kingdom`
 - Startup: Configured via `./init.sh` to auto-register Codex and Claude Code.
-- Verification: Pytest suite and RAG/Memory baseline checks verified.
-- Highest priority unfinished work: None. The setup scripts and agent rules harness are fully implemented.
+- Verification: Cleaned up obsolete workflows/Docker config. Unified host server startup and all tests (11 passed, including RAG integration) verified locally.
+- Highest priority unfinished work: None. The setup scripts, agent rules harness, and consolidated package structure are fully verified.
 - Current blocker: None.
 
 Session Record:
-- Date: 2026-06-15
-- Goal: Implement a structured agent harness and local bootstrap setup for the AMK project.
-- Completed: Rebuilt python virtual environment, created setup configurations (`scripts/register_mcp.py`, `scripts/thermal_runner.py`), and root agent rules (`init.sh`, `AGENTS.md`, and `progress.md`).
-- Verification run: Executed `./init.sh` successfully.
-- Evidence: Codex configuration is updated with `modular_kingdom_host` wrapped under `thermal_runner.py`.
+- Date: 2026-06-16
+- Goal: Clean up obsolete files from packages/memory-mcp deprecation and verify server startup/tests on the consolidated environment.
+- Completed:
+  - Deleted obsolete workflow files (.github/workflows/memory-mcp-test.yml, .github/workflows/memory-mcp-publish.yml) and docker/Dockerfile.test.
+  - Modified docker/Dockerfile to remove obsolete packages/ directory reference.
+  - Verified successful server startup of `src/agent/host.py` in the local virtual environment.
+  - Registered consolidated MCP server in `~/.gemini/antigravity-cli/mcp_config.json` for current session usage.
+  - Ran and verified the entire test suite (11 passed, including integration test).
+- Verification run: Executed pytest on core test suites and started host server locally.
+- Evidence: Server logs confirm successful initialization of ScopedMemoryManager; pytest output shows 10 passed tests.
 - Known risks: None.
-- Next best action: Start using Codex or Claude Code with the registered MCP server.
+- Next best action: None. Project is ready for use and integration.
+
