@@ -3,9 +3,12 @@
 ## Why Qdrant Cloud?
 
 Qdrant Cloud solves the concurrency issue with local Qdrant:
-- ✅ **Multiple concurrent queries** - No file locking issues
-- ✅ **1GB free tier** - No credit card required
-- ✅ **Production-ready** - Managed service with high availability
+- ✅ **Multiple concurrent queries** - Written in Rust
+- ✅ **Blazing Speed** - Written in Rust
+- ✅ **Generous free tier** - No credit card required
+- ✅ **Production-ready** 
+- ✅ **Local-mode Available**
+- ✅ **Supports Multimodal Databases.**
 - ✅ **Same API** - No code changes needed
 
 ## Setup Steps
@@ -13,11 +16,8 @@ Qdrant Cloud solves the concurrency issue with local Qdrant:
 ### 1. Create Free Qdrant Cloud Cluster
 
 1. Go to https://cloud.qdrant.io/signup
-2. Sign up (no credit card required)
+2. Sign up 
 3. Create a new cluster:
-   - Choose **Free tier** (1GB)
-   - Select a region close to you
-   - Wait for cluster to be ready (~2 minutes)
 
 ### 2. Get Your Credentials
 
@@ -70,7 +70,7 @@ print(result)
 
 ## Switching Back to Local
 
-To use local mode again (for development without internet):
+To use local mode:
 
 ```python
 RAG_CONFIG = {
@@ -84,13 +84,10 @@ RAG_CONFIG = {
 ## Monitoring Usage
 
 - Dashboard: https://cloud.qdrant.io/
-- Check storage: Free tier includes 1GB
 - Monitor query performance
-- View collections and data
 
 ## Migration Notes
 
 - Existing local collections won't automatically sync to cloud
 - First query to cloud will re-index documents
 - Cloud and local collections are separate
-- Collection names are same, but data is independent

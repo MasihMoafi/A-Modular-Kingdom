@@ -6,8 +6,8 @@ __pycache__/
 # Databases and indices
 agent_chroma_db/
 rag/rag_db/
+rag/rag_db_v1/
 rag/rag_db_v2/
-rag/rag_db_v3/
 
 # Logs/temp
 *.log

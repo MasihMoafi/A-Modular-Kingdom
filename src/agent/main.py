@@ -70,7 +70,7 @@ _DOC_EXTENSIONS = {
 }
 _DOC_SKIP_DIRS = {
     ".git", ".venv", "__pycache__", ".pytest_cache", "agent_chroma_db",
-    "agent_qdrant_db", "rag_db_v2", "rag_db_v3", "qdrant_storage",
+    "agent_qdrant_db", "rag_db_v1", "rag_db_v2", "qdrant_storage",
     "venv", "env", "node_modules", "site-packages", "dist", "build",
 }
 _NON_PATH_REFERENTS = {
@@ -108,9 +108,15 @@ def initialize_llm(provider: str = "ollama", model: Optional[str] = None):
 
         genai_client = genai.Client(api_key=api_key)
         types = gemini_types
-        LLM_MODEL = "gemini"
+        target_model = model or "gemini-2.5-flash"
+        LLM_MODEL = f"gemini:{target_model}"
         ollama = None
-        print("Using Gemini API")
+        print(f"Using Gemini API ({target_model})")
+        return
+    elif selected == "openrouter":
+        LLM_MODEL = f"openrouter:{model or 'google/gemini-2.5-flash'}"
+        print(f"Using OpenRouter model: {model or 'google/gemini-2.5-flash'}")
+        ollama = None
         return
 
     # Default path: local Ollama.
@@ -119,6 +125,77 @@ def initialize_llm(provider: str = "ollama", model: Optional[str] = None):
 
     LLM_MODEL = (model or os.getenv("OLLAMA_MODEL") or "qwen3:8b").strip()
     print(f"Using Ollama ({LLM_MODEL})")
+
+def openrouter_chat_stream(model: str, messages: list):
+    import requests
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        try:
+            with open(os.path.expanduser("~/.openrouter_api_key"), "r") as f:
+                api_key = f.read().strip()
+        except:
+            pass
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY is missing in environment or ~/.openrouter_api_key")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/MasihMoafi/A-Modular-Kingdom",
+        "X-Title": "A-Modular-Kingdom Client",
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+    }
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    response = requests.post(url, headers=headers, json=payload, stream=True)
+    response.raise_for_status()
+    for line in response.iter_lines():
+        if line:
+            decoded = line.decode('utf-8').strip()
+            if decoded.startswith("data: "):
+                data_str = decoded[6:]
+                if data_str == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_str)
+                    chunk = data["choices"][0]["delta"].get("content", "")
+                    if chunk:
+                        yield chunk
+                except:
+                    pass
+
+def openrouter_chat_non_stream(model: str, messages: list, format_json: bool = False):
+    import requests
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        try:
+            with open(os.path.expanduser("~/.openrouter_api_key"), "r") as f:
+                api_key = f.read().strip()
+        except:
+            pass
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY is missing in environment or ~/.openrouter_api_key")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/MasihMoafi/A-Modular-Kingdom",
+        "X-Title": "A-Modular-Kingdom Client",
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+    }
+    if format_json:
+        payload["response_format"] = {"type": "json_object"}
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+    data = response.json()
+    return data["choices"][0]["message"]["content"]
 
 class DocumentCompleter(Completer):
     def __init__(self, workspace_root: str):
@@ -350,7 +427,7 @@ def _broader_name_matches(name: str, limit: int = 20) -> list[str]:
     needle = name.strip().strip("'\"`.,;:@").lower()
     if not needle or needle in _NON_PATH_REFERENTS:
         return []
-    roots = ["/home/masih/Desktop/f/context", "/home/masih/Desktop/u", "/home/masih/Desktop/p"]
+    roots = ["/home/masih/Desktop/context", "/home/masih/Desktop/u", "/home/masih/Desktop/p"]
     found: list[str] = []
     for base in roots:
         if not os.path.isdir(base):
@@ -1040,6 +1117,32 @@ async def main(think_level=None):
                             print(f"Repo: {REPO_ROOT}")
                             print(f"Provider/model: {LLM_MODEL}")
                             print(f"Memory base: {os.environ.get('MEMORY_BASE_PATH', DEFAULT_MEMORY_BASE)}")
+                            
+                            # Calculate approximate token usage
+                            system_len = len(system_prompt) if 'system_prompt' in locals() else 0
+                            history_len = 0
+                            try:
+                                for msg in stm.chat_memory.messages:
+                                    history_len += len(msg.content)
+                            except:
+                                pass
+                            
+                            total_chars = system_len + history_len
+                            est_tokens = total_chars // 4
+                            
+                            # Determine model context limit
+                            if "gemini" in LLM_MODEL.lower():
+                                limit = 1048576
+                            elif "deepseek" in LLM_MODEL.lower():
+                                limit = 64000
+                            else:
+                                limit = 32768 # Default Ollama/Qwen limit
+                            
+                            remaining = max(0, limit - est_tokens)
+                            print(f"Context Window Limit: {limit} tokens")
+                            print(f"Estimated Context Used: {est_tokens} tokens (approx {total_chars} chars)")
+                            print(f"Estimated Context Remaining: {remaining} tokens")
+
                             if "memory_storage_info" in available_tools or not available_tools:
                                 try:
                                     result = await session.call_tool('memory_storage_info')
@@ -1391,18 +1494,18 @@ async def main(think_level=None):
                             parts = remainder.split()
                             
                             # Defaults
-                            version = 'v2'
+                            version = 'v1'
                             doc_path = ''
                             
                             # Parse: first part is path, second is version (or vice versa)
                             if len(parts) > 0:
-                                if parts[0] in ['v1', 'v2', 'v3']:
+                                if parts[0] in ['v1', 'v2']:
                                     version = parts[0]
                                     if len(parts) > 1:
                                         doc_path = parts[1]
                                 else:
                                     doc_path = parts[0]
-                                    if len(parts) > 1 and parts[1] in ['v1', 'v2', 'v3']:
+                                    if len(parts) > 1 and parts[1] in ['v1', 'v2']:
                                         version = parts[1]
 
                             print(f"📚 Querying knowledge base with RAG {version}...")
@@ -1502,21 +1605,24 @@ async def main(think_level=None):
    - Relative paths like "tools" → "./tools"
    - Absolute paths stay as-is
    - Empty string if not mentioned
-3. version: Extract RAG version if mentioned ("v1", "v2", "v3"). Default "v2" if not specified.
+3. version: Extract RAG version if mentioned ("v1", "v2"). Default "v1" if not specified.
 
 Examples:
-- "search Desktop for Napoleon" → {{"tool": "rag", "doc_path": "~/Desktop", "version": "v2"}}
-- "what's in tools folder using v3?" → {{"tool": "rag", "doc_path": "./tools", "version": "v3"}}
-- "current weather" → {{"tool": "web_search", "doc_path": "", "version": "v2"}}
+- "search Desktop for Napoleon" → {{"tool": "rag", "doc_path": "~/Desktop", "version": "v1"}}
+- "what's in tools folder using v2?" → {{"tool": "rag", "doc_path": "./tools", "version": "v2"}}
+- "current weather" → {{"tool": "web_search", "doc_path": "", "version": "v1"}}
 
 User Query: "{user_input}"
 
 JSON Response:"""
                         
-                        # Use Gemini or Ollama for tool decision
-                        if LLM_MODEL == 'gemini':
+                        # Use Gemini, OpenRouter, or Ollama for tool decision
+                        if LLM_MODEL == 'gemini' or LLM_MODEL.startswith("gemini:"):
+                            model_name = "gemini-2.0-flash-exp"
+                            if LLM_MODEL.startswith("gemini:"):
+                                model_name = LLM_MODEL.replace("gemini:", "", 1)
                             response = genai_client.models.generate_content(
-                                model='gemini-2.0-flash-exp',
+                                model=model_name,
                                 contents=decision_prompt,
                                 config=types.GenerateContentConfig(
                                     response_mime_type='application/json',
@@ -1525,13 +1631,19 @@ JSON Response:"""
                                         'properties': {
                                             'tool': {'type': 'string', 'enum': ['rag', 'web_search', 'none']},
                                             'doc_path': {'type': 'string'},
-                                            'version': {'type': 'string', 'enum': ['v1', 'v2', 'v3']}
+                                            'version': {'type': 'string', 'enum': ['v1', 'v2']}
                                         },
                                         'required': ['tool', 'doc_path', 'version']
                                     }
                                 )
                             )
                             decision = json.loads(response.text)
+                        elif LLM_MODEL.startswith("openrouter:"):
+                            model_name = LLM_MODEL.replace("openrouter:", "", 1)
+                            content = openrouter_chat_non_stream(model_name, [{'role': 'user', 'content': decision_prompt}], format_json=True)
+                            if not content.strip():
+                                raise json.JSONDecodeError("Empty response", "", 0)
+                            decision = json.loads(content)
                         else:
                             if ollama is None:
                                 raise RuntimeError("Ollama backend not initialized.")
@@ -1544,12 +1656,12 @@ JSON Response:"""
                         try:
                             tool_to_use = decision.get("tool", "none")
                             doc_path = decision.get("doc_path", "")
-                            version = decision.get("version", "v2")
+                            version = decision.get("version", "v1")
                         except (json.JSONDecodeError, KeyError) as e:
                             print(f"Tool decision parsing error: {e}, defaulting to none")
                             tool_to_use = "none"
                             doc_path = ""
-                            version = "v2"
+                            version = "v1"
 
                         try:
                             if tool_to_use == "rag":
@@ -1637,10 +1749,25 @@ User: {user_input}"""
                     
                     print("💡 Synthesizing final response...")
                     
+                    # Read system prompt dynamically if present
+                    sys_prompt_path = "/home/masih/Desktop/p/amk-tui/system_prompt.md"
+                    system_prompt = ""
+                    if os.path.exists(sys_prompt_path):
+                        try:
+                            with open(sys_prompt_path, "r") as sf:
+                                system_prompt = sf.read().strip()
+                        except Exception:
+                            pass
+                    
+                    messages = []
+                    if system_prompt:
+                        messages.append({'role': 'system', 'content': system_prompt})
+                    messages.append({'role': 'user', 'content': final_prompt})
+
                     # Prepare chat parameters
                     chat_params = {
                         'model': LLM_MODEL, 
-                        'messages': [{'role': 'user', 'content': final_prompt}], 
+                        'messages': messages, 
                         'stream': True
                     }
                     
@@ -1652,14 +1779,30 @@ User: {user_input}"""
                     assistant_output = ""
                     thinking_output = ""
                     
-                    if LLM_MODEL == 'gemini':
+                    if LLM_MODEL == 'gemini' or LLM_MODEL.startswith("gemini:"):
+                        config = None
+                        if system_prompt:
+                            config = types.GenerateContentConfig(system_instruction=system_prompt)
+                        model_name = "gemini-2.0-flash-exp"
+                        if LLM_MODEL.startswith("gemini:"):
+                            model_name = LLM_MODEL.replace("gemini:", "", 1)
                         response = genai_client.models.generate_content(
-                            model='gemini-2.0-flash-exp',
-                            contents=final_prompt
+                            model=model_name,
+                            contents=final_prompt,
+                            config=config
                         )
                         answer = _strip_think_blocks(response.text.strip())
                         print(f"\nJuliette: {answer}\n")
                         assistant_output = answer
+                    elif LLM_MODEL.startswith("openrouter:"):
+                        model_name = LLM_MODEL.replace("openrouter:", "", 1)
+                        print("Juliette: ", end="", flush=True)
+                        stream = openrouter_chat_stream(model_name, messages)
+                        for chunk in stream:
+                            assistant_output += chunk
+                            print(chunk, end="", flush=True)
+                        print("\n")
+                        assistant_output = _strip_think_blocks(assistant_output)
                     else:
                         if ollama is None:
                             raise RuntimeError("Ollama backend not initialized.")
@@ -1716,7 +1859,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--provider",
-        choices=["ollama", "gemini"],
+        choices=["ollama", "gemini", "openrouter"],
         default="ollama",
         help="LLM backend to use (default: ollama)",
     )

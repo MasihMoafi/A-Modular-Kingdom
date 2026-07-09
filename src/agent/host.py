@@ -46,7 +46,7 @@ _DOC_EXTENSIONS = {
 }
 _DOC_SKIP_DIRS = {
     ".git", ".venv", "__pycache__", ".pytest_cache", "agent_chroma_db",
-    "agent_qdrant_db", "rag_db_v2", "rag_db_v3", "qdrant_storage",
+    "agent_qdrant_db", "rag_db_v1", "rag_db_v2", "qdrant_storage",
 }
 
 _DEFAULT_MEMORY_BASE = resolve_memory_base(project_root=workspace_root)
@@ -379,7 +379,7 @@ def search_memories(
 )
 def query_knowledge_base(
     query: str = Field(description="The search query for the knowledge base"),
-    version: str = Field(default="v2", description="RAG version to use: 'v1', 'v2', or 'v3'"),
+    version: str = Field(default="v1", description="RAG version to use: 'v1' or 'v2'"),
     doc_path: str = Field(default="", description="Optional path to a specific documents directory"),
     files: List[str] = Field(default=[], description="Optional list of specific file paths to index and search")
 ) -> str:
@@ -419,14 +419,13 @@ def query_knowledge_base(
 
         # Map version to module name
         module_map = {
-            "v1": "rag.fetch",
-            "v2": "rag.fetch_2",
-            "v3": "rag.fetch_3"
+            "v1": "rag.fetch_1",
+            "v2": "rag.fetch_2"
         }
 
         module_name = module_map.get(version)
         if not module_name:
-            return json.dumps({"error": f"Invalid RAG version '{version}'. Must be 'v1', 'v2', or 'v3'."})
+            return json.dumps({"error": f"Invalid RAG version '{version}'. Must be 'v1' or 'v2'."})
 
         # IMPORTANT: Keep RAG in-process so models/pipelines can be cached across calls.
         # The previous per-call subprocess approach was reliable for isolation, but it
@@ -506,10 +505,10 @@ def health_check() -> str:
         "server": "ok",
         "memory": "ok" if scoped_memory else "disabled",
     }
-    # Keep health checks cheap. Importing rag.fetch_2 pulls heavier retrieval
+    # Keep health checks cheap. Importing rag.fetch_1 pulls heavier retrieval
     # dependencies and made simple health probes take several seconds.
     try:
-        status["rag"] = "available" if importlib.util.find_spec("rag.fetch_2") else "missing"
+        status["rag"] = "available" if importlib.util.find_spec("rag.fetch_1") else "missing"
     except Exception as e:
         status["rag"] = f"error: {str(e)}"
     return json.dumps(status)
@@ -1056,12 +1055,12 @@ if _EXPOSE_RESOURCES:
         except Exception as e:
             return f"Error: Could not retrieve content for {doc_id}: {str(e)}"
 
-def _warm_rag_v2_background() -> None:
+def _warm_rag_v1_background() -> None:
     # Important: never print to stdout; MCP stdio transport uses stdout for protocol messages.
     try:
-        from rag import fetch_2 as _rag_v2
-        _ = _rag_v2.get_rag_pipeline()
-        _elog("[HOST] RAG v2 warmed (background)\n")
+        from rag import fetch_1 as _rag_v1
+        _ = _rag_v1.get_rag_pipeline()
+        _elog("[HOST] RAG v1 warmed (background)\n")
     except Exception as _e:
         _elog(f"[HOST] RAG warm skipped/failed: {_e}\n")
     finally:
@@ -1074,7 +1073,7 @@ if os.environ.get("MCP_WARM_RAG_ON_START", "0").lower() in ("1", "true", "yes", 
     try:
         import threading
 
-        threading.Thread(target=_warm_rag_v2_background, daemon=True).start()
+        threading.Thread(target=_warm_rag_v1_background, daemon=True).start()
     except Exception as _e:
         _elog(f"[HOST] RAG warm thread failed: {_e}\n")
 

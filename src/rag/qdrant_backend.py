@@ -1,5 +1,5 @@
 """
-Qdrant Vector Database Backend for RAG V3
+Qdrant Vector Database Backend for RAG V2
 
 Replaces custom VectorIndex with production-ready Qdrant.
 Key improvements:
