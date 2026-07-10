@@ -307,6 +307,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
+name = "elpis"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "ratatui",
+ "unicode-width",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1072,15 +1081,6 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
-
-[[package]]
-name = "rust_tui"
-version = "0.1.0"
-dependencies = [
- "crossterm",
- "ratatui",
- "unicode-width",
-]
 
 [[package]]
 name = "rustc_version"

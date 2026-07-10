@@ -2,7 +2,7 @@ import os
 import hashlib
 from typing import Dict, Optional
 try:
-    from .core import RAGPipeline as RAGPipelineV2
+    from .core import RAGPipelineV2
 except Exception:
     from .core_2 import RAGPipelineV2
 

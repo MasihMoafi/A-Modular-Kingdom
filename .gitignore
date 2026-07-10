@@ -74,3 +74,6 @@ src/fix_cuda.sh
 
 # Pytest
 .pytest_cache/
+
+# Deb packages
+*.deb

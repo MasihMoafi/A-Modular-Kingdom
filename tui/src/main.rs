@@ -99,6 +99,7 @@ impl App {
                 ("CODEX_CODING_GUIDELINES.md".to_string(), false),
                 ("ARTIFACT_RULES.md".to_string(), false),
                 ("TERMINAL_AND_GIT_RULES.md".to_string(), false),
+                ("readme.md".to_string(), false),
                 ("progress.md".to_string(), false),
             ],
             agent_type: AgentType::Amk,
@@ -113,6 +114,65 @@ impl App {
         }
     }
 
+    fn add_message(&mut self, sender: MessageSender, text: String) {
+        let pruned_text = if text.len() > 8000 {
+            format!("{}...\n<truncated to save context>", &text[..8000])
+        } else {
+            text
+        };
+
+        if sender == MessageSender::System {
+            if let Some(last_msg) = self.messages.last_mut() {
+                if last_msg.sender == MessageSender::System {
+                    let last_base = if let Some(idx) = last_msg.text.find(" (x") {
+                        &last_msg.text[..idx]
+                    } else {
+                        &last_msg.text
+                    };
+                    if last_base == pruned_text {
+                        let count = if let Some(idx) = last_msg.text.find(" (x") {
+                            last_msg.text[idx + 3..last_msg.text.len() - 1].parse::<u32>().unwrap_or(1) + 1
+                        } else {
+                            2
+                        };
+                        last_msg.text = format!("{} (x{})", last_base, count);
+                        return;
+                    }
+                }
+            }
+        }
+
+        self.messages.push(ChatMessage {
+            sender,
+            text: pruned_text,
+        });
+
+        self.prune_context();
+    }
+
+    fn prune_context(&mut self) {
+        let limit = self.context_window_limit();
+        let target_tokens = (limit as f64 * 0.7) as i64;
+
+        loop {
+            let mut total_chars = self.system_prompt.len() + self.current_reply.len();
+            for msg in &self.messages {
+                total_chars += msg.text.len();
+            }
+            let est_tokens = (total_chars / 4) as i64;
+
+            if est_tokens <= target_tokens || self.messages.is_empty() {
+                break;
+            }
+
+            if let Some(pos) = self.messages.iter().position(|m| m.sender == MessageSender::User || m.sender == MessageSender::Agent) {
+                self.messages.remove(pos);
+            } else {
+                break;
+            }
+        }
+    }
+
     fn update_completions(&mut self) {
         self.completions.clear();
         self.show_completions = false;
@@ -121,11 +181,11 @@ impl App {
         if input_trimmed.starts_with('/') {
             let parts: Vec<&str> = input_trimmed.split_whitespace().collect();
 
-            // Suggest main commands (only /auth now)
+            // Suggest main commands (only /auth and /model)
             let is_typing_cmd = parts.len() <= 1 && !self.input.ends_with(' ');
             if is_typing_cmd {
                 let cmd_typed = parts.first().copied().unwrap_or("/");
-                let commands = vec!["/auth"];
+                let commands = vec!["/auth", "/model"];
                 for cmd in commands {
                     if cmd.starts_with(cmd_typed) {
                         self.completions.push(cmd.to_string());
@@ -143,44 +203,40 @@ impl App {
                             self.completions.push(prov.to_string());
                         }
                     }
-                } else if parts.len() == 2 || (parts.len() == 3 && !self.input.ends_with(' ')) {
-                    // Suggest models based on the selected provider
-                    let prov = parts[1].to_lowercase();
-                    let typed_model = if parts.len() >= 3 {
-                        parts[2..].join(" ")
-                    } else {
-                        "".to_string()
-                    };
+                }
+            } else if parts.first() == Some(&"/model") {
+                // Suggest models based on the active provider
+                let typed_model = if parts.len() >= 2 {
+                    parts[1..].join(" ")
+                } else {
+                    "".to_string()
+                };
 
-                    let models = match prov.as_str() {
-                        "ollama" => vec!["qwen3:8b", "llama3.2:3b"],
-                        "gemini" => vec![
-                            "gemini-1.5-flash",
-                            "gemini-1.5-pro",
-                            "gemini-2.0-flash",
-                            "gemini-3.5-flash",
-                            "gemini-3.5-pro",
-                        ],
-                        "openrouter" | "open-router" => vec![
-                            "google/gemini-3.5-flash",
-                            "google/gemini-3.5-pro",
-                            "moonshotai/kimi-k2.6",
-                            "deepseek/deepseek-v4-pro",
-                            "deepseek/deepseek-v4-flash",
-                        ],
-                        _ => vec![],
-                    };
+                let models = match self.provider.as_str() {
+                    "ollama" => vec!["qwen3:8b", "llama3.2:3b"],
+                    "gemini" => vec![
+                        "gemini-3.5-flash",
+                        "gemini-3.5-pro",
+                    ],
+                    "openrouter" | "open-router" => vec![
+                        "google/gemini-3.5-flash",
+                        "google/gemini-3.5-pro",
+                        "moonshotai/kimi-k2.6",
+                        "deepseek/deepseek-v4-pro",
+                        "deepseek/deepseek-v4-flash",
+                    ],
+                    _ => vec![],
+                };
 
-                    // If a model is fully selected or typed (e.g. /auth provider model), clear completions
-                    let is_fully_specified = parts.len() >= 3 && models.contains(&typed_model.as_str());
-                    if is_fully_specified {
-                        self.show_completions = false;
-                        self.completions.clear();
-                    } else {
-                        for model in models {
-                            if model.to_lowercase().starts_with(&typed_model.to_lowercase()) {
-                                self.completions.push(model.to_string());
-                            }
+                // If a model is fully selected or typed, clear completions
+                let is_fully_specified = parts.len() >= 2 && models.contains(&typed_model.as_str());
+                if is_fully_specified {
+                    self.show_completions = false;
+                    self.completions.clear();
+                } else {
+                    for model in models {
+                        if model.to_lowercase().starts_with(&typed_model.to_lowercase()) {
+                            self.completions.push(model.to_string());
                         }
                     }
                 }
@@ -211,7 +267,7 @@ impl App {
 
         let completed = &self.completions[self.completion_selected];
         if completed.starts_with('/') {
-            // Auto-completed a command, e.g. "/auth". Append a space.
+            // Auto-completed a command, e.g. "/auth" or "/model". Append a space.
             self.input = format!("{} ", completed);
         } else if completed.starts_with('@') {
             if let Some(last_at_idx) = self.input.rfind('@') {
@@ -222,20 +278,21 @@ impl App {
             self.completion_selected = 0;
             return;
         } else {
-            // Check if we are completing inside /auth
             let parts: Vec<&str> = self.input.split_whitespace().collect();
             if parts.first() == Some(&"/auth") {
-                if parts.len() == 1 || (parts.len() == 2 && !self.input.ends_with(' ')) {
-                    // Completed the provider, append space to trigger model autocomplete
-                    self.input = format!("/auth {} ", completed);
-                } else {
-                    // Completed the model
-                    self.input = format!("/auth {} {}", parts[1], completed);
-                    self.show_completions = false;
-                    self.completions.clear();
-                    self.completion_selected = 0;
-                    return;
-                }
+                // Completed the provider, close the completions
+                self.input = format!("/auth {}", completed);
+                self.show_completions = false;
+                self.completions.clear();
+                self.completion_selected = 0;
+                return;
+            } else if parts.first() == Some(&"/model") {
+                // Completed the model, close the completions
+                self.input = format!("/model {}", completed);
+                self.show_completions = false;
+                self.completions.clear();
+                self.completion_selected = 0;
+                return;
             } else {
                 if let Some(last_space_idx) = self.input.rfind(' ') {
                     self.input = format!("{} {} ", &self.input[..last_space_idx], completed);
@@ -302,14 +359,11 @@ impl App {
                         } else {
                             MessageSender::Agent
                         };
-                        self.messages.push(ChatMessage {
-                            sender,
-                            text: finished,
-                        });
+                        self.add_message(sender, finished);
                     }
                     self.is_command_reply = false;
                     // Reload system prompt if modified by agent tools
-                    let sys_prompt_file = "/home/masih/Desktop/p/amk-tui/system_prompt.md";
+                    let sys_prompt_file = "/home/masih/Desktop/f/p/Elpis/tui/system_prompt.md";
                     if let Ok(content) = std::fs::read_to_string(sys_prompt_file) {
                         self.system_prompt = content;
                     }
@@ -337,9 +391,8 @@ impl App {
             "ARTIFACT_RULES.md" => Some("/home/masih/.codex/ARTIFACT_RULES.md"),
             "JULIETTE_RULES.md" => Some("/home/masih/.codex/JULIETTE_RULES.md"),
             "TERMINAL_AND_GIT_RULES.md" => Some("/home/masih/.codex/TERMINAL_AND_GIT_RULES.md"),
-            "CONTEXT.md" => Some("/home/masih/Desktop/p/A-Modular-Kingdom/CONTEXT.md"),
-            "README.md" => Some("/home/masih/Desktop/p/A-Modular-Kingdom/README.md"),
-            "progress.md" => Some("/home/masih/Desktop/p/A-Modular-Kingdom/progress.md"),
+            "readme.md" => Some("/home/masih/Desktop/f/p/Elpis/readme.md"),
+            "progress.md" => Some("/home/masih/Desktop/f/p/Elpis/progress.md"),
             _ => None,
         };
         path.and_then(|p| std::fs::read_to_string(p).ok())
@@ -394,9 +447,9 @@ fn start_agent(
     caller_cwd: std::path::PathBuf,
     event_tx: mpsc::Sender<TuiEvent>,
 ) -> Option<(std::process::Child, mpsc::Sender<String>)> {
-    let python_path = "/home/masih/Desktop/f/p/A-Modular-Kingdom/.venv/bin/python";
+    let python_path = "/home/masih/Desktop/f/p/Elpis/.venv/bin/python";
     let script_path = "src/agent/main.py";
-    let working_dir = "/home/masih/Desktop/f/p/A-Modular-Kingdom";
+    let working_dir = "/home/masih/Desktop/f/p/Elpis";
 
     debug_log(&format!("[START_AGENT] Spawning agent: {:?}, provider={}, model={}, working_dir={}", agent_type, provider, model, working_dir));
 
@@ -514,7 +567,7 @@ fn start_agent(
 
 fn main() -> io::Result<()> {
     // Check/create system prompt file in global folder using .md
-    let sys_prompt_file = "/home/masih/Desktop/p/amk-tui/system_prompt.md";
+    let sys_prompt_file = "/home/masih/Desktop/f/p/Elpis/tui/system_prompt.md";
     let system_prompt = if std::path::Path::new(sys_prompt_file).exists() {
         std::fs::read_to_string(sys_prompt_file).unwrap_or_default()
     } else {
@@ -742,14 +795,8 @@ fn main() -> io::Result<()> {
                                                 AgentType::Codex => "gpt-5.5 (OpenAI)".to_string(),
                                                 AgentType::Kiro => "Kiro Agent (AWS)".to_string(),
                                             };
-                                            app.messages.push(ChatMessage {
-                                                sender: MessageSender::User,
-                                                text: msg.clone(),
-                                            });
-                                            app.messages.push(ChatMessage {
-                                                sender: MessageSender::System,
-                                                text: format!("🔄 Switched active agent to: {:?}", agent),
-                                            });
+                                            app.add_message(MessageSender::User, msg.clone());
+                                            app.add_message(MessageSender::System, format!("🔄 Switched active agent to: {:?}", agent));
 
                                             // Kill current child process
                                             if let Some(mut child) = active_child.take() {
@@ -765,16 +812,10 @@ fn main() -> io::Result<()> {
                                                 app.stdin_tx = Some(tx);
                                                 app.backend_connected = true;
                                             } else {
-                                                app.messages.push(ChatMessage {
-                                                    sender: MessageSender::System,
-                                                    text: format!("❌ Failed to launch {:?} agent. Is it installed and on PATH?", agent),
-                                                });
+                                                app.add_message(MessageSender::System, format!("❌ Failed to launch {:?} agent. Is it installed and on PATH?", agent));
                                             }
                                         } else {
-                                            app.messages.push(ChatMessage {
-                                                sender: MessageSender::System,
-                                                text: format!("❌ Unknown agent: {}. Choose amk, codex, or kiro.", parts[1]),
-                                            });
+                                            app.add_message(MessageSender::System, format!("❌ Unknown agent: {}. Choose amk, codex, or kiro.", parts[1]));
                                         }
                                     }
                                     continue;
@@ -785,14 +826,8 @@ fn main() -> io::Result<()> {
                                     let content = trimmed.replacen("/sys ", "", 1).trim().to_string();
                                     app.system_prompt = content.clone();
                                     let _ = std::fs::write(sys_prompt_file, &content);
-                                    app.messages.push(ChatMessage {
-                                        sender: MessageSender::User,
-                                        text: msg.clone(),
-                                    });
-                                    app.messages.push(ChatMessage {
-                                        sender: MessageSender::System,
-                                        text: "⚙️ System prompt updated and saved to system_prompt.md.".to_string(),
-                                    });
+                                    app.add_message(MessageSender::User, msg.clone());
+                                    app.add_message(MessageSender::System, "⚙️ System prompt updated and saved to system_prompt.md.".to_string());
                                     continue;
                                 }
 
@@ -805,60 +840,38 @@ fn main() -> io::Result<()> {
                                     if let Some(reply) = last_reply {
                                         app.system_prompt = reply.clone();
                                         let _ = std::fs::write(sys_prompt_file, &reply);
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::User,
-                                            text: "/setsys".to_string(),
-                                        });
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::System,
-                                            text: "⚙️ Last response set as active system prompt and saved to system_prompt.md.".to_string(),
-                                        });
+                                        app.add_message(MessageSender::User, "/setsys".to_string());
+                                        app.add_message(MessageSender::System, "⚙️ Last response set as active system prompt and saved to system_prompt.md.".to_string());
                                     } else {
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::System,
-                                            text: "❌ No response found from agent to use.".to_string(),
-                                        });
+                                        app.add_message(MessageSender::System, "❌ No response found from agent to use.".to_string());
                                     }
                                     continue;
                                 }
 
-                                // Intercept /auth <provider> [model]
+                                // Intercept /auth <provider>
                                 if trimmed.starts_with("/auth ") || trimmed == "/auth" {
                                     let parts: Vec<&str> = trimmed.split_whitespace().collect();
                                     if parts.len() < 2 {
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::System,
-                                            text: "❌ Usage: /auth <ollama|open-router> [model_name]".to_string(),
-                                        });
+                                        app.add_message(MessageSender::System, "❌ Usage: /auth <ollama|gemini|openrouter>".to_string());
                                         continue;
                                     }
                                     let new_provider = match parts[1].to_lowercase().as_str() {
                                         "ollama" => Some("ollama"),
-                                        "gemini" => Some("gemini"),
-                                        "open-router" | "openrouter" => Some("openrouter"),
+                                        "gemini" | "gemini-api" => Some("gemini"),
+                                        "openrouter" | "open-router" => Some("openrouter"),
                                         _ => None,
                                     };
 
                                     if let Some(prov) = new_provider {
                                         app.provider = prov.to_string();
-                                        if parts.len() >= 3 {
-                                            app.model = parts[2..].join(" ");
-                                        } else {
-                                            app.model = match prov {
-                                                "openrouter" => "google/gemini-2.5-flash".to_string(),
-                                                "gemini" => "gemini-2.5-flash".to_string(),
-                                                _ => "qwen3:8b".to_string(),
-                                            };
-                                        }
+                                        app.model = match prov {
+                                            "openrouter" => "moonshotai/kimi-k2.6".to_string(),
+                                            "gemini" => "gemini-3.5-flash".to_string(),
+                                            _ => "qwen3:8b".to_string(),
+                                        };
 
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::User,
-                                            text: msg.clone(),
-                                        });
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::System,
-                                            text: format!("🔄 Switched active provider to: {} (Model: {})", prov, app.model),
-                                        });
+                                        app.add_message(MessageSender::User, msg.clone());
+                                        app.add_message(MessageSender::System, format!("🔄 Switched active provider to: {} (Default Model: {})", prov, app.model));
 
                                         // Kill current child process
                                         if let Some(mut child) = active_child.take() {
@@ -874,28 +887,49 @@ fn main() -> io::Result<()> {
                                             app.stdin_tx = Some(tx);
                                             app.backend_connected = true;
                                         } else {
-                                            app.messages.push(ChatMessage {
-                                                sender: MessageSender::System,
-                                                text: "❌ Failed to restart agent with the new provider.".to_string(),
-                                            });
+                                            app.add_message(MessageSender::System, "❌ Failed to restart agent with the new provider.".to_string());
                                         }
                                     } else {
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::System,
-                                            text: format!("❌ Unknown provider: {}. Choose ollama or open-router.", parts[1]),
-                                        });
+                                        app.add_message(MessageSender::System, format!("❌ Unknown provider: {}. Choose ollama, gemini, or openrouter.", parts[1]));
                                     }
                                     continue;
                                 }
 
+                                // Intercept /model <model_name>
+                                if trimmed.starts_with("/model ") || trimmed == "/model" {
+                                    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                                    if parts.len() < 2 {
+                                        app.add_message(MessageSender::System, "❌ Usage: /model <model_name>".to_string());
+                                        continue;
+                                    }
+                                    let new_model = parts[1..].join(" ");
+                                    app.model = new_model.clone();
 
+                                    app.add_message(MessageSender::User, msg.clone());
+                                    app.add_message(MessageSender::System, format!("🔄 Switched active model to: {}", app.model));
+
+                                    // Kill current child process
+                                    if let Some(mut child) = active_child.take() {
+                                        let _ = child.kill();
+                                        let _ = child.wait();
+                                    }
+                                    app.backend_connected = false;
+                                    app.is_first_message = true;
+
+                                    // Restart agent
+                                    if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone()) {
+                                        active_child = Some(c);
+                                        app.stdin_tx = Some(tx);
+                                        app.backend_connected = true;
+                                    } else {
+                                        app.add_message(MessageSender::System, "❌ Failed to restart agent with the new model.".to_string());
+                                    }
+                                    continue;
+                                }
 
                                 // Intercept /status: forward as-is, capture backend's printed reply as a System message
                                 if trimmed == "/status" {
-                                    app.messages.push(ChatMessage {
-                                        sender: MessageSender::User,
-                                        text: msg.clone(),
-                                    });
+                                    app.add_message(MessageSender::User, msg.clone());
                                     app.in_reply = true;
                                     app.is_command_reply = true;
                                     app.current_reply.clear();
@@ -912,19 +946,34 @@ fn main() -> io::Result<()> {
                                         app.stdin_tx = Some(tx);
                                         app.backend_connected = true;
                                     } else {
-                                        app.messages.push(ChatMessage {
-                                            sender: MessageSender::System,
-                                            text: "Failed to relaunch agent process.".to_string(),
-                                        });
+                                        app.add_message(MessageSender::System, "Failed to relaunch agent process.".to_string());
                                     }
                                 }
 
                                 // Standard message sending
                                 let mut context_str = String::new();
                                 let mut active_names = Vec::new();
-                                for (name, selected) in &app.context_files {
-                                    if *selected {
+
+                                // Scan for @ resource mentions in the message
+                                for (name, _) in &app.context_files {
+                                    let mention = format!("@{}", name);
+                                    if msg.contains(&mention) {
                                         if let Some(content) = app.read_context_file(name) {
+                                            context_str.push_str(&format!("[Context File: {}]\n{}\n\n", name, content));
+                                            active_names.push(name.clone());
+                                        }
+                                    }
+                                }
+
+                                // Add checklist selected files (if not already added via @ mention)
+                                let selected_files: Vec<String> = app.context_files.iter()
+                                    .filter(|(_, selected)| *selected)
+                                    .map(|(name, _)| name.clone())
+                                    .collect();
+
+                                for name in selected_files {
+                                    if !active_names.contains(&name) {
+                                        if let Some(content) = app.read_context_file(&name) {
                                             context_str.push_str(&format!("[Context File: {}]\n{}\n\n", name, content));
                                             active_names.push(name.clone());
                                         }
@@ -941,16 +990,10 @@ fn main() -> io::Result<()> {
                                     app.is_first_message = false;
                                 }
 
-                                app.messages.push(ChatMessage {
-                                    sender: MessageSender::User,
-                                    text: msg.clone(),
-                                });
+                                app.add_message(MessageSender::User, msg.clone());
 
                                 if !active_names.is_empty() {
-                                    app.messages.push(ChatMessage {
-                                        sender: MessageSender::System,
-                                        text: format!("📎 Injected context from: {}", active_names.join(", ")),
-                                    });
+                                    app.add_message(MessageSender::System, format!("📎 Injected context from: {}", active_names.join(", ")));
                                 }
 
                                 if let Some(ref tx) = app.stdin_tx {
