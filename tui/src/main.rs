@@ -336,7 +336,7 @@ impl App {
                 } else if !model_part.is_empty() {
                     self.model = model_part;
                 } else {
-                    self.model = "gemini-2.5-flash".to_string();
+                    self.model = "gemini-3.5-flash".to_string();
                 }
             } else if trimmed.starts_with("Using OpenRouter model:") {
                 self.provider = "openrouter".to_string();
