@@ -4,7 +4,7 @@
 **Target Document:** `document.pdf` (Napoleon Biography)
 
 ## Objective
-Test pure, raw retrieval capability (finding the needle-in-a-haystack) without LLM reranking interference. The goal is to prove whether the embedding model and vector search can successfully pull the necessary context into the top 5 chunks.
+Test pure, raw retrieval capability (finding the needle-in-a-haystack) without LLM reranking interference. The goal is to prove whether the embedding model + bm25 can successfully pull the necessary context into the top 5 chunks.
 
 ## Constraints
 - **Retrieval Limit:** `top_k=5` strictly.
@@ -22,10 +22,9 @@ Test pure, raw retrieval capability (finding the needle-in-a-haystack) without L
   - **Unified Hybrid Architecture Success Rate:** 93.33% (26 fully present, 4 partial, 0 missing)
 
 ## Critical Lesson Learned
-Finding the "sweet spot" for chunk sizing is the single most important factor in RAG accuracy. 
-- At **4000 characters**, the chunks were too bloated, causing context limits to overflow and downstream LLM evaluation to fail.
-- At **300 characters**, the chunks were too small, literally amputating semantic context and dropping success rates to ~31%.
+Finding the "sweet spot" for chunk sizing is the an important factor in RAG accuracy. 
+- At **300 characters**, the chunks were too small, literally amputating semantic context; perfect result for keyword queries.
 - At **1000 characters** (with 150 overlap), the chunks perfectly captured full philosophical paragraphs and semantic meaning, rocketing the success rate to 93% without overwhelming the context window.
 
 **Conclusion:** 
-A 1000-character chunk size is the golden ratio for this architecture. Furthermore, the Unified Hybrid Search (Vector + BM25) eliminated all 0% misses. We will proceed with this single unified architecture and 1000-character chunks for all future experiments.
+A 1000-character chunk size is the golden ratio for this architecture. Furthermore, the Unified Hybrid Search (Vector + BM25) eliminated all 0% misses. We will proceed with this single unified architecture and 1000-character chunks for future experiments as our base-line.
