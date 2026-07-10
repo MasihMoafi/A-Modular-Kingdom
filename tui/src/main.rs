@@ -1520,3 +1520,59 @@ fn ui(f: &mut Frame, app: &App) {
         f.set_cursor_position((cursor_x, cursor_y));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_system_message_coalescing() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut app = App::new(tx, "System Prompt".to_string());
+        
+        app.add_message(MessageSender::System, "Database initialized".to_string());
+        app.add_message(MessageSender::System, "Database initialized".to_string());
+        app.add_message(MessageSender::System, "Database initialized".to_string());
+        
+        assert_eq!(app.messages.len(), 1);
+        assert_eq!(app.messages[0].text, "Database initialized (x3)");
+        
+        app.add_message(MessageSender::System, "Connection lost".to_string());
+        assert_eq!(app.messages.len(), 2);
+        assert_eq!(app.messages[1].text, "Connection lost");
+    }
+
+    #[test]
+    fn test_large_message_truncation() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut app = App::new(tx, "System Prompt".to_string());
+        
+        let huge_text = "A".repeat(10000);
+        app.add_message(MessageSender::User, huge_text);
+        
+        assert_eq!(app.messages.len(), 1);
+        assert!(app.messages[0].text.contains("<truncated to save context>"));
+        assert_eq!(app.messages[0].text.len(), 8000 + "...\n<truncated to save context>".len());
+    }
+
+    #[test]
+    fn test_sliding_window_pruning() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut app = App::new(tx, "System Prompt".to_string());
+        app.model = "qwen3:8b".to_string(); // Limit is 32768
+        
+        // Populate messages to exceed 32768 tokens (approx 131,000 characters)
+        // Each message will be 7000 characters (approx 1750 tokens)
+        for i in 0..25 {
+            app.add_message(MessageSender::User, format!("User message {} with repeating text: {}", i, "X".repeat(7000)));
+            app.add_message(MessageSender::Agent, format!("Agent reply {} with repeating text: {}", i, "Y".repeat(7000)));
+        }
+
+        let total_chars: usize = app.system_prompt.len() + app.messages.iter().map(|m| m.text.len()).sum::<usize>();
+        let est_tokens = (total_chars / 4) as i64;
+        let limit = app.context_window_limit();
+        let target_tokens = (limit as f64 * 0.7) as i64;
+        
+        assert!(est_tokens <= target_tokens, "est_tokens: {}, target_tokens: {}", est_tokens, target_tokens);
+    }
+}
