@@ -374,8 +374,10 @@ async def _read_document_content(session: ClientSession, doc_id: str) -> str:
         if not os.path.isfile(file_path):
             return ""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read()
+            def _read_file():
+                with open(file_path, "r", encoding="utf-8") as f:
+                    return f.read()
+            return await asyncio.to_thread(_read_file)
         except Exception:
             return ""
 
