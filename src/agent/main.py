@@ -1750,7 +1750,7 @@ User: {user_input}"""
                     print("💡 Synthesizing final response...")
                     
                     # Read system prompt dynamically if present
-                    sys_prompt_path = "/home/masih/Desktop/p/amk-tui/system_prompt.md"
+                    sys_prompt_path = "/home/masih/Desktop/f/p/Elpis/tui/system_prompt.md"
                     system_prompt = ""
                     if os.path.exists(sys_prompt_path):
                         try:
