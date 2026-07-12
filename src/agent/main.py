@@ -18,11 +18,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 
 # --- Initial Setup ---
-def clear_proxy_settings():
-    for var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-        if var in os.environ:
-            del os.environ[var]
-clear_proxy_settings()
+# Respect user environment proxy settings
 
 try:
     # Prefer classic namespace to avoid deprecation noise in langchain>=1.0.
