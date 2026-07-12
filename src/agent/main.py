@@ -987,7 +987,14 @@ async def main(think_level=None):
             while True:
                 try:
                     try:
-                        user_input = await prompt_session.prompt_async("\n> ")
+                        if sys.stdin.isatty():
+                            user_input = await prompt_session.prompt_async("\n> ")
+                        else:
+                            loop = asyncio.get_event_loop()
+                            user_input = await loop.run_in_executor(None, sys.stdin.readline)
+                            if not user_input:
+                                raise EOFError()
+                            user_input = user_input.strip()
                     except (EOFError, KeyboardInterrupt):
                         print("\nExiting...")
                         break
