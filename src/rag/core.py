@@ -4,12 +4,17 @@ import torch
 from typing import List, Dict, Tuple, Any, Optional
 
 # --- FIX for Ollama Proxy ---
-# This is necessary to ensure the local Ollama server can be reached.
-def clear_proxy_settings():
-    for var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-        if var in os.environ:
-            del os.environ[var]
-clear_proxy_settings()
+# This is necessary to ensure the local Ollama server can be reached without breaking other proxy settings.
+def bypass_proxy_for_localhost():
+    no_proxy_additions = "localhost,127.0.0.1,::1,0.0.0.0"
+    for var in ["NO_PROXY", "no_proxy"]:
+        existing = os.environ.get(var, "")
+        if existing:
+            if no_proxy_additions not in existing:
+                os.environ[var] = f"{existing},{no_proxy_additions}"
+        else:
+            os.environ[var] = no_proxy_additions
+bypass_proxy_for_localhost()
 
 import ollama
 from collections import Counter
