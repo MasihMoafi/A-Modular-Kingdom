@@ -434,14 +434,14 @@ def _broader_name_matches(name: str, limit: int = 20) -> list[str]:
             continue
         for root, dirs, files in os.walk(base):
             dirs[:] = [d for d in dirs if d not in _DOC_SKIP_DIRS and not d.startswith(".")]
-            for candidate in sorted(files):
+            for candidate in files:
                 candidate_l = candidate.lower()
-                stem_l = os.path.splitext(candidate_l)[0]
-                if needle in {candidate_l, stem_l}:
-                    found.append(os.path.join(root, candidate))
-                    if len(found) >= limit:
-                        return found
-    return found
+                if needle in candidate_l:
+                    if candidate_l == needle or os.path.splitext(candidate_l)[0] == needle:
+                        found.append(os.path.join(root, candidate))
+                        if len(found) >= limit:
+                            return sorted(found)
+    return sorted(found)
 
 
 def _best_single_match(name: str) -> str:
