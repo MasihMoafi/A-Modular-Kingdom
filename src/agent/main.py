@@ -1546,33 +1546,42 @@ async def main(think_level=None):
 
                     # --- Step 1: Process @ mentions for document references ---
                     document_context = ""
-                    mentions = re.findall(r"@([^\s]+)", user_input)
+                    explicit_mentions = re.findall(r"@([^\s]+)", user_input)
                     bare_doc_refs = _extract_local_document_references(user_input)
-                    for ref in bare_doc_refs:
-                        if ref not in mentions:
-                            mentions.append(ref)
                     
-                    if mentions:
-                        print(f"Found document mentions: {mentions}")
-                        try:
-                            # Get list of available documents
-                            doc_list = await _list_documents(session)
-                            mention_errors = []
+                    try:
+                        # Get list of available documents
+                        doc_list = await _list_documents(session)
+                        mention_errors = []
+                        
+                        # Process explicit mentions (fatal if not found)
+                        for mention in explicit_mentions:
+                            doc_id, mention_error = _resolve_document_mention(mention, doc_list)
+                            if doc_id:
+                                print(f"Fetching content for: {doc_id}")
+                                content = await _read_document_content(session, doc_id)
+                                document_context += f'\n<document id="{doc_id}">\n{content}\n</document>\n'
+                            else:
+                                mention_errors.append(mention_error)
+                                
+                        if mention_errors:
+                            print("\n".join(mention_errors))
+                            continue
                             
-                            for mention in mentions:
-                                doc_id, mention_error = _resolve_document_mention(mention, doc_list)
-                                if doc_id:
-                                    print(f"Fetching content for: {doc_id}")
+                        # Process bare references (optional/non-fatal if not found)
+                        for ref in bare_doc_refs:
+                            if ref in explicit_mentions:
+                                continue
+                            doc_id, _ = _resolve_document_mention(ref, doc_list)
+                            if doc_id:
+                                if f'id="{doc_id}"' not in document_context:
+                                    print(f"Fetching content for bare reference: {doc_id}")
                                     content = await _read_document_content(session, doc_id)
                                     document_context += f'\n<document id="{doc_id}">\n{content}\n</document>\n'
-                                else:
-                                    mention_errors.append(mention_error)
-                            if mention_errors:
-                                print("\n".join(mention_errors))
-                                continue
-                        except Exception as e:
-                            print(f"Could not fetch document resources: {e}")
-                            continue
+                                    
+                    except Exception as e:
+                        print(f"Could not fetch document resources: {e}")
+                        continue
 
                     # --- Step 2: Search Internal Memory ---
                     if document_context:
