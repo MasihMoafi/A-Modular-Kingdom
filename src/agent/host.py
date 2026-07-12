@@ -22,6 +22,7 @@ import importlib.util
 import glob
 import shutil
 import subprocess
+import shlex
 import zipfile
 from xml.sax.saxutils import escape as _xml_escape
 from datetime import datetime
@@ -875,11 +876,13 @@ if _EXPOSE_EXTRA_TOOLS:
         if not isinstance(command, str) or not command.strip():
             return json.dumps({"status": "error", "error": "Empty command"})
         try:
+            cmd_args = shlex.split(command)
+            if not cmd_args:
+                return json.dumps({"status": "error", "error": "Empty command"})
             proc = subprocess.run(
-                command,
+                cmd_args,
                 cwd=workspace_root,
-                shell=True,
-                executable="/bin/bash",
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
