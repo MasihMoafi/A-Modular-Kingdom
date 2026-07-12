@@ -3,6 +3,13 @@
 
 import os
 import sys
+
+# Clean up socks proxy environment variables to prevent httpx crashes
+for var in ("all_proxy", "ALL_PROXY"):
+    val = os.environ.get(var, "")
+    if val.startswith("socks://") or val.startswith("socks5://") or val.startswith("socks4://"):
+        os.environ.pop(var, None)
+
 import asyncio
 import nest_asyncio
 import traceback
