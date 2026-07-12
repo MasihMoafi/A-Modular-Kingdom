@@ -96,8 +96,7 @@ class QdrantVectorDB:
             points = []
             for j, (doc, vector) in enumerate(zip(batch, vectors)):
                 point_id = i + j
-                payload = {k: v for k, v in doc.items() if k != "content"}
-                payload["content"] = doc["content"]
+                payload = doc.copy()
 
                 points.append(PointStruct(
                     id=point_id,
@@ -171,11 +170,8 @@ class QdrantVectorDB:
         # Convert to standard format
         formatted = []
         for hit in results:
-            doc = {
-                "content": hit.payload.get("content", ""),
-                "score": hit.score,
-                **{k: v for k, v in hit.payload.items() if k != "content"}
-            }
+            doc = hit.payload.copy()
+            doc["score"] = hit.score
             formatted.append(doc)
 
         return formatted
