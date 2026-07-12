@@ -732,18 +732,22 @@ fn main() -> io::Result<()> {
                 }
                 TuiEvent::ProcessExited(code) => {
                     app.backend_connected = false;
+                    let err_msg = if let Some(ref err) = app.backend_error {
+                        format!("❌ Agent process exited (code {}): {}", code, err)
+                    } else {
+                        format!("❌ Agent process exited with code {}", code)
+                    };
+                    app.add_message(MessageSender::System, err_msg.clone());
+                    
                     // For non-AMK runtimes (Codex), exiting concludes the prompt output
                     if app.agent_type != AgentType::Amk {
                         app.in_reply = false;
                         let finished = std::mem::take(&mut app.current_reply);
                         if !finished.trim().is_empty() {
-                            app.messages.push(ChatMessage {
-                                sender: MessageSender::Agent,
-                                text: finished,
-                            });
+                            app.add_message(MessageSender::Agent, finished);
                         }
                     } else {
-                        app.backend_error = Some(format!("Agent exited with code {}", code));
+                        app.backend_error = Some(err_msg);
                     }
                 }
             }
