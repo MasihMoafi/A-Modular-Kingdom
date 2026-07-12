@@ -524,22 +524,19 @@ class RAGPipelineV2:
 
             # Convert JSON to searchable text
             def flatten_json(obj, prefix=''):
-                text_parts = []
                 if isinstance(obj, dict):
                     for key, value in obj.items():
                         if isinstance(value, (dict, list)):
-                            text_parts.extend(flatten_json(value, f"{prefix}{key}."))
+                            yield from flatten_json(value, f"{prefix}{key}.")
                         else:
-                            text_parts.append(f"{prefix}{key}: {value}")
+                            yield f"{prefix}{key}: {value}"
                 elif isinstance(obj, list):
                     for i, item in enumerate(obj):
-                        text_parts.extend(flatten_json(item, f"{prefix}[{i}]."))
+                        yield from flatten_json(item, f"{prefix}[{i}].")
                 else:
-                    text_parts.append(str(obj))
-                return text_parts
+                    yield str(obj)
 
-            text_parts = flatten_json(data)
-            return "\n".join(text_parts)
+            return "\n".join(flatten_json(data))
         except Exception as e:
             print(f"Error extracting text from {json_path}: {e}")
             return ""
