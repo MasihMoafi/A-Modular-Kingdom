@@ -74,19 +74,22 @@ def _wait_for_approval(payload: dict) -> str:
     # Poll for response file or stdin data
     for i in range(3000):
         if os.path.exists(response_file):
-            sys.stderr.write(f"[DEBUG] response_file found on iteration {i}!\n")
-            sys.stderr.flush()
+            if _DEBUG_PROTOCOL:
+                sys.stderr.write(f"[DEBUG] response_file found on iteration {i}!\n")
+                sys.stderr.flush()
             try:
                 time.sleep(0.05)
                 with open(response_file, "r") as f:
                     content = f.read().strip()
-                sys.stderr.write(f"[DEBUG] response_file content: '{content}'\n")
-                sys.stderr.flush()
+                if _DEBUG_PROTOCOL:
+                    sys.stderr.write(f"[DEBUG] response_file content: '{content}'\n")
+                    sys.stderr.flush()
                 os.remove(response_file)
                 return content
             except Exception as e:
-                sys.stderr.write(f"[DEBUG] error reading response_file: {e}\n")
-                sys.stderr.flush()
+                if _DEBUG_PROTOCOL:
+                    sys.stderr.write(f"[DEBUG] error reading response_file: {e}\n")
+                    sys.stderr.flush()
         
         # Non-blocking check for stdin data (for CLI tests/non-TUI)
         try:
@@ -94,12 +97,14 @@ def _wait_for_approval(payload: dict) -> str:
             if sys.stdin in r:
                 line = sys.stdin.readline()
                 if line:
-                    sys.stderr.write(f"[DEBUG] read stdin line: '{line.strip()}'\n")
-                    sys.stderr.flush()
+                    if _DEBUG_PROTOCOL:
+                        sys.stderr.write(f"[DEBUG] read stdin line: '{line.strip()}'\n")
+                        sys.stderr.flush()
                     return line.strip()
         except Exception as e:
-            sys.stderr.write(f"[DEBUG] stdin select error: {e}\n")
-            sys.stderr.flush()
+            if _DEBUG_PROTOCOL:
+                sys.stderr.write(f"[DEBUG] stdin select error: {e}\n")
+                sys.stderr.flush()
     return ""
 
 def request_approval_for_write(path: str, content: str) -> tuple[bool, str]:
