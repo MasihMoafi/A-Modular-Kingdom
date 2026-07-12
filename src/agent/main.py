@@ -964,18 +964,20 @@ async def main(think_level=None):
                 else:
                     buf.validate_and_handle()
             
-            prompt_session = PromptSession(
-                completer=completer,
-                key_bindings=kb,
-                style=Style.from_dict({
-                    "prompt": "#aaaaaa",
-                    "completion-menu.completion": "bg:#222222 #ffffff",
-                    "completion-menu.completion.current": "bg:#444444 #ffffff",
-                }),
-                complete_while_typing=True,
-                complete_in_thread=True,
-            )
             interactive_input = sys.stdin.isatty()
+            prompt_session = None
+            if interactive_input:
+                prompt_session = PromptSession(
+                    completer=completer,
+                    key_bindings=kb,
+                    style=Style.from_dict({
+                        "prompt": "#aaaaaa",
+                        "completion-menu.completion": "bg:#222222 #ffffff",
+                        "completion-menu.completion.current": "bg:#444444 #ffffff",
+                    }),
+                    complete_while_typing=True,
+                    complete_in_thread=True,
+                )
             # Short-term memory (windowed) with fixed k=50
             stm = ConversationBufferWindowMemory(k=50, return_messages=False)
             
@@ -987,7 +989,7 @@ async def main(think_level=None):
             while True:
                 try:
                     try:
-                        if sys.stdin.isatty():
+                        if sys.stdin.isatty() and prompt_session is not None:
                             user_input = await prompt_session.prompt_async("\n> ")
                         else:
                             loop = asyncio.get_event_loop()
