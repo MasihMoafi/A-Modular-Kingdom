@@ -622,37 +622,6 @@ class RAGPipelineV2:
         rrf_results.sort(key=lambda x: x[1], reverse=True)
         return [doc for doc, score in rrf_results]
 
-    def _llm_rerank(self, docs: List[Dict], query: str, k: int) -> List[Dict]:
-        """
-        STEP 6b: LLM-BASED RERANKING (Alternative to CrossEncoder)
-
-        Instead of a specialized CrossEncoder (like Qwen3 or MS-MARCO), this uses 
-        a generative LLM to act as a judge, analyzing each chunk's relevance to the query.
-        
-        Why this exists:
-        - Portability: Users don't need heavy ML frameworks (Torch/Transformers).
-        - Reasoning: Large LLMs can reason through complex semantic connections that 
-          smaller cross-encoders might miss.
-        """
-        print("[RAG Core] Executing LLM-based Reranking...")
-        
-        # NOTE: In a full production environment, this would call your Ollama/OpenAI API.
-        # This implementation serves as the scaffolding for the LLM judge logic.
-        scores = []
-        for doc in docs:
-            # Hypothetical Prompt Structure:
-            # prompt = f"Query: {query}\nPassage: {doc['content']}\nScore this passage from 0 to 10 based on its ability to answer the query."
-            # response = llm.generate(prompt)
-            # score = parse_score(response)
-            
-            # Since we don't want to block the execution with an API call here unless configured,
-            # we simulate an LLM pass-through for now, ready to be wired to the TUI's LLM engine.
-            scores.append(1.0) 
-            
-        ranked = sorted(zip(docs, scores), key=lambda x: x[1], reverse=True)
-        return [doc for doc, score in ranked[:k]]
-
-
     def _crossencoder_rerank(self, docs: List[Dict], query: str, k: int) -> List[Dict]:
         """
         STEP 6: CROSSENCODER RERANKING
@@ -749,11 +718,10 @@ class RAGPipelineV2:
             # Step 4: Reranking (Configurable via reranker_type)
             reranker_type = self.config.get("reranker_type", "cross-encoder").lower()
             
-            if reranker_type == "disabled" or reranker_type == "none":
+            if reranker_type in ("disabled", "none", "llm"):
+                if reranker_type == "llm":
+                    print("[RAG Core] LLM reranking is not implemented yet. Skipping reranking...")
                 final_docs = fused_docs[:rerank_top_k]
-            elif reranker_type == "llm":
-                print(f"[RAG Core] Reranking {len(fused_docs)} initial results using LLM Reranker...")
-                final_docs = self._llm_rerank(fused_docs, query, k=rerank_top_k)
             else:
                 print(f"[RAG Core] Reranking {len(fused_docs)} initial results using CrossEncoder Reranker...")
                 final_docs = self._crossencoder_rerank(fused_docs, query, k=rerank_top_k)
