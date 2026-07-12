@@ -164,6 +164,7 @@ class BM25Index:
     def __init__(self, k1: float = 1.5, b: float = 0.75, tokenizer=None):
         self.documents: List[Dict[str, Any]] = []
         self._corpus_tokens: List[List[str]] = []
+        self._doc_term_counts: List[Counter] = []
         self._doc_len: List[int] = []
         self._doc_freqs: Dict[str, int] = {}
         self._avg_doc_len: float = 0.0
@@ -201,6 +202,7 @@ class BM25Index:
         doc_tokens = self._tokenizer(content)
         self.documents.append(document)
         self._corpus_tokens.append(doc_tokens)
+        self._doc_term_counts.append(Counter(doc_tokens))
         
         # Update statistics
         self._doc_len.append(len(doc_tokens))
@@ -263,7 +265,7 @@ class BM25Index:
     def _compute_bm25_score(self, query_tokens: List[str], doc_index: int) -> float:
         """Compute BM25 score for a document given query tokens"""
         score = 0.0
-        doc_term_counts = Counter(self._corpus_tokens[doc_index])
+        doc_term_counts = self._doc_term_counts[doc_index]
         doc_length = self._doc_len[doc_index]
 
         for token in query_tokens:
