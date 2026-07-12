@@ -16,7 +16,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, Paragraph, Wrap},
+    widgets::{Block, Borders, BorderType, Paragraph, Wrap, Clear},
     Terminal, Frame,
 };
 use unicode_width::UnicodeWidthStr;
@@ -33,6 +33,7 @@ enum Focus {
     Input,
     Context,
     SysPrompt,
+    Approval,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +53,75 @@ enum TuiEvent {
 struct ChatMessage {
     sender: MessageSender,
     text: String,
+}
+
+#[derive(Debug, Clone)]
+struct ApprovalRequest {
+    req_type: String, // "write_file" or "execute_command"
+    path: Option<String>,
+    content: Option<String>,
+    command: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+enum DiffLine {
+    Unchanged(String),
+    Added(String),
+    Deleted(String),
+}
+
+fn compute_line_diff(old: &str, new: &str) -> Vec<DiffLine> {
+    let old_lines: Vec<&str> = old.lines().collect();
+    let new_lines: Vec<&str> = new.lines().collect();
+    
+    let mut diff = Vec::new();
+    let mut i = 0;
+    let mut j = 0;
+    
+    while i < old_lines.len() || j < new_lines.len() {
+        if i < old_lines.len() && j < new_lines.len() {
+            if old_lines[i] == new_lines[j] {
+                diff.push(DiffLine::Unchanged(old_lines[i].to_string()));
+                i += 1;
+                j += 1;
+            } else {
+                let mut found_match = false;
+                for lookahead in 1..5 {
+                    if j + lookahead < new_lines.len() && old_lines[i] == new_lines[j + lookahead] {
+                        for k in 0..lookahead {
+                            diff.push(DiffLine::Added(new_lines[j + k].to_string()));
+                        }
+                        j += lookahead;
+                        found_match = true;
+                        break;
+                    }
+                    if i + lookahead < old_lines.len() && old_lines[i + lookahead] == new_lines[j] {
+                        for k in 0..lookahead {
+                            diff.push(DiffLine::Deleted(old_lines[i + k].to_string()));
+                        }
+                        i += lookahead;
+                        found_match = true;
+                        break;
+                    }
+                }
+                
+                if !found_match {
+                    diff.push(DiffLine::Deleted(old_lines[i].to_string()));
+                    diff.push(DiffLine::Added(new_lines[j].to_string()));
+                    i += 1;
+                    j += 1;
+                }
+            }
+        } else if i < old_lines.len() {
+            diff.push(DiffLine::Deleted(old_lines[i].to_string()));
+            i += 1;
+        } else {
+            diff.push(DiffLine::Added(new_lines[j].to_string()));
+            j += 1;
+        }
+    }
+    
+    diff
 }
 
 struct App {
@@ -77,6 +147,8 @@ struct App {
     provider: String,
     input_backup: Option<String>,
     is_command_reply: bool,
+    pending_approval: Option<ApprovalRequest>,
+    yolo_mode: bool,
 }
 
 impl App {
@@ -111,6 +183,8 @@ impl App {
             provider: "ollama".to_string(),
             input_backup: None,
             is_command_reply: false,
+            pending_approval: None,
+            yolo_mode: false,
         }
     }
 
@@ -185,7 +259,7 @@ impl App {
             let is_typing_cmd = parts.len() <= 1 && !self.input.ends_with(' ');
             if is_typing_cmd {
                 let cmd_typed = parts.first().copied().unwrap_or("/");
-                let commands = vec!["/auth", "/model"];
+                let commands = vec!["/auth", "/model", "/rag", "/yolo"];
                 for cmd in commands {
                     if cmd.starts_with(cmd_typed) {
                         self.completions.push(cmd.to_string());
@@ -318,6 +392,36 @@ impl App {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             return;
+        }
+
+        // Intercept ELPIS_REQUEST_APPROVAL
+        if trimmed.starts_with("ELPIS_REQUEST_APPROVAL ") {
+            let json_str = trimmed.replacen("ELPIS_REQUEST_APPROVAL ", "", 1);
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                let req_type = parsed.get("type").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let path = parsed.get("path").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let content = parsed.get("content").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let command = parsed.get("command").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+                let req = ApprovalRequest {
+                    req_type,
+                    path,
+                    content,
+                    command,
+                };
+
+                // If YOLO mode is on, auto-approve immediately
+                if self.yolo_mode {
+                    if let Some(ref tx) = self.stdin_tx {
+                        let _ = tx.send("{\"status\": \"accept\"}\n".to_string());
+                    }
+                    return;
+                }
+
+                self.pending_approval = Some(req);
+                self.focus = Focus::Approval;
+                return;
+            }
         }
 
         if self.agent_type == AgentType::Amk {
@@ -848,6 +952,15 @@ fn main() -> io::Result<()> {
                                     continue;
                                 }
 
+                                // Intercept /yolo
+                                if trimmed == "/yolo" {
+                                    app.yolo_mode = !app.yolo_mode;
+                                    app.add_message(MessageSender::User, "/yolo".to_string());
+                                    let status = if app.yolo_mode { "ENABLED (No approval prompts)" } else { "DISABLED (Prompts for all changes)" };
+                                    app.add_message(MessageSender::System, format!("⚡ YOLO Mode is now {}.", status));
+                                    continue;
+                                }
+
                                 // Intercept /auth <provider>
                                 if trimmed.starts_with("/auth ") || trimmed == "/auth" {
                                     let parts: Vec<&str> = trimmed.split_whitespace().collect();
@@ -1097,7 +1210,7 @@ fn main() -> io::Result<()> {
                                 app.system_prompt.pop();
                             }
                             KeyCode::Enter => {
-                                let sys_prompt_file = "/home/masih/Desktop/p/amk-tui/system_prompt.md";
+                                let sys_prompt_file = "/home/masih/Desktop/f/p/Elpis/tui/system_prompt.md";
                                 let _ = std::fs::write(sys_prompt_file, &app.system_prompt);
                                 app.messages.push(ChatMessage {
                                     sender: MessageSender::System,
@@ -1107,6 +1220,23 @@ fn main() -> io::Result<()> {
                             }
                             _ => {}
                         }
+                    }
+                    Focus::Approval => match key.code {
+                        KeyCode::Char('y') | KeyCode::Char('a') | KeyCode::Enter => {
+                            if let Some(ref tx) = app.stdin_tx {
+                                let _ = tx.send("{\"status\": \"accept\"}\n".to_string());
+                            }
+                            app.pending_approval = None;
+                            app.focus = Focus::Input;
+                        }
+                        KeyCode::Char('n') | KeyCode::Char('r') | KeyCode::Esc => {
+                            if let Some(ref tx) = app.stdin_tx {
+                                let _ = tx.send("{\"status\": \"reject\"}\n".to_string());
+                            }
+                            app.pending_approval = None;
+                            app.focus = Focus::Input;
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -1392,7 +1522,7 @@ fn ui(f: &mut Frame, app: &App) {
 
     let context_border_color = match app.focus {
         Focus::Context | Focus::SysPrompt => Color::Yellow,
-        Focus::Input => Color::Blue,
+        Focus::Input | Focus::Approval => Color::Blue,
     };
 
     let info_block = Paragraph::new(info_text).block(
@@ -1458,7 +1588,7 @@ fn ui(f: &mut Frame, app: &App) {
 
     let input_border_color = match app.focus {
         Focus::Input => Color::Yellow,
-        Focus::Context | Focus::SysPrompt => Color::DarkGray,
+        Focus::Context | Focus::SysPrompt | Focus::Approval => Color::DarkGray,
     };
 
     let decorated_block = input_block.block(
@@ -1475,13 +1605,13 @@ fn ui(f: &mut Frame, app: &App) {
     // 5. Render blinking cursor position based on active focus
     if app.focus == Focus::SysPrompt {
         // Calculate coordinates for the system prompt editor line in the right sidebar
-        // Right sidebar is main_chunks[1]. The prompt line is index 1 of info_text.
-        // It resides at main_chunks[1].y + 1 (top border) + 1 (line index 1)
         let cleaned_sys_prompt = app.system_prompt.replace('\n', " ");
         let text_len = if cleaned_sys_prompt.chars().count() > 20 { 23 } else { cleaned_sys_prompt.chars().count() };
         let cursor_x = main_chunks[1].x + 1 + text_len as u16;
         let cursor_y = main_chunks[1].y + 2;
         f.set_cursor_position((cursor_x, cursor_y));
+    } else if app.focus == Focus::Approval {
+        // Hide cursor during approval modal by placing it out of view
     } else {
         let text_width = chunks[input_chunk_idx].width.saturating_sub(2) as usize;
         let mut cursor_row = 0;
@@ -1518,6 +1648,96 @@ fn ui(f: &mut Frame, app: &App) {
         let max_y = chunks[input_chunk_idx].y + chunks[input_chunk_idx].height.saturating_sub(2);
         let cursor_y = cursor_y.min(max_y);
         f.set_cursor_position((cursor_x, cursor_y));
+    }
+
+    // 6. Render Approval Modal popup over the layout
+    if let Some(ref req) = app.pending_approval {
+        let popup_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(15),
+                Constraint::Percentage(70),
+                Constraint::Percentage(15),
+            ])
+            .split(size);
+
+        let area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(15),
+                Constraint::Percentage(70),
+                Constraint::Percentage(15),
+            ])
+            .split(popup_layout[1])[1];
+
+        // Clear the popup area
+        f.render_widget(Clear, area);
+
+        let block = Block::default()
+            .title(format!(" ⚠️ APPROVAL REQUIRED: {} ", req.req_type.to_uppercase()))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+
+        let mut text = Vec::new();
+        text.push(Line::from(""));
+
+        match req.req_type.as_str() {
+            "write_file" => {
+                let path_str = req.path.as_deref().unwrap_or("unknown");
+                text.push(Line::from(vec![
+                    Span::styled("📝 Action: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::from("Write file to "),
+                    Span::styled(path_str, Style::default().fg(Color::Cyan)),
+                ]));
+                text.push(Line::from(""));
+
+                // Read old file content to show diff
+                let old_content = std::fs::read_to_string(path_str).unwrap_or_default();
+                let new_content = req.content.as_deref().unwrap_or("");
+                let diff = compute_line_diff(&old_content, new_content);
+
+                text.push(Line::from(Span::styled("--- PROPOSED EDITS (DIFF) ---", Style::default().fg(Color::DarkGray))));
+                for d_line in diff {
+                    match d_line {
+                        DiffLine::Unchanged(l) => {
+                            text.push(Line::from(Span::styled(format!("  {}", l), Style::default().fg(Color::Gray))));
+                        }
+                        DiffLine::Added(l) => {
+                            text.push(Line::from(Span::styled(format!("+ {}", l), Style::default().fg(Color::Green))));
+                        }
+                        DiffLine::Deleted(l) => {
+                            text.push(Line::from(Span::styled(format!("- {}", l), Style::default().fg(Color::Red))));
+                        }
+                    }
+                }
+            }
+            "execute_command" => {
+                let cmd_str = req.command.as_deref().unwrap_or("unknown");
+                text.push(Line::from(vec![
+                    Span::styled("🚀 Action: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::from("Execute local command"),
+                ]));
+                text.push(Line::from(""));
+                text.push(Line::from(Span::styled("--- COMMAND ---", Style::default().fg(Color::DarkGray))));
+                text.push(Line::from(Span::styled(format!("  {}", cmd_str), Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))));
+            }
+            _ => {
+                text.push(Line::from("Unknown action type."));
+            }
+        }
+
+        text.push(Line::from(""));
+        text.push(Line::from(vec![
+            Span::styled("👉 Choices: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("[a] Accept / [Enter] Accept  |  [r] Reject / [Esc] Reject", Style::default().fg(Color::White)),
+        ]));
+
+        let paragraph = Paragraph::new(text)
+            .block(block)
+            .wrap(Wrap { trim: false });
+
+        f.render_widget(paragraph, area);
     }
 }
 
@@ -1574,5 +1794,28 @@ mod tests {
         let target_tokens = (limit as f64 * 0.7) as i64;
         
         assert!(est_tokens <= target_tokens, "est_tokens: {}, target_tokens: {}", est_tokens, target_tokens);
+    }
+
+    #[test]
+    fn test_compute_line_diff() {
+        let old = "line1\nline2\nline3\n";
+        let new = "line1\nline2_modified\nline3\nline4\n";
+        let diff = compute_line_diff(old, new);
+        
+        let mut added = Vec::new();
+        let mut deleted = Vec::new();
+        let mut unchanged = Vec::new();
+        
+        for d in diff {
+            match d {
+                DiffLine::Unchanged(l) => unchanged.push(l),
+                DiffLine::Added(l) => added.push(l),
+                DiffLine::Deleted(l) => deleted.push(l),
+            }
+        }
+        
+        assert_eq!(unchanged, vec!["line1", "line3"]);
+        assert_eq!(deleted, vec!["line2"]);
+        assert_eq!(added, vec!["line2_modified", "line4"]);
     }
 }

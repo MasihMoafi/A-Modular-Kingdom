@@ -56,6 +56,40 @@ os.environ.setdefault("MEMORY_BASE_PATH", _DEFAULT_MEMORY_BASE)
 mcp = FastMCP("unified_knowledge_agent_host")
 scoped_memory = None
 
+def request_approval_for_write(path: str, content: str) -> tuple[bool, str]:
+    payload = {
+        "type": "write_file",
+        "path": path,
+        "content": content
+    }
+    print(f"ELPIS_REQUEST_APPROVAL {json.dumps(payload)}", flush=True)
+    line = sys.stdin.readline()
+    if not line:
+        return False, content
+    try:
+        resp = json.loads(line.strip())
+        if resp.get("status") == "accept":
+            return True, resp.get("content", content)
+        return False, content
+    except Exception:
+        accepted = line.strip().lower() in ("yes", "y", "accept")
+        return accepted, content
+
+def request_approval_for_command(command: str) -> bool:
+    payload = {
+        "type": "execute_command",
+        "command": command
+    }
+    print(f"ELPIS_REQUEST_APPROVAL {json.dumps(payload)}", flush=True)
+    line = sys.stdin.readline()
+    if not line:
+        return False
+    try:
+        resp = json.loads(line.strip())
+        return resp.get("status") == "accept"
+    except Exception:
+        return line.strip().lower() in ("yes", "y", "accept")
+
 _LOG_STDERR = os.environ.get("MCP_LOG_STDERR", "0").lower() in ("1", "true", "yes", "y", "on")
 _LOG_FILE = os.environ.get("MCP_LOG_FILE", "").strip()
 _DEBUG_PROTOCOL = os.environ.get("MCP_DEBUG_PROTOCOL", "0").lower() in ("1", "true", "yes", "y", "on")
@@ -612,15 +646,21 @@ def write_file(
         target = _resolve_target_path(path)
         if not _is_safe_target(target):
             return json.dumps({"error": "Path blocked. Allowed roots: workspace, AMK repo, and /tmp."})
+        
+        # Check approval
+        approved, final_content = request_approval_for_write(str(target), content)
+        if not approved:
+            return json.dumps({"error": "Write request rejected by user."})
+            
         if target.exists() and not overwrite:
             return json.dumps({"error": f"File exists and overwrite is false: {str(target)}"})
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content or "", encoding="utf-8")
+        target.write_text(final_content or "", encoding="utf-8")
         return json.dumps(
             {
                 "status": "success",
                 "path": str(target),
-                "bytes": len((content or "").encode("utf-8")),
+                "bytes": len((final_content or "").encode("utf-8")),
             }
         )
     except Exception as e:
@@ -669,6 +709,11 @@ def create_docx(
             return json.dumps({"error": "Path must end with .docx"})
         if not _is_safe_target(target):
             return json.dumps({"error": "Path blocked. Allowed roots: workspace, AMK repo, and /tmp."})
+        
+        # Check approval
+        if not request_approval_for_command(f"Create docx file at {str(target)} with title='{title}'"):
+            return json.dumps({"error": "Create docx request rejected by user."})
+            
         if target.exists() and not overwrite:
             return json.dumps({"error": f"File exists and overwrite is false: {str(target)}"})
         try:
@@ -859,6 +904,9 @@ if _EXPOSE_EXTRA_TOOLS:
         code: str = Field(description="Python code to execute"),
         timeout_seconds: int = Field(default=15, description="Execution timeout in seconds")
     ) -> str:
+        # Check approval
+        if not request_approval_for_command(f"python -c ...\nCode:\n{code}"):
+            return json.dumps({"status": "error", "error": "Command execution rejected by user."})
         try:
             return _call_tool_safely(run_code, code=code, timeout_seconds=timeout_seconds)
         except Exception as e:
@@ -874,6 +922,9 @@ if _EXPOSE_EXTRA_TOOLS:
     ) -> str:
         if not isinstance(command, str) or not command.strip():
             return json.dumps({"status": "error", "error": "Empty command"})
+        # Check approval
+        if not request_approval_for_command(command):
+            return json.dumps({"status": "error", "error": "Command execution rejected by user."})
         try:
             proc = subprocess.run(
                 command,
