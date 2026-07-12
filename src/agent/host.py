@@ -58,9 +58,6 @@ scoped_memory = None
 
 def _wait_for_approval(payload: dict) -> str:
     import select
-    # Write approval request to stderr so it does not pollute MCP stdout
-    sys.stderr.write(f"ELPIS_REQUEST_APPROVAL {json.dumps(payload)}\n")
-    sys.stderr.flush()
 
     response_file = "/tmp/elpis_approval_response.json"
     if os.path.exists(response_file):
@@ -68,6 +65,10 @@ def _wait_for_approval(payload: dict) -> str:
             os.remove(response_file)
         except Exception:
             pass
+
+    # Write approval request to stderr so it does not pollute MCP stdout
+    sys.stderr.write(f"ELPIS_REQUEST_APPROVAL {json.dumps(payload)}\n")
+    sys.stderr.flush()
 
     # Poll for response file or stdin data
     for _ in range(3000):
