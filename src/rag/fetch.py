@@ -101,36 +101,6 @@ def get_rag_pipeline_v2(doc_path: Optional[str] = None):
         sys.stderr.flush()
         raise
 
-# class V2RetrieverAdapter:
-#     """
-#     Adapts the V2 pipeline's custom output to the standard retriever interface
-#     expected by the evaluation script.
-#     """
-#     def __init__(self, pipeline):
-#         self.pipeline = pipeline
-
-#     def get_relevant_documents(self, query: str):
-#         """
-#         Calls the V2 search and wraps the string results in Document objects.
-#         """
-#         # The V2 search function returns a single string with results separated by "---".
-#         search_result_str = self.pipeline.search(query)
-        
-#         # We need to parse this string back into a list of Document objects.
-#         # This is a simplified parsing based on the V2 search function's output format.
-#         if "Document search results:" in search_result_str:
-#             content = search_result_str.split("Document search results:\n\n")[1]
-#             chunks = content.split("\n\n---\n\n")
-#             # langchain_core.documents.Document
-#             from langchain_core.documents import Document
-#             return [Document(page_content=chunk) for chunk in chunks]
-#         return []
-
-# def get_retriever():
-#     """Returns the retriever interface for the evaluation script."""
-#     pipeline = get_rag_pipeline_v2()
-#     return V2RetrieverAdapter(pipeline)
-
 def find_all_indexable_files(
     directory: str,
     max_depth: int = 5,
