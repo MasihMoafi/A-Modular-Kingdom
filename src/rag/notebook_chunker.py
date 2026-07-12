@@ -142,28 +142,3 @@ def split_large_cell(cell: Dict[str, Any], chunk_size: int = 1500, chunk_overlap
     return chunks
 
 
-def process_notebook_for_rag(notebook_path: str, max_chunk_size: int = 2000) -> List[Dict[str, Any]]:
-    """
-    Complete pipeline: extract cells, optionally split large ones.
-
-    Args:
-        notebook_path: Path to .ipynb file
-        max_chunk_size: Max size before splitting
-
-    Returns:
-        List of processed chunks ready for indexing
-    """
-    cells = extract_cells_from_notebook(notebook_path)
-
-    processed_chunks = []
-
-    for cell in cells:
-        if should_split_cell(cell, max_chunk_size):
-            # Split large cell
-            sub_chunks = split_large_cell(cell, chunk_size=1500, chunk_overlap=200)
-            processed_chunks.extend(sub_chunks)
-        else:
-            # Keep cell as-is
-            processed_chunks.append(cell)
-
-    return processed_chunks
