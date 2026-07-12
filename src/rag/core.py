@@ -758,9 +758,11 @@ class RAGPipelineV2:
                 print(f"[RAG Core] Reranking {len(fused_docs)} initial results using CrossEncoder Reranker...")
                 final_docs = self._crossencoder_rerank(fused_docs, query, k=rerank_top_k)
             unique_content = []
+            seen_content = set()
             for doc in final_docs:
                 content = doc.get('original_content', doc.get('content', ''))
-                if content not in unique_content:
+                if content not in seen_content:
+                    seen_content.add(content)
                     unique_content.append(content)
             
             sys.stderr.write(f"[RAG V2] Returning {len(final_docs)} unique results\n")
