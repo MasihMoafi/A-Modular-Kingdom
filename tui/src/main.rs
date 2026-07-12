@@ -289,12 +289,12 @@ impl App {
                 let models = match self.provider.as_str() {
                     "ollama" => vec!["qwen3:8b", "llama3.2:3b"],
                     "gemini" => vec![
-                        "gemini-3.5-flash",
-                        "gemini-3.5-pro",
+                        "gemini-2.5-flash",
+                        "gemini-2.5-pro",
                     ],
                     "openrouter" | "open-router" => vec![
-                        "google/gemini-3.5-flash",
-                        "google/gemini-3.5-pro",
+                        "google/gemini-2.5-flash",
+                        "google/gemini-2.5-pro",
                         "moonshotai/kimi-k2.6",
                         "deepseek/deepseek-v4-pro",
                         "deepseek/deepseek-v4-flash",
@@ -441,7 +441,7 @@ impl App {
                 } else if !model_part.is_empty() {
                     self.model = model_part;
                 } else {
-                    self.model = "gemini-3.5-flash".to_string();
+                    self.model = "gemini-2.5-flash".to_string();
                 }
             } else if trimmed.starts_with("Using OpenRouter model:") {
                 self.provider = "openrouter".to_string();
@@ -986,7 +986,7 @@ fn main() -> io::Result<()> {
                                         app.provider = prov.to_string();
                                         app.model = match prov {
                                             "openrouter" => "moonshotai/kimi-k2.6".to_string(),
-                                            "gemini" => "gemini-3.5-flash".to_string(),
+                                            "gemini" => "gemini-2.5-flash".to_string(),
                                             _ => "qwen3:8b".to_string(),
                                         };
 
