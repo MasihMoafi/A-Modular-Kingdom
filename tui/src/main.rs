@@ -412,6 +412,7 @@ impl App {
 
                 // If YOLO mode is on, auto-approve immediately
                 if self.yolo_mode {
+                    let _ = std::fs::write("/tmp/elpis_approval_response.json", "{\"status\": \"accept\"}");
                     if let Some(ref tx) = self.stdin_tx {
                         let _ = tx.send("{\"status\": \"accept\"}\n".to_string());
                     }
@@ -726,7 +727,9 @@ fn main() -> io::Result<()> {
                 }
                 TuiEvent::StderrLine(line) => {
                     let err = line.trim().to_string();
-                    if !err.is_empty() && !err.contains("Warning") {
+                    if err.starts_with("ELPIS_REQUEST_APPROVAL ") {
+                        app.handle_stdout_line(err);
+                    } else if !err.is_empty() && !err.contains("Warning") {
                         app.backend_error = Some(err);
                     }
                 }
@@ -1227,6 +1230,7 @@ fn main() -> io::Result<()> {
                     }
                     Focus::Approval => match key.code {
                         KeyCode::Char('y') | KeyCode::Char('a') | KeyCode::Enter => {
+                            let _ = std::fs::write("/tmp/elpis_approval_response.json", "{\"status\": \"accept\"}");
                             if let Some(ref tx) = app.stdin_tx {
                                 let _ = tx.send("{\"status\": \"accept\"}\n".to_string());
                             }
@@ -1234,6 +1238,7 @@ fn main() -> io::Result<()> {
                             app.focus = Focus::Input;
                         }
                         KeyCode::Char('n') | KeyCode::Char('r') | KeyCode::Esc => {
+                            let _ = std::fs::write("/tmp/elpis_approval_response.json", "{\"status\": \"reject\"}");
                             if let Some(ref tx) = app.stdin_tx {
                                 let _ = tx.send("{\"status\": \"reject\"}\n".to_string());
                             }

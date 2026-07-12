@@ -56,23 +56,58 @@ os.environ.setdefault("MEMORY_BASE_PATH", _DEFAULT_MEMORY_BASE)
 mcp = FastMCP("unified_knowledge_agent_host")
 scoped_memory = None
 
+def _wait_for_approval(payload: dict) -> str:
+    import select
+    # Write approval request to stderr so it does not pollute MCP stdout
+    sys.stderr.write(f"ELPIS_REQUEST_APPROVAL {json.dumps(payload)}\n")
+    sys.stderr.flush()
+
+    response_file = "/tmp/elpis_approval_response.json"
+    if os.path.exists(response_file):
+        try:
+            os.remove(response_file)
+        except Exception:
+            pass
+
+    # Poll for response file or stdin data
+    for _ in range(3000):
+        if os.path.exists(response_file):
+            try:
+                time.sleep(0.05)
+                with open(response_file, "r") as f:
+                    content = f.read().strip()
+                os.remove(response_file)
+                return content
+            except Exception:
+                pass
+        
+        # Non-blocking check for stdin data (for CLI tests/non-TUI)
+        try:
+            r, _, _ = select.select([sys.stdin], [], [], 0.05)
+            if sys.stdin in r:
+                line = sys.stdin.readline()
+                if line:
+                    return line.strip()
+        except Exception:
+            pass
+    return ""
+
 def request_approval_for_write(path: str, content: str) -> tuple[bool, str]:
     payload = {
         "type": "write_file",
         "path": path,
         "content": content
     }
-    print(f"ELPIS_REQUEST_APPROVAL {json.dumps(payload)}", flush=True)
-    line = sys.stdin.readline()
+    line = _wait_for_approval(payload)
     if not line:
         return False, content
     try:
-        resp = json.loads(line.strip())
+        resp = json.loads(line)
         if resp.get("status") == "accept":
             return True, resp.get("content", content)
         return False, content
     except Exception:
-        accepted = line.strip().lower() in ("yes", "y", "accept")
+        accepted = line.lower() in ("yes", "y", "accept")
         return accepted, content
 
 def request_approval_for_command(command: str) -> bool:
@@ -80,15 +115,14 @@ def request_approval_for_command(command: str) -> bool:
         "type": "execute_command",
         "command": command
     }
-    print(f"ELPIS_REQUEST_APPROVAL {json.dumps(payload)}", flush=True)
-    line = sys.stdin.readline()
+    line = _wait_for_approval(payload)
     if not line:
         return False
     try:
-        resp = json.loads(line.strip())
+        resp = json.loads(line)
         return resp.get("status") == "accept"
     except Exception:
-        return line.strip().lower() in ("yes", "y", "accept")
+        return line.lower() in ("yes", "y", "accept")
 
 _LOG_STDERR = os.environ.get("MCP_LOG_STDERR", "0").lower() in ("1", "true", "yes", "y", "on")
 _LOG_FILE = os.environ.get("MCP_LOG_FILE", "").strip()
