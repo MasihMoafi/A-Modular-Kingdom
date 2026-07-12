@@ -11,6 +11,7 @@ import argparse
 import warnings
 import re
 import subprocess
+import shlex
 from typing import List, Optional
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
@@ -587,11 +588,10 @@ def _extract_shell_command(text: str) -> str:
 
 def _run_shell_local(command: str, timeout_seconds: int = 30) -> dict:
     try:
+        parsed_command = shlex.split(command)
         proc = subprocess.run(
-            command,
+            parsed_command,
             cwd=WORKSPACE_ROOT,
-            shell=True,
-            executable="/bin/bash",
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
