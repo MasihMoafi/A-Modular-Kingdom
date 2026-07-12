@@ -108,7 +108,7 @@ def initialize_llm(provider: str = "ollama", model: Optional[str] = None):
 
         genai_client = genai.Client(api_key=api_key)
         types = gemini_types
-        target_model = model or "gemini-2.5-flash"
+        target_model = model or "gemini-3.5-flash"
         LLM_MODEL = f"gemini:{target_model}"
         ollama = None
         print(f"Using Gemini API ({target_model})")
@@ -1618,7 +1618,7 @@ JSON Response:"""
                         
                         # Use Gemini, OpenRouter, or Ollama for tool decision
                         if LLM_MODEL == 'gemini' or LLM_MODEL.startswith("gemini:"):
-                            model_name = "gemini-2.0-flash-exp"
+                            model_name = "gemini-3.5-flash"
                             if LLM_MODEL.startswith("gemini:"):
                                 model_name = LLM_MODEL.replace("gemini:", "", 1)
                             response = genai_client.models.generate_content(
@@ -1783,7 +1783,7 @@ User: {user_input}"""
                         config = None
                         if system_prompt:
                             config = types.GenerateContentConfig(system_instruction=system_prompt)
-                        model_name = "gemini-2.0-flash-exp"
+                        model_name = "gemini-3.5-flash"
                         if LLM_MODEL.startswith("gemini:"):
                             model_name = LLM_MODEL.replace("gemini:", "", 1)
                         response = genai_client.models.generate_content(
