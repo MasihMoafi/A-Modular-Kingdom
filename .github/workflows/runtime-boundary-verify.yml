@@ -1,0 +1,66 @@
+name: Runtime boundary verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/runtime-boundary
+    paths:
+      - .github/workflows/runtime-boundary-verify.yml
+      - codex-rs/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-boundary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Compile codex-tui and run focused tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: codex-rs
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bubblewrap \
+            libcap-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --no-self-update
+
+      - name: Restore Cargo cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            codex-rs/target
+          key: runtime-boundary-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock', 'codex-rs/rust-toolchain.toml') }}
+
+      - name: Compile codex-tui library tests
+        run: cargo test -p codex-tui --lib --locked --no-run
+
+      - name: Run runtime-boundary tests
+        run: |
+          cargo test -p codex-tui --lib --locked cli::tests::runtime_defaults_to_codex -- --exact
+          cargo test -p codex-tui --lib --locked cli::tests::runtime_accepts_explicit_codex_selection -- --exact
+          cargo test -p codex-tui --lib --locked cli::tests::runtime_rejects_unimplemented_adapters -- --exact
+          cargo test -p codex-tui --lib --locked runtime_contract::tests::codex_ownership_preserves_the_elpis_control_boundary -- --exact
