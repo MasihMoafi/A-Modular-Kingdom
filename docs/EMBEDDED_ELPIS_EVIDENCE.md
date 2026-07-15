@@ -35,3 +35,14 @@ clone is not used at runtime.
 This checkpoint proves the contained build and installation. Command/file rendering,
 permissions, mouse behavior, sessions, and compaction are inherited Codex capabilities;
 future Elpis work should preserve them while subtracting unwanted surfaces.
+
+## Canonical Main Verification
+
+- Canonical commit: `948c373`
+- GitHub Actions run: `29449900034` (passed)
+- Installed SHA-256: `bcb9dc5c5402e15cbb670210c31b94ccac58255bf7aaafca0b48831f4a395f8b`
+- The first subtraction removed the archived root TUI, old Python agent main, and
+  obsolete Debian builder. Remote formatting, focused TUI compilation, branding,
+  release build, executable identity, and artifact upload still passed.
+- The installed artifact launched as `Elpis · Codex runtime` from canonical `main` and
+  exited cleanly on interruption.

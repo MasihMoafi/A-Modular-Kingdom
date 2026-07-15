@@ -21,6 +21,10 @@ removing obsolete and unwanted surfaces one bounded, verified deletion at a time
 - Done: commit `dd36256` removes the superseded root `tui/`, old Python agent main,
   and obsolete Debian builder after reference checks proved the canonical binary and
   live RAG MCP do not use them. The ignored old TUI build cache was also removed.
+- Verified: GitHub Actions run `29449900034` passed the remote Rust checks after that
+  deletion. Its artifact is installed with SHA-256
+  `bcb9dc5c5402e15cbb670210c31b94ccac58255bf7aaafca0b48831f4a395f8b` and launched
+  successfully as `Elpis · Codex runtime` from canonical `main`.
 - Blocked: none.
 
 ## Evidence
@@ -34,9 +38,10 @@ removing obsolete and unwanted surfaces one bounded, verified deletion at a time
 
 ## Next Action
 
-Push canonical `main`, let the remote Elpis workflow rebuild and verify the subtraction,
-then install and launch-smoke that exact artifact. After it passes, inventory the next
-Codex surface as keep, remove, or decide-later before deleting more code.
+Inventory the remaining non-`codex-rs/` Python/MCP, memory, RAG, tools, packaging, and
+documentation surfaces as keep, remove, or decide-later. Select the next smallest
+proven-unused surface; do not delete another Codex capability without an acceptance
+check that names what must remain visible.
 
 ## Do Not Repeat
 

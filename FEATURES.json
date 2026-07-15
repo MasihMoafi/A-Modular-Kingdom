@@ -38,7 +38,7 @@
       "status": "in_progress",
       "user_visible_behavior": "Elpis becomes smaller and clearer while every retained Codex capability continues to work.",
       "acceptance": ["Classify candidate surfaces as keep, remove, or decide-later.", "Delete one bounded unused surface.", "Pass remote build, focused checks, and launch smoke after each deletion."],
-      "evidence": ["archive/legacy-prototype-20260716 preserves the superseded prototype", "dd36256 removes the old root TUI, Python agent main, and obsolete Debian builder"]
+      "evidence": ["archive/legacy-prototype-20260716 preserves the superseded prototype", "dd36256 removes the old root TUI, Python agent main, and obsolete Debian builder", "GitHub Actions run 29449900034 passed and its artifact launched locally"]
     },
     {
       "id": "context-sovereignty",
