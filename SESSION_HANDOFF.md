@@ -76,10 +76,10 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   `docs/FOUNDATION_CODEX_BASELINE_EVIDENCE.md`.
 - Blocked: none. The incomplete TUI test run is a known verification gap, not a blocker
   for the compilation baseline Masih accepted on 2026-07-15.
-- Runtime-boundary verification is deferred: local Cargo compilation significantly
-  disrupted Masih's workstation and was stopped at his request. This WIP must remain
-  `in_progress` until its focused tests and behavior-preservation check run elsewhere or
-  under an explicitly approved low-impact setup.
+- Verified for the focused runtime-boundary slice: GitHub Actions compiled the locked
+  `codex-tui` library-test target and passed all four contract tests without using
+  Masih's workstation. The broader multi-runtime feature remains `in_progress` because
+  Gemini and Claude adapters are not implemented.
 
 ## Evidence
 
@@ -133,16 +133,16 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   policy (`on-request` plus workspace write).
 - The foundation import is committed on `agent/foundation-codex-baseline`; inspect
   `git log -1` for the checkpoint hash. Build output under `codex-rs/target/` is ignored.
-- Runtime-boundary WIP evidence is recorded in
-  `docs/RUNTIME_BOUNDARY_WIP_EVIDENCE.md`. Static review and `git diff --check` passed;
-  the added Rust tests were not executed, so no runtime-selection acceptance claim was
-  made and `FEATURES.json` remains `in_progress`.
+- Runtime-boundary evidence is recorded in
+  `docs/RUNTIME_BOUNDARY_WIP_EVIDENCE.md`. GitHub Actions run
+  `29442993318` compiled the test target and passed all four focused tests at commit
+  `033c00f`; `FEATURES.json` remains `in_progress` because no non-Codex adapter exists.
 
 ## Next Action
 
-Stop at the runtime-boundary WIP checkpoint. Before expanding the contract or adding a
-non-Codex adapter, run the focused tests and behavior-preservation check in an
-environment that does not disrupt Masih's workstation.
+Define the smallest first non-Codex adapter contract and acceptance test before coding
+it. Inventory the existing Gemini path first; do not alter Codex's native loop or the
+authentication-only boundary.
 
 ## Ordered Tasks
 

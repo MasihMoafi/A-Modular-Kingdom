@@ -2,8 +2,9 @@
 
 ## Status
 
-This checkpoint is **WIP and not verified**. It must not be used as evidence that
-runtime selection or non-Codex adapters satisfy their user-visible acceptance check.
+The focused Codex runtime-boundary slice is **verified**. The broader runtime-selection
+feature remains `in_progress`: Gemini and Claude adapters have not been implemented or
+accepted through a user-visible turn.
 
 ## Challenged Scope
 
@@ -22,12 +23,17 @@ because they require separate product decisions and acceptance tests.
 - Focused unit tests cover the default, explicit Codex selection, rejection of
   unimplemented Gemini and Claude values, and the ownership split.
 
-## Review And Deferred Verification
+## Verification
 
 - Static review confirmed the diff is limited to the TUI CLI, launch seam, runtime
   contract, focused tests, and project evidence.
 - `git diff --check` passed before the WIP commit.
-- Cargo compilation and tests were attempted but stopped before completion at Masih's
-  request because local Rust compilation significantly disrupted the workstation.
-- No Cargo command was rerun after that instruction. The tests remain unexecuted and
-  the feature remains `in_progress`, not `verified`.
+- No Cargo command was rerun on Masih's workstation.
+- GitHub Actions run
+  [29442993318](https://github.com/MasihMoafi/Elpis/actions/runs/29442993318)
+  compiled the locked `codex-tui` library-test target at commit `033c00f` and passed
+  all four focused runtime-boundary tests.
+- Compilation took about 6.5 minutes; the focused tests took about 5 seconds. The
+  remote cache was saved for later runs.
+- This proves the Codex boundary and rejection of unimplemented adapters; it does not
+  prove the full multi-runtime user-visible acceptance check.

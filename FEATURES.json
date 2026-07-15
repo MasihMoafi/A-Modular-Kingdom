@@ -86,6 +86,7 @@
       "acceptance": ["Complete one visible turn on each supported runtime and resume its Elpis session."],
       "evidence": [
         "Codex launches by default; older Python provider paths exist but parity is unverified.",
+        "The focused Codex runtime-boundary compile and four contract tests passed in GitHub Actions run 29442993318; non-Codex adapters remain unimplemented.",
         "docs/RUNTIME_BOUNDARY_WIP_EVIDENCE.md"
       ]
     },
