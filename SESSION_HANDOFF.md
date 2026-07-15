@@ -18,6 +18,9 @@ removing obsolete and unwanted surfaces one bounded, verified deletion at a time
   mouse handling, native sessions, native compaction, and ChatGPT authentication.
 - Parked: Gemini/runtime-boundary work remains isolated on `agent/runtime-boundary` and
   is not current priority.
+- Done: commit `dd36256` removes the superseded root `tui/`, old Python agent main,
+  and obsolete Debian builder after reference checks proved the canonical binary and
+  live RAG MCP do not use them. The ignored old TUI build cache was also removed.
 - Blocked: none.
 
 ## Evidence
@@ -31,9 +34,9 @@ removing obsolete and unwanted surfaces one bounded, verified deletion at a time
 
 ## Next Action
 
-Audit references to the superseded root `tui/` and Python agent runtime. Classify each
-surface as keep, remove, or decide-later; delete only the first proven-unused bounded
-surface, then run the remote Elpis build and launch smoke.
+Push canonical `main`, let the remote Elpis workflow rebuild and verify the subtraction,
+then install and launch-smoke that exact artifact. After it passes, inventory the next
+Codex surface as keep, remove, or decide-later before deleting more code.
 
 ## Do Not Repeat
 
