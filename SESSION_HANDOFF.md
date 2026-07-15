@@ -72,6 +72,15 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   `docs/FOUNDATION_CODEX_BASELINE_EVIDENCE.md`.
 - Blocked: none. The incomplete TUI test run is a known verification gap, not a blocker
   for the compilation baseline Masih accepted on 2026-07-15.
+- Done: the contained Rust foundation now identifies and builds as `elpis` on branch
+  `agent/elpis-embedded-launcher` at implementation commit `4c6ad25`.
+- Done: GitHub Actions run `29446246504` passed formatting, focused compilation,
+  branding, release build, executable identity, and artifact publication without
+  compiling Rust on Masih's workstation.
+- Done: the verified artifact is installed at `/home/masih/.local/bin/elpis` and is
+  available as `elpis` in a fresh terminal. A four-second launch smoke stayed alive
+  until the safety timer; no process remained. Evidence in
+  `docs/EMBEDDED_ELPIS_EVIDENCE.md`.
 
 ## Evidence
 
@@ -128,8 +137,10 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
 
 ## Next Action
 
-Stop at the verified foundation checkpoint. Runtime-boundary work has not begun;
-wait for Masih to select the next priority before changing runtime contracts.
+Masih runs `elpis` interactively and asks it to run `pwd` and create a harmless file.
+Record whether command start/output/completion, file change, and diff are readable.
+Use that result to finish the current priority, `action-rendering`. Do not start Gemini
+or runtime-selection work first.
 
 ## Ordered Tasks
 

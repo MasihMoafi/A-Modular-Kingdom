@@ -4,7 +4,7 @@
   "difficulty_values": ["easy", "medium", "hard"],
   "rule": "Only mark verified after the user-visible acceptance check passes and evidence is recorded.",
   "parallel_rule": "Use a separate worktree per task; parallelize only when dependencies are verified and file ownership does not overlap.",
-  "current_priority": "foundation-codex-baseline",
+  "current_priority": "action-rendering",
   "features": [
     {
       "id": "foundation-codex-baseline",
@@ -27,7 +27,8 @@
       "evidence": [
         "docs/CODEX_FOUNDATION_MIGRATION.md",
         "docs/LAUNCH_SMOKE_EVIDENCE.md",
-        "docs/FOUNDATION_CODEX_BASELINE_EVIDENCE.md"
+        "docs/FOUNDATION_CODEX_BASELINE_EVIDENCE.md",
+        "docs/EMBEDDED_ELPIS_EVIDENCE.md"
       ]
     },
     {
