@@ -30,8 +30,8 @@ clone is not used at runtime.
   stopped by the safety timer. No Elpis process remained afterward.
 - The installed binary contains `Welcome to Elpis, with Codex as the active runtime`.
 
-## Remaining Acceptance
+## Scope
 
-Masih must complete one interactive turn and judge the visible command/file lifecycle.
-That acceptance belongs to the next feature, `action-rendering`, rather than this build
-and installation checkpoint.
+This checkpoint proves the contained build and installation. Command/file rendering,
+permissions, mouse behavior, sessions, and compaction are inherited Codex capabilities;
+future Elpis work should preserve them while subtracting unwanted surfaces.

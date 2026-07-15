@@ -50,17 +50,16 @@ The clone's origin is [openai/codex](https://github.com/openai/codex). Use the r
 only for provenance or an explicitly requested update; do not browse it when the local
 clone can answer the question.
 
-Use Codex as the implementation foundation for thread/turn/item semantics, streaming,
-file changes, command execution, approvals, sandboxing, `@` interactions, and TUI
-ergonomics. Copy the required Rust crates and their tests into Elpis, preserving the
-Apache-2.0 notices. The finished Elpis program must not load code from, or require,
-the separate Codex clone directory at runtime.
+Codex is the contained implementation foundation for thread/turn/item semantics,
+streaming, file changes, command execution, approvals, sandboxing, `@` interactions,
+and TUI ergonomics. The pinned Rust workspace and tests live under `codex-rs/`, with
+Apache-2.0 notices preserved. Elpis does not load code from, or require, the separate
+Codex clone directory at runtime.
 
-The preferred foundation strategy is **fork and subtract**: begin from a known Codex
-source revision, keep its proven execution and TUI paths intact, remove unwanted
+The active foundation strategy is **fork and subtract**: keep the pinned Codex
+execution and TUI paths intact, remove unwanted
 OpenAI-specific product surfaces in small tested steps, and introduce a provider
-boundary for OpenAI/Codex, Gemini, Claude, and later providers. Do not reproduce these
-subsystems piecemeal in the current prototype.
+subsystems piecemeal or revive the archived hand-grown prototype.
 
 ### OpenClaw: context and continuity reference
 
@@ -106,9 +105,9 @@ User
   -> Workspace + durable Elpis state (~/.elpis)
 ```
 
-The current prototype launches the installed `codex app-server` by executable name; it
-does not use the separate Codex source directory. That is a temporary OpenAI backend
-and a working milestone, not the finished runtime architecture.
+The current `elpis` executable is built from the contained `codex-rs/` foundation. It
+uses the existing ChatGPT/Codex authentication and native Codex turn implementation;
+it does not launch code from the donor clone or the archived prototype.
 
 Runtime ownership is explicit. When Codex is selected, Codex may own the low-level
 model loop, native shell/file tools, native thread, and native compaction. Elpis still
@@ -198,28 +197,23 @@ large outputs also should not remain indefinitely in the model-visible working s
 
 ## Current State
 
-Prototype milestone implemented:
+Verified foundation:
 
-- temporary ChatGPT-authenticated Codex app-server adapter with `gpt-5.4-mini` default;
-- thread creation/resume/fork, persisted thread IDs, streamed messages, and real token usage;
-- Codex command/file approval requests routed to the Elpis approval modal when Codex
-  emits them;
-- workspace-write sandbox policy with on-request escalation;
-- explicit `@` injection and changed-only persistent context injection;
-- bounded TUI transcript messages and a sliding display window;
-- single-tool local retrieval MCP; Python voice modules remain non-agent services.
-- status-only account verification proven through `account/read`; explicit Codex runtime
-  ownership is recorded in `docs/AUTHENTICATION_BOUNDARY.md`.
+- `main` contains the pinned Codex Rust workspace under `codex-rs/` and builds the
+  user-facing `elpis` executable;
+- ChatGPT authentication, streaming, commands, patches, permission modes, sandboxing,
+  mouse interaction, native sessions, and native compaction are inherited from Codex;
+- a real authenticated turn ran a command and created a file, and launch checks proved
+  no donor-clone runtime dependency;
+- the old hand-grown TUI and Python agent state is preserved on
+  `archive/legacy-prototype-20260716`, not the active architecture;
+- Gemini/runtime-boundary experiments are parked on `agent/runtime-boundary` and are
+  not part of canonical `main`.
 
-Important gaps:
-
-1. Replace the hand-grown prototype with a pinned Codex Rust foundation inside Elpis.
-2. Preserve Codex's exact permission presets and action rendering, then prove them in Elpis.
-3. Add an explicit runtime contract so Codex, an Elpis embedded provider-neutral loop,
-   and external runtimes can share the Elpis control layer without pretending they own
-   identical native capabilities.
-4. Add the OpenClaw-derived context pipeline: pruning, receipts, guarded compaction,
-   dated notes, retrieval, and bounded long-term promotion.
+Current priority is stabilization by subtraction: identify obsolete or unwanted code,
+remove one bounded surface at a time, and remotely rebuild and smoke-test after each
+deletion. Feature additions, context design, memory design, `/auto` routing, and visual
+restyling follow only after this baseline is lean and trustworthy.
 
 ## Engineering Rules
 
@@ -231,16 +225,11 @@ Important gaps:
 - Do not call a temporary directory a sandbox. State the actual isolation boundary.
 - Preserve user-visible behavior with focused tests for protocol and context changes.
 - Record what is implemented separately from what is intended.
+- Treat `main` as canonical. Read archive branches only when historical prototype
+  behavior is specifically needed.
 
 ## Verification
 
-```bash
-cd tui
-CC=/usr/bin/cc CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=/usr/bin/cc cargo test
-cd ..
-.venv/bin/python -m compileall -q src
-codex login status
-```
-
-The explicit linker override avoids a user-local `cc` wrapper on this machine. It is
-not a project requirement on systems where `cc` resolves to a C compiler.
+Use `.github/workflows/embedded-elpis-linux.yml` for Rust formatting, focused tests,
+build, executable identity, and artifact verification. Do not compile Rust locally on
+Masih's workstation. Run only narrow non-Rust checks locally.

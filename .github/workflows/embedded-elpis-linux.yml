@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - agent/elpis-embedded-launcher
     paths:
       - .github/workflows/embedded-elpis-linux.yml

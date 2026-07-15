@@ -75,29 +75,27 @@ feature needs a focused user-visible check before it is marked working.
 
 ## Required Work, In Order
 
-1. **Adopt the proven Codex foundation inside Elpis**
-   - Pin a known upstream revision and preserve its license notices.
-   - Copy the required Rust workspace into Elpis; do not link to the donor directory.
-   - Keep the proven TUI/event, command, patch, permission, sandbox, session, and test
-     paths working before removing unwanted features.
-2. **Match Codex's visible actions and exact permission behavior**
-   - Render command start, live output, completion/failure, file patches, and changed
-     file summaries using the copied Codex lifecycle and rendering code.
-   - Preserve Codex's built-in Read Only, Default, and Full Access presets and its
-     underlying approval/sandbox rules. Full Access is the explicit no-prompt mode;
-     Default permits workspace work but asks for escalation; Read Only requires approval
-     for edits or internet access.
-3. **Create the provider boundary**
-   - Keep OpenAI/Codex as the first working adapter with subscription authentication.
-   - Add Gemini and Claude adapters without duplicating the TUI, tools, permissions,
-     context, sessions, or memory engine.
-4. **Implement the context and session engine**
+1. **Stabilize and subtract from the imported Codex foundation**
+   - The pinned foundation import is complete; do not rebuild its mature behavior.
+   - Archive and remove the superseded prototype only after proving it is not used.
+   - Inventory Codex surfaces as keep, remove, or decide-later.
+   - Delete one bounded surface at a time and preserve commands, patches, permissions,
+     sandboxing, mouse interaction, sessions, and authentication with remote checks.
+2. **Implement the context and session engine**
    - Full transcript on disk; small model-visible working set.
    - Expiring tool output, compact receipts, visible context ledger, checkpoints,
      compaction, exact/lean continuation, fork, and rollback.
-5. **Implement the memory foundation**
+3. **Implement the memory foundation**
    - Curated long-term memory, dated working notes, search and selective retrieval,
      pre-compaction memory flush, provenance, review, and deletion.
+4. **Add automatic model routing**
+   - `/auto` chooses a suitable model from a user-approved pool for each task.
+   - The choice, reason, cost/quality tier, and manual override remain visible.
+   - Start with explicit easy/medium/hard tiers; do not hide routing behind login.
+5. **Create the provider boundary**
+   - Keep OpenAI/Codex as the first working runtime with subscription authentication.
+   - Add Gemini and Claude adapters without duplicating the TUI, tools, permissions,
+     context, sessions, or memory engine.
 6. **Complete required coding-agent capabilities**
    - Web research, image/file inputs where supported, interruption/cancellation,
      reliable errors, configuration, and recovery after restart.
@@ -106,20 +104,19 @@ feature needs a focused user-visible check before it is marked working.
 
 | Area | Current state |
 | --- | --- |
-| ChatGPT login | Working through installed Codex. |
-| Default model turn | Working through Codex app-server. Codex owns the low-level turn; Elpis currently supplies only a thin surrounding TUI. |
-| Streaming answer | Working for Codex agent-message text. |
-| File/command permissions | Partial. The prototype requests Codex's Default policy (`on-request` + workspace write), so in-workspace writes may correctly proceed without a prompt. Its `/yolo` switch does not reconfigure the thread and is therefore not a faithful mode switch. |
-| File/command activity display | Incomplete. The action occurred visibly, but most structured command/file events are ignored or poorly rendered, so the display is much less informative than Codex. |
-| Session save/list | Basic Elpis JSON session files exist. |
-| Resume/fork | Working only authoritatively through delegated Codex threads; non-Codex mode replays rendered messages. |
-| Context file selection | Partial. Explicit files can be injected, and unchanged selected files are not repeatedly appended by the TUI. |
-| Context pruning | Display/session-message trimming exists, but it does not shrink the delegated Codex model context. |
+| Canonical source | `main` is the contained Codex-derived Elpis foundation. The former prototype is archived at `archive/legacy-prototype-20260716`. |
+| Installed command | `elpis` resolves to `/home/masih/.local/bin/elpis`, built remotely from this repository. |
+| ChatGPT login and Codex turn | Working through the imported native Codex implementation. |
+| Commands, patches, and activity display | Inherited from Codex and exercised in the authenticated foundation acceptance turn. |
+| Permission modes and sandboxing | Inherited from Codex; no Elpis reimplementation is required. A focused all-mode acceptance matrix remains useful before release. |
+| Mouse selection/copy | Inherited from the Codex TUI; Masih confirmed the old prototype limitation does not apply to this foundation. |
+| Native sessions and compaction | Inherited for Codex-owned threads. Elpis-wide provider-neutral continuity is not implemented. |
 | Context ledger and receipts | Specified in docs; not implemented. |
 | Compaction/checkpoints/lean continuation | Specified in docs; not implemented. |
-| Retrieval MCP | Working: one local `query_knowledge_base` tool. |
-| Long-term memory | Not active in the current Codex path. Older Python memory modules remain, but the live MCP does not expose them. |
+| Long-term memory | Not implemented in the canonical Codex-derived path. |
 | OpenClaw-style memory | Not implemented. Source inspection confirms OpenClaw combines pruning, guarded compaction, dated append-only flushes, hybrid retrieval, and scored long-term promotion. Elpis currently has none of that complete pipeline. |
+| `/auto` model routing | Required but not implemented. It means per-task model selection from a configured pool, not authentication. |
+| Gemini/other runtimes | Experimental Gemini ACP work is parked on `agent/runtime-boundary`; it is not merged into `main`. |
 
 ## Proposed State Layout
 
@@ -138,11 +135,9 @@ This is a proposal, not yet approved:
 
 ### D1. Foundation migration shape
 
-The direction is settled: use Codex's Rust foundation and subtract. Before moving code,
-choose whether to replace the present repository tree in one migration branch or place
-the pinned upstream foundation under a temporary internal directory and move Elpis
-features onto it incrementally. The choice must preserve the current prototype until
-the copied foundation reaches the same working milestone.
+Resolved: the pinned Codex Rust foundation lives under `codex-rs/`; `main` uses it as
+the canonical Elpis baseline, and the former prototype is preserved on
+`archive/legacy-prototype-20260716`. Continue by subtraction.
 
 ### D2. ES file
 
@@ -166,6 +161,12 @@ memory. Decide how much automatic promotion is acceptable.
 
 Recommended: exact resume while the context is healthy; lean continuation when context
 pressure is high or the user requests it. The switch and its evidence should be visible.
+
+### D6. Automatic model-routing policy
+
+The `/auto` outcome is confirmed, but the classifier, tier boundaries, eligible model
+pool, fallback behavior, and whether routing occurs per user message or per delegated
+subtask require design after foundation stabilization.
 
 ## Nice-To-Haves After The Foundation
 
