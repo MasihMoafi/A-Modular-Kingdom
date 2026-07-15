@@ -1,0 +1,246 @@
+# Elpis Technical Guide
+
+## Purpose
+
+Elpis is a provider-neutral coding-agent TUI. It does not try to make a new foundation
+model. It gives agents backed by OpenAI/Codex, Gemini, Claude, or another model one
+coherent local interface by managing:
+
+- the instructions and project knowledge admitted into working context;
+- the boundary between transient context and durable memory;
+- tools, edits, commands, permissions, and their evidence;
+- continuity across turns, compaction, and sessions;
+- a model-independent TUI where consequential actions remain inspectable.
+
+The intended result is assimilation: whichever model provider is selected, the agent
+adopts the user's harness, workspace, memory, and control policy without being buried
+under them.
+
+## Product Value
+
+Elpis should create value in four ways:
+
+1. **Context sovereignty:** the user can see and control what enters the agent's
+   working set. Selecting a file is an intentional context operation, not decoration.
+2. **Reliable continuity:** sessions preserve goals, decisions, changes, and evidence,
+   while disposable logs and stale file bodies fall away.
+3. **Safe agency:** edits and commands use explicit sandbox and approval contracts.
+   The UI shows what is proposed and records what happened.
+4. **Runtime choice:** Elpis keeps one surrounding control environment while allowing
+   the model provider and low-level agent runtime to change explicitly.
+
+Elpis is not primarily a provider switcher, a transcript viewer, or a collection of
+slash commands. A command belongs in the product only when the user deliberately
+selects it and its behavior has a stable contract.
+
+## Source Map
+
+Treat upstream behavior as evidence, not inspiration copied from memory.
+
+### Codex: execution and interface reference
+
+Primary source is the local clone at `/home/masih/Desktop/f/p/others/codex`:
+
+- App-server: `/home/masih/Desktop/f/p/others/codex/codex-rs/app-server`
+- App-server protocol: `/home/masih/Desktop/f/p/others/codex/codex-rs/app-server-protocol`
+- Rust TUI: `/home/masih/Desktop/f/p/others/codex/codex-rs/tui`
+- Core agent runtime: `/home/masih/Desktop/f/p/others/codex/codex-rs/core`
+
+The clone's origin is [openai/codex](https://github.com/openai/codex). Use the remote
+only for provenance or an explicitly requested update; do not browse it when the local
+clone can answer the question.
+
+Use Codex as the implementation foundation for thread/turn/item semantics, streaming,
+file changes, command execution, approvals, sandboxing, `@` interactions, and TUI
+ergonomics. Copy the required Rust crates and their tests into Elpis, preserving the
+Apache-2.0 notices. The finished Elpis program must not load code from, or require,
+the separate Codex clone directory at runtime.
+
+The preferred foundation strategy is **fork and subtract**: begin from a known Codex
+source revision, keep its proven execution and TUI paths intact, remove unwanted
+OpenAI-specific product surfaces in small tested steps, and introduce a provider
+boundary for OpenAI/Codex, Gemini, Claude, and later providers. Do not reproduce these
+subsystems piecemeal in the current prototype.
+
+### OpenClaw: context and continuity reference
+
+Primary source is the current shallow clone at
+`/home/masih/Desktop/f/p/others/openclaw-upstream`. The older May 26 source archive is
+`/home/masih/Desktop/f/p/others/openclaw-main`.
+Read implementation and tests, not only explanatory documents. The main source areas
+are:
+
+- live context pruning: `src/agents/pi-hooks/context-pruning/`;
+- pre-compaction memory flush: `src/auto-reply/reply/memory-flush.ts` and
+  `agent-runner-memory.ts`;
+- guarded compaction: `src/agents/pi-hooks/compaction-safeguard.ts`;
+- search and retrieval: `extensions/memory-core/src/memory/`;
+- dated notes, long-term promotion, size budgets, and dreaming:
+  `extensions/memory-core/src/flush-plan.ts`, `short-term-promotion.ts`,
+  `memory-budget.ts`, and `dreaming.ts`.
+
+The upstream project is [openclaw/openclaw](https://github.com/openclaw/openclaw).
+The initialized but empty-history `/home/masih/Desktop/f/repos/openclaw-main` is not an
+upstream source clone and is not the Elpis reference tree.
+
+OpenClaw's useful memory behavior is a pipeline, not a special Markdown filename:
+ephemeral pruning keeps a live turn small; guarded compaction preserves continuity;
+pre-compaction flush writes dated append-only notes; hybrid search retrieves only
+relevant excerpts; repeated useful recalls may be promoted into bounded long-term
+memory. Dreaming is optional scheduled review and promotion on top of that foundation.
+
+Elpis's concrete context-receipt and session-checkpoint contract lives in
+`docs/CONTEXT_AND_SESSIONS.md`.
+
+## Runtime Architecture
+
+```text
+User
+  -> Elpis TUI (presentation, selection, approvals, context visibility)
+  -> Elpis control layer (runtime choice, context, memory, session mirror, policy)
+       -> selected agent runtime
+            -> Codex app-server (owns a Codex turn and its native tools/thread)
+            -> Elpis embedded runtime (provider-neutral direct model path)
+            -> external/ACP runtime (Claude CLI, Gemini CLI, or another harness)
+       -> Elpis retrieval services
+  -> Workspace + durable Elpis state (~/.elpis)
+```
+
+The current prototype launches the installed `codex app-server` by executable name; it
+does not use the separate Codex source directory. That is a temporary OpenAI backend
+and a working milestone, not the finished runtime architecture.
+
+Runtime ownership is explicit. When Codex is selected, Codex may own the low-level
+model loop, native shell/file tools, native thread, and native compaction. Elpis still
+owns the surrounding product: runtime selection, context projection, durable memory,
+provider-neutral session mirror, behavioral policy, approvals bridge, and visible TUI.
+Selecting another runtime must not silently route through Codex.
+
+The Codex account and runtime boundaries are specified in
+`docs/AUTHENTICATION_BOUNDARY.md`. Authentication alone must never silently select a
+runtime; the active model and runtime owner must be visible.
+
+## Context Contract
+
+Context is a budgeted working set, not the session archive.
+
+### 1. Durable prefix
+
+Load the smallest stable routing layer: applicable `AGENTS.md`, this guide, and a
+short skill index. Detailed rules are loaded only when a task triggers them. An
+instruction file should behave like a table of contents, not a knowledge dump.
+
+### 2. Turn input
+
+Send the new user message plus explicitly requested context. An `@file` mention is
+an explicit refresh. A pinned checklist file is injected once and again only when its
+content changes. Never append the same unchanged file body on every turn.
+
+### 3. Exploration expires
+
+Searches, directory listings, file reads, probes, and unsuccessful paths are temporary
+working material. Once they have answered the current question, remove their raw output
+from the model-visible context. Keep only the useful conclusion, a pointer to its source,
+and the consequence for the next action.
+
+Do not turn `GUIDE.md` into an exploration log. Promote one distilled fact only when it is
+durable enough to change how future agents should work on Elpis; replace stale guidance
+instead of accumulating discoveries.
+
+### 4. Tool and file receipts
+
+Keep full events in the on-disk transcript. The model-visible working set should
+replace stale bulky results with compact receipts containing:
+
+- operation and target;
+- success/failure and exit status;
+- concise result or error summary;
+- changed paths and a diff/stat reference;
+- verification performed;
+- a pointer for rereading the full artifact when needed.
+
+After a file edit, preserve the path, semantic change, diff, and verification. Do not
+retain the entire old and new file merely because the agent touched them.
+
+### 5. Pruning and compaction
+
+- **Pruning is ephemeral:** trim or replace old tool results for the next request;
+  leave the durable transcript intact.
+- **Compaction is persistent:** summarize older conversation into a checkpoint that
+  preserves the goal, constraints, decisions, changed files, verification, blockers,
+  and next action.
+- Before compaction, flush genuinely reusable facts to durable memory.
+- Keep a recent-turn suffix verbatim so the agent does not wake up inside a summary.
+
+### 6. Memory
+
+Memory is curated cross-session knowledge, not a transcript mirror. Store stable user
+preferences, project facts, decisions, and proven procedures. Retrieve only relevant
+entries for the current task and make provenance visible.
+
+### 7. Measurement
+
+Prefer runtime-reported token usage and context-window size. Character division is a
+fallback estimate only. Track injected sources and bytes/tokens by category so the
+user can answer: "Why is this in context?"
+
+## Session Semantics
+
+An API call does not receive previous messages by magic. Either Elpis resends the chosen
+working context, or a provider stores a thread and reconstructs it. Elpis must keep its
+own provider-neutral session record and context ledger even when a provider also offers
+thread IDs. Resume, fork, rollback, and compaction must therefore have Elpis semantics,
+with provider thread IDs treated as adapter-specific state rather than the project truth.
+
+Reasoning tokens count toward usage, but hidden reasoning is not a useful transcript
+to carry forward verbatim. Preserve decisions and evidence. Streamed tool events and
+large outputs also should not remain indefinitely in the model-visible working set.
+
+## Current State
+
+Prototype milestone implemented:
+
+- temporary ChatGPT-authenticated Codex app-server adapter with `gpt-5.4-mini` default;
+- thread creation/resume/fork, persisted thread IDs, streamed messages, and real token usage;
+- Codex command/file approval requests routed to the Elpis approval modal when Codex
+  emits them;
+- workspace-write sandbox policy with on-request escalation;
+- explicit `@` injection and changed-only persistent context injection;
+- bounded TUI transcript messages and a sliding display window;
+- single-tool local retrieval MCP; Python voice modules remain non-agent services.
+- status-only account verification proven through `account/read`; explicit Codex runtime
+  ownership is recorded in `docs/AUTHENTICATION_BOUNDARY.md`.
+
+Important gaps:
+
+1. Replace the hand-grown prototype with a pinned Codex Rust foundation inside Elpis.
+2. Preserve Codex's exact permission presets and action rendering, then prove them in Elpis.
+3. Add an explicit runtime contract so Codex, an Elpis embedded provider-neutral loop,
+   and external runtimes can share the Elpis control layer without pretending they own
+   identical native capabilities.
+4. Add the OpenClaw-derived context pipeline: pruning, receipts, guarded compaction,
+   dated notes, retrieval, and bounded long-term promotion.
+
+## Engineering Rules
+
+- Read this guide before architectural work; read only the source sections relevant
+  to the current task.
+- Keep upstream protocol handling version-aware. Generate schemas from the installed
+  Codex version when exact message shapes matter.
+- Do not add slash commands without explicit user selection.
+- Do not call a temporary directory a sandbox. State the actual isolation boundary.
+- Preserve user-visible behavior with focused tests for protocol and context changes.
+- Record what is implemented separately from what is intended.
+
+## Verification
+
+```bash
+cd tui
+CC=/usr/bin/cc CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=/usr/bin/cc cargo test
+cd ..
+.venv/bin/python -m compileall -q src
+codex login status
+```
+
+The explicit linker override avoids a user-local `cc` wrapper on this machine. It is
+not a project requirement on systems where `cc` resolves to a C compiler.
