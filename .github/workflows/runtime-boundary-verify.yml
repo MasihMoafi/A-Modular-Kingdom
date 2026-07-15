@@ -43,7 +43,10 @@ jobs:
       - name: Install pinned Rust toolchain
         run: |
           rustup set profile minimal
-          rustup toolchain install 1.95.0 --no-self-update
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
 
       - name: Restore Cargo cache
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
@@ -64,3 +67,6 @@ jobs:
           cargo test -p codex-tui --lib --locked cli::tests::runtime_accepts_explicit_codex_selection -- --exact
           cargo test -p codex-tui --lib --locked cli::tests::runtime_rejects_unimplemented_adapters -- --exact
           cargo test -p codex-tui --lib --locked runtime_contract::tests::codex_ownership_preserves_the_elpis_control_boundary -- --exact
+          cargo test -p codex-tui --lib --locked gemini_acp::tests::request_collects_notifications_before_response -- --exact
+          cargo test -p codex-tui --lib --locked gemini_acp::tests::request_rejects_unsupported_client_capability_without_hanging -- --exact
+          cargo test -p codex-tui --lib --locked gemini_acp::tests::rpc_errors_are_visible -- --exact
