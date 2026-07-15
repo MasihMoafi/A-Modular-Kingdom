@@ -53,6 +53,10 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   acceptance check.
 - Done: `foundation-codex-baseline` worktree at `/home/masih/Desktop/f/p/Elpis-foundation`
   on branch `agent/foundation-codex-baseline`.
+- WIP: runtime-boundary work now has a Codex-only `--runtime` selector, an explicit
+  ownership contract, dispatch through the existing Codex launch body, and focused
+  contract tests. Gemini and Claude adapters and transport/authentication choices were
+  deliberately not added.
 - Done for the foundation import: the complete committed `codex-rs/` workspace from
   pinned revision `2e1607ee2fa8099a233df7437adee5f16a741905` is now contained in
   this worktree. Its Apache-2.0 `LICENSE`, `NOTICE`, provenance, upstream crate
@@ -72,6 +76,10 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   `docs/FOUNDATION_CODEX_BASELINE_EVIDENCE.md`.
 - Blocked: none. The incomplete TUI test run is a known verification gap, not a blocker
   for the compilation baseline Masih accepted on 2026-07-15.
+- Runtime-boundary verification is deferred: local Cargo compilation significantly
+  disrupted Masih's workstation and was stopped at his request. This WIP must remain
+  `in_progress` until its focused tests and behavior-preservation check run elsewhere or
+  under an explicitly approved low-impact setup.
 
 ## Evidence
 
@@ -125,11 +133,16 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   policy (`on-request` plus workspace write).
 - The foundation import is committed on `agent/foundation-codex-baseline`; inspect
   `git log -1` for the checkpoint hash. Build output under `codex-rs/target/` is ignored.
+- Runtime-boundary WIP evidence is recorded in
+  `docs/RUNTIME_BOUNDARY_WIP_EVIDENCE.md`. Static review and `git diff --check` passed;
+  the added Rust tests were not executed, so no runtime-selection acceptance claim was
+  made and `FEATURES.json` remains `in_progress`.
 
 ## Next Action
 
-Stop at the verified foundation checkpoint. Runtime-boundary work has not begun;
-wait for Masih to select the next priority before changing runtime contracts.
+Stop at the runtime-boundary WIP checkpoint. Before expanding the contract or adding a
+non-Codex adapter, run the focused tests and behavior-preservation check in an
+environment that does not disrupt Masih's workstation.
 
 ## Ordered Tasks
 
@@ -158,3 +171,5 @@ wait for Masih to select the next priority before changing runtime contracts.
   accepted baseline, and the hanging TUI test is a recorded gap.
 - Do not retain raw searches, file reads, command output, or failed probes after their
   conclusion and source pointer have been recorded.
+- Do not run Cargo on Masih's workstation for this WIP unless he explicitly approves a
+  low-impact verification setup.

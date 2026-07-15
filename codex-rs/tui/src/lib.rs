@@ -156,6 +156,7 @@ pub(crate) mod public_widgets;
 mod render;
 mod resize_reflow_cap;
 mod resume_picker;
+mod runtime_contract;
 mod selection_list;
 mod service_tier_resolution;
 mod session_archive_commands;
@@ -216,6 +217,9 @@ use crate::startup_hooks_review::load_startup_hooks_review_entry;
 use crate::startup_hooks_review::maybe_run_startup_hooks_review;
 use crate::tui::Tui;
 pub use cli::Cli;
+pub use runtime_contract::CapabilityOwner;
+pub use runtime_contract::RuntimeKind;
+pub use runtime_contract::RuntimeOwnership;
 use codex_arg0::Arg0DispatchPaths;
 pub use markdown_render::render_markdown_text;
 pub use public_widgets::composer_input::ComposerAction;
@@ -846,6 +850,25 @@ fn can_reuse_implicit_local_daemon(
 }
 
 pub async fn run_main(
+    cli: Cli,
+    arg0_paths: Arg0DispatchPaths,
+    loader_overrides: LoaderOverrides,
+    explicit_remote_endpoint: Option<RemoteAppServerEndpoint>,
+) -> std::io::Result<AppExitInfo> {
+    match cli.runtime {
+        RuntimeKind::Codex => {
+            run_codex_main(
+                cli,
+                arg0_paths,
+                loader_overrides,
+                explicit_remote_endpoint,
+            )
+            .await
+        }
+    }
+}
+
+async fn run_codex_main(
     mut cli: Cli,
     arg0_paths: Arg0DispatchPaths,
     loader_overrides: LoaderOverrides,

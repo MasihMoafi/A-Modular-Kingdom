@@ -4,7 +4,7 @@
   "difficulty_values": ["easy", "medium", "hard"],
   "rule": "Only mark verified after the user-visible acceptance check passes and evidence is recorded.",
   "parallel_rule": "Use a separate worktree per task; parallelize only when dependencies are verified and file ownership does not overlap.",
-  "current_priority": "foundation-codex-baseline",
+  "current_priority": "runtime-selection",
   "features": [
     {
       "id": "foundation-codex-baseline",
@@ -81,10 +81,13 @@
       "dependencies": ["foundation-codex-baseline"],
       "parallel_safe": false,
       "file_scope": ["runtime contract", "model/provider selection", "session runtime identity", "contract tests"],
-      "status": "partial",
+      "status": "in_progress",
       "user_visible_behavior": "The user can choose Codex, Gemini, Claude, or another supported runtime and can see which layer owns the current turn.",
       "acceptance": ["Complete one visible turn on each supported runtime and resume its Elpis session."],
-      "evidence": ["Codex launches by default; older Python provider paths exist but parity is unverified."]
+      "evidence": [
+        "Codex launches by default; older Python provider paths exist but parity is unverified.",
+        "docs/RUNTIME_BOUNDARY_WIP_EVIDENCE.md"
+      ]
     },
     {
       "id": "context-ledger",

@@ -5,12 +5,18 @@ use codex_utils_cli::ApprovalModeCliArg;
 use codex_utils_cli::CliConfigOverrides;
 use codex_utils_cli::SharedCliOptions;
 
+use crate::RuntimeKind;
+
 #[derive(Parser, Clone, Debug)]
 #[command(version)]
 pub struct Cli {
     /// Optional user prompt to start the session.
     #[arg(value_name = "PROMPT", value_hint = clap::ValueHint::Other)]
     pub prompt: Option<String>,
+
+    /// Select the low-level agent runtime that owns the turn.
+    #[arg(long, value_enum, default_value = "codex")]
+    pub runtime: RuntimeKind,
 
     /// Error out when config.toml contains fields that are not recognized by this version of Codex.
     #[arg(long = "strict-config", default_value_t = false)]
@@ -136,4 +142,30 @@ fn mark_tui_args(cmd: clap::Command) -> clap::Command {
     cmd.mut_arg("dangerously_bypass_approvals_and_sandbox", |arg| {
         arg.conflicts_with("approval_policy")
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_defaults_to_codex() {
+        let cli = Cli::try_parse_from(["codex"]).expect("default CLI should parse");
+
+        assert_eq!(cli.runtime, RuntimeKind::Codex);
+    }
+
+    #[test]
+    fn runtime_accepts_explicit_codex_selection() {
+        let cli = Cli::try_parse_from(["codex", "--runtime", "codex"])
+            .expect("Codex runtime should be supported");
+
+        assert_eq!(cli.runtime, RuntimeKind::Codex);
+    }
+
+    #[test]
+    fn runtime_rejects_unimplemented_adapters() {
+        assert!(Cli::try_parse_from(["codex", "--runtime", "gemini"]).is_err());
+        assert!(Cli::try_parse_from(["codex", "--runtime", "claude"]).is_err());
+    }
 }
