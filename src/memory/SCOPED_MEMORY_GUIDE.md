@@ -43,7 +43,7 @@ search_memories(query="preferences", top_k=3, scope_filter="global_preferences")
 ## Storage Locations
 
 ```
-~/.modular_kingdom/memories/
+~/.elpis/memories/
 ├── global/
 │   ├── rules/          # Global coding rules
 │   ├── preferences/    # User preferences  
@@ -114,7 +114,7 @@ These persist across projects and sessions automatically.
 Run comprehensive tests:
 
 ```bash
-cd /home/masih/Desktop/p/A-Modular-Kingdom
+cd /home/masih/Desktop/f/p/Elpis
 uv run python -m pytest src/memory/test_scoped_memory.py -v
 ```
 

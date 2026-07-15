@@ -54,7 +54,7 @@ if SRC_ROOT not in sys.path:
 
 
 def _initial_workspace_root() -> str:
-    for var in ("AMK_WORKSPACE_ROOT", "INIT_CWD", "PWD"):
+    for var in ("ELPIS_WORKSPACE_ROOT", "INIT_CWD", "PWD"):
         value = os.environ.get(var, "").strip()
         if value and os.path.isdir(os.path.expanduser(value)):
             return os.path.realpath(os.path.expanduser(value))
@@ -144,8 +144,8 @@ def openrouter_chat_stream(model: str, messages: list):
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/MasihMoafi/A-Modular-Kingdom",
-        "X-Title": "A-Modular-Kingdom Client",
+        "HTTP-Referer": "https://github.com/MasihMoafi/Elpis",
+        "X-Title": "Elpis Client",
     }
     payload = {
         "model": model,
@@ -185,8 +185,8 @@ def openrouter_chat_non_stream(model: str, messages: list, format_json: bool = F
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/MasihMoafi/A-Modular-Kingdom",
-        "X-Title": "A-Modular-Kingdom Client",
+        "HTTP-Referer": "https://github.com/MasihMoafi/Elpis",
+        "X-Title": "Elpis Client",
     }
     payload = {
         "model": model,
@@ -424,7 +424,7 @@ def _broader_name_matches(name: str, limit: int = 20) -> list[str]:
     if os.path.realpath(WORKSPACE_ROOT) != os.path.realpath(REPO_ROOT):
         return matches
 
-    # Last-resort repair for wrappers that accidentally launch from the AMK
+    # Last-resort repair for wrappers that accidentally launch from the Elpis
     # source repo: search nearby user work areas, but only after workspace search
     # failed. This keeps normal @/read behavior scoped and avoids eager indexing.
     needle = name.strip().strip("'\"`.,;:@").lower()
@@ -588,30 +588,6 @@ def _extract_shell_command(text: str) -> str:
     return command
 
 
-def _run_shell_local(command: str, timeout_seconds: int = 30) -> dict:
-    try:
-        proc = subprocess.run(
-            command,
-            cwd=WORKSPACE_ROOT,
-            shell=True,
-            executable="/bin/bash",
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
-        return {
-            "status": "success" if proc.returncode == 0 else "error",
-            "returncode": proc.returncode,
-            "stdout": proc.stdout,
-            "stderr": proc.stderr,
-            "cwd": WORKSPACE_ROOT,
-        }
-    except subprocess.TimeoutExpired:
-        return {"status": "error", "error": f"Command timed out after {timeout_seconds}s", "cwd": WORKSPACE_ROOT}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "cwd": WORKSPACE_ROOT}
-
-
 async def _run_shell_command(session: ClientSession, available_tools: set[str], command: str, timeout_seconds: int = 30) -> dict:
     if "shell_execute" in available_tools:
         result = await session.call_tool(
@@ -619,7 +595,11 @@ async def _run_shell_command(session: ClientSession, available_tools: set[str], 
             {"command": command, "timeout_seconds": timeout_seconds},
         )
         return _parse_json_dict(_extract_tool_text(result))
-    return _run_shell_local(command, timeout_seconds=timeout_seconds)
+    return {
+        "status": "error",
+        "error": "Shell execution is unavailable because the approval-capable tool is not registered.",
+        "cwd": WORKSPACE_ROOT,
+    }
 
 
 def _print_shell_payload(payload: dict) -> None:
@@ -763,17 +743,18 @@ def _parse_nl_file_request(text: str):
     if not any(x in lower for x in ["create", "write", "generate", "make", "save"]):
         return None
 
-    path_match = re.search(r'["\']([^"\']+\.(?:md|markdown|docx))["\']', text, re.IGNORECASE)
+    path_match = re.search(r'["\']([^"\']+\.[A-Za-z0-9]+)["\']', text, re.IGNORECASE)
     if path_match:
         raw_path = path_match.group(1).strip()
     else:
-        plain = re.search(r'((?:~|/|\./|\.\./)?[A-Za-z0-9_\-./]+?\.(?:md|markdown|docx))\b', text, re.IGNORECASE)
+        plain = re.search(r'((?:~|/|\./|\.\./)?[A-Za-z0-9_\-./]+?\.(?:md|markdown|docx|txt|py|json|yaml|yml|sh|js|ts|rs|toml|html|css))\b', text, re.IGNORECASE)
         raw_path = plain.group(1).strip() if plain else ""
     if not raw_path:
         return None
 
     suffix = os.path.splitext(raw_path)[1].lower()
-    if suffix not in (".md", ".markdown", ".docx"):
+    allowed_suffixes = (".md", ".markdown", ".docx", ".txt", ".py", ".json", ".yaml", ".yml", ".sh", ".js", ".ts", ".rs", ".toml", ".html", ".css")
+    if suffix not in allowed_suffixes and not path_match:
         return None
 
     title = ""
@@ -914,7 +895,7 @@ async def _web_crawl_rag_context(
 async def main(think_level=None):
     print("--- Intelligent Agent ---")
     host_env = dict(os.environ)
-    host_env["AMK_WORKSPACE_ROOT"] = WORKSPACE_ROOT
+    host_env["ELPIS_WORKSPACE_ROOT"] = WORKSPACE_ROOT
     params = StdioServerParameters(
         command=sys.executable,
         args=["-u", HOST_PATH],
@@ -981,7 +962,7 @@ async def main(think_level=None):
             # Short-term memory (windowed) with fixed k=50
             stm = ConversationBufferWindowMemory(k=50, return_messages=False)
             
-            print(f"\nWorkspace: {WORKSPACE_ROOT}")
+            print(f"\nWorkspace root: {WORKSPACE_ROOT}")
             print("File @ search is ready. Type @ plus part of a filename.")
             
             print("\nAgent is ready. Type 'exit' to quit. Use @ to see document dropdown.")
@@ -1004,6 +985,17 @@ async def main(think_level=None):
                         break
                     if not user_input.strip():
                         continue
+                    if user_input.startswith('/inject_history '):
+                        parts = user_input.replace("/inject_history ", "", 1).split(" ", 1)
+                        if len(parts) == 2:
+                            role, content = parts[0], parts[1]
+                            if role == "user":
+                                stm.chat_memory.add_user_message(content)
+                            elif role in ("assistant", "agent"):
+                                stm.chat_memory.add_ai_message(content)
+                        print(">", flush=True)
+                        continue
+
                     if _is_capability_question(user_input):
                         print(_capabilities_hint())
                         continue
@@ -1342,7 +1334,7 @@ async def main(think_level=None):
                                 continue
                             target = _resolve_user_path(path_part)
                             if not _is_safe_write_target(target):
-                                print("Write blocked. Allowed roots: workspace, AMK repo, and /tmp.")
+                                print("Write blocked. Allowed roots: workspace, Elpis repo, and /tmp.")
                                 continue
                             if not content_part:
                                 if not interactive_input:
@@ -1768,6 +1760,58 @@ When <document id="...">...</document> appears above, the inner text is the actu
 
 User: {user_input}"""
                     
+                    def load_openclaw_context(workspace_root: str) -> str:
+                        from datetime import datetime
+                        base_dir = os.path.expanduser("~/.elpis/global")
+                        if not os.path.exists(base_dir):
+                            try:
+                                os.makedirs(base_dir, exist_ok=True)
+                            except Exception:
+                                pass
+                        
+                        defaults = {
+                            "IDENTITY.md": "# IDENTITY.md - Who Am I?\n\n- Name: Juliette\n- Creature: Elpis Agent\n- Vibe: Sharp, direct, extremely capable, offline-first\n- Emoji: \ud83c\udff0\n",
+                            "SOUL.md": "# SOUL.md - Core Truths & Boundaries\n\n- Be genuinely helpful, not performatively helpful.\n- Have opinions.\n- Be resourceful before asking.\n- Earn trust through competence.\n- Remember you're a guest.\n",
+                            "USER.md": f"# USER.md - User Persona & Timezone\n\n- Timezone: {datetime.now().astimezone().tzname() if hasattr(datetime.now().astimezone(), 'tzname') else 'Local'}\n- Preferences: Prefers concise, precise, action-oriented code without explanation.\n",
+                            "TOOLS.md": "# TOOLS.md - Local Infrastructure Notes\n\n- Main workspace: /home/masih/Desktop/f/p/Elpis\n"
+                        }
+                        
+                        for filename, content in defaults.items():
+                            filepath = os.path.join(base_dir, filename)
+                            if not os.path.exists(filepath):
+                                try:
+                                    with open(filepath, "w") as f:
+                                        f.write(content)
+                                except Exception:
+                                    pass
+                                    
+                        context_parts = []
+                        for filename in ("IDENTITY.md", "SOUL.md", "USER.md", "TOOLS.md"):
+                            filepath = os.path.join(base_dir, filename)
+                            if os.path.exists(filepath):
+                                try:
+                                    with open(filepath, "r") as f:
+                                        context_parts.append(f.read().strip())
+                                except Exception:
+                                    pass
+
+                        workspace_overrides = []
+                        for filename in ("IDENTITY.md", "SOUL.md", "USER.md", "TOOLS.md"):
+                            filepath = os.path.join(workspace_root, filename)
+                            if os.path.exists(filepath):
+                                try:
+                                    with open(filepath, "r") as f:
+                                        workspace_overrides.append(f.read().strip())
+                                except Exception:
+                                    pass
+                                    
+                        compiled_str = "\n\n".join(context_parts)
+                        if workspace_overrides:
+                            override_str = "\n\n".join(workspace_overrides)
+                            compiled_str = f"{compiled_str}\n\n=== Project Workspace Overrides ===\n{override_str}"
+                            
+                        return compiled_str
+
                     print("💡 Synthesizing final response...")
                     
                     # Read system prompt dynamically if present
@@ -1780,6 +1824,13 @@ User: {user_input}"""
                         except Exception:
                             pass
                     
+                    openclaw_context = load_openclaw_context(WORKSPACE_ROOT)
+                    if openclaw_context:
+                        if system_prompt:
+                            system_prompt = f"{system_prompt}\n\n=== Declarative Workspace Memory (OpenClaw) ===\n{openclaw_context}"
+                        else:
+                            system_prompt = openclaw_context
+
                     messages = []
                     if system_prompt:
                         messages.append({'role': 'system', 'content': system_prompt})
@@ -1856,6 +1907,7 @@ User: {user_input}"""
                         stm.chat_memory.add_ai_message(assistant_output)
                     except Exception:
                         pass
+                    print(">", flush=True)
                     
 
                 except (EOFError, KeyboardInterrupt):
@@ -1894,12 +1946,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     try:
-        if args.profile == "online":
-            os.environ["MCP_EXPOSE_EXTRA_TOOLS"] = "1"
-        else:
-            os.environ["MCP_EXPOSE_EXTRA_TOOLS"] = "0"
-        os.environ.setdefault("MCP_EXPOSE_RESOURCES", "1")
+        # Determine workspace root early to print it
+        WORKSPACE_ROOT = _initial_workspace_root()
+        print(f"Workspace: {WORKSPACE_ROOT}", flush=True)
+        
         initialize_llm(provider=args.provider, model=args.model)
+        sys.stdout.flush()
+        
         asyncio.run(main(think_level=args.think))
     except KeyboardInterrupt:
         print("\nExiting...")

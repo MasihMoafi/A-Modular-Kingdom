@@ -9,5 +9,4 @@ def resolve_memory_base(project_root: str | None = None) -> str:
         return str(Path(explicit).expanduser())
 
     # Default global location for cross-project persistence.
-    return str((Path.home() / ".modular_kingdom" / "memories").expanduser())
-
+    return str((Path.home() / ".elpis" / "memories").expanduser())

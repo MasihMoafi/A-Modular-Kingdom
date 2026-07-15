@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Speech-to-Text Tool for A-Modular-Kingdom
+Speech-to-Text Tool for Elpis
 CLI-compatible audio input and transcription
 """
 
@@ -26,7 +26,7 @@ class STTEngine:
     """Speech-to-Text engine with multiple backend support"""
     
     def __init__(self):
-        self.temp_dir = Path(tempfile.gettempdir()) / "amk_stt"
+        self.temp_dir = Path(tempfile.gettempdir()) / "elpis_stt"
         self.temp_dir.mkdir(exist_ok=True)
         self.recording = False
         
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     # Test the STT system
     stt = STTEngine()
     
-    print("🎤 Testing A-Modular-Kingdom STT System...")
+    print("🎤 Testing Elpis STT System...")
     
     # Show available models
     print("\nAvailable models:")

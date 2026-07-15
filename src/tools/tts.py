@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Text-to-Speech Tool for A-Modular-Kingdom
+Text-to-Speech Tool for Elpis
 Supports multiple TTS engines for CLI-compatible audio output
 """
 
@@ -23,7 +23,7 @@ class TTSEngine:
     """Text-to-Speech engine with multiple backend support"""
     
     def __init__(self):
-        self.temp_dir = Path(tempfile.gettempdir()) / "amk_tts"
+        self.temp_dir = Path(tempfile.gettempdir()) / "elpis_tts"
         self.temp_dir.mkdir(exist_ok=True)
         
     def speak(
@@ -212,11 +212,11 @@ if __name__ == "__main__":
     # Test the TTS system
     tts = TTSEngine()
     
-    print("🔊 Testing A-Modular-Kingdom TTS System...")
+    print("🔊 Testing Elpis TTS System...")
     
     # Test pyttsx3
     print("\nTesting pyttsx3...")
-    result = tts.speak("Hello from your A-Modular-Kingdom TTS system!", engine="pyttsx3")
+    result = tts.speak("Hello from your Elpis TTS system!", engine="pyttsx3")
     print(f"Result: {result}")
     
     # List voices

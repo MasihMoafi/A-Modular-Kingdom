@@ -33,8 +33,8 @@ package-lock.json
 Thumbs.db
 
 # Runtime storage / generated DBs
-.modular_kingdom/
-src/.modular_kingdom/
+.elpis/
+src/.elpis/
 agent_chroma_db/
 agent_qdrant_db/
 src/agent_chroma_db/

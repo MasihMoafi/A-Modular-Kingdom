@@ -23,7 +23,7 @@ class ScopedMemoryManager:
         self.config = MemoryConfig(project_root)
         self._instances: Dict[MemoryScope, Mem0] = {}
         self.markdown_store = MarkdownMemoryStore(self.config)
-        self.use_qdrant = os.getenv("AMK_MEMORY_VECTOR_BACKEND", "").lower() == "qdrant"
+        self.use_qdrant = os.getenv("ELPIS_MEMORY_VECTOR_BACKEND", "").lower() == "qdrant"
         
     def _get_instance(self, scope: MemoryScope) -> Mem0:
         """Get or create Mem0 instance for a scope."""

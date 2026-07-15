@@ -5,8 +5,8 @@
   "mcpServers": {
     "unified_knowledge_agent": {
       "command": "python",
-      "args": ["/home/masih/Desktop/migrate/Projects/A-Modular-Kingdom/A-Modular-Kingdom/agent/host.py"]
+      "args": ["/home/masih/Desktop/f/p/Elpis/src/agent/host.py"]
     }
   },
-  "contextFileName": "KINGDOM.md"
+  "contextFileName": "ELPIS.md"
 }

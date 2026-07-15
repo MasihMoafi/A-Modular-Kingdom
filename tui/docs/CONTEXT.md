@@ -1,6 +1,6 @@
-# Rust TUI Client Context (`amk` CLI)
+# Rust TUI Client Context (`elpis` CLI)
 
-This directory contains the source code for the Rust Terminal User Interface (TUI) client for `A-Modular-Kingdom`. It acts as a unified frontend dashboard for multiple local/remote AI agents (AMK Python host, Codex, and Kiro).
+This directory contains the source code for the Elpis Rust Terminal User Interface (TUI). It acts as a unified frontend dashboard for the Elpis Python host, Codex, and Kiro.
 
 ---
 
@@ -33,7 +33,7 @@ This directory contains the source code for the Rust Terminal User Interface (TU
 
 ## 🔌 Provider Authentication & Active Switching (`/auth`)
 
-The AMK agent defaults to using local Ollama (`qwen3:8b`), but supports active switching to **OpenRouter** APIs:
+The Elpis agent defaults to using local Ollama (`qwen3:8b`), but supports active switching to **OpenRouter** APIs:
 - **Command:** Type `/auth open-router` to switch providers, or `/auth ollama` to switch back.
 - **Authentication:** OpenRouter pulls its key directly from `~/.openrouter_api_key` or your active shell environment (`OPENROUTER_API_KEY`).
 - **Default OpenRouter Model:** `google/gemini-2.5-flash` (customizable in arguments).
@@ -44,7 +44,7 @@ The AMK agent defaults to using local Ollama (`qwen3:8b`), but supports active s
 
 ## 🏗️ Architecture & Commands
 
-- **Path:** `/home/masih/Desktop/p/amk-tui`
+- **Path:** `/home/masih/Desktop/f/p/Elpis/tui`
 - **TUI Source:** `src/main.rs` (Crossterm event processing + Ratatui UI drawing)
 - **Compile command:** `cargo build --release`
-- **Run command alias:** `amk` (points to `target/release/rust_tui`)
+- **Run command:** `cargo run --release`

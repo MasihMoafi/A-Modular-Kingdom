@@ -51,11 +51,11 @@ class MemoryConfig:
             Path object for Qdrant storage
         """
         if scope.name.startswith("GLOBAL_"):
-            # Global memories stored in ~/.modular_kingdom/memories/global/
+            # Global memories stored in ~/.elpis/memories/global/
             scope_name = scope.value.replace("global_", "")
             return self.global_memory_base / "global" / scope_name
         else:
-            # Project memories stored in ~/.modular_kingdom/memories/projects/{hash}/
+            # Project memories stored in ~/.elpis/memories/projects/{hash}/
             scope_name = scope.value.replace("project_", "")
             return self.global_memory_base / "projects" / self.project_hash / scope_name
     

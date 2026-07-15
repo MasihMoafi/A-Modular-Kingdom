@@ -1,16 +1,16 @@
 # Project Context & Conversation Status
 
-This file tracks the current implementation status, project structure, and key details of our conversation regarding the `amk-tui` Rust client and the `A-Modular-Kingdom` provider integrations.
+This file tracks the current implementation status and project structure of the Elpis Rust client and its provider integrations.
 
 ---
 
 ## 🏗️ Project Architecture & Locations
 
-- **TUI Frontend Client:** `/home/masih/Desktop/p/amk-tui`
+- **TUI Frontend Client:** `/home/masih/Desktop/f/p/Elpis/tui`
   - **Source Code:** `src/main.rs` (Crossterm events + Ratatui UI rendering loop)
   - **Compile Command:** `cargo build --release`
-  - **Run Command Alias:** `amk` (points to `target/release/rust_tui`)
-- **Backend MCP Host:** `/home/masih/Desktop/p/A-Modular-Kingdom`
+  - **Run Command:** `cargo run --release`
+- **Backend MCP Host:** `/home/masih/Desktop/f/p/Elpis`
   - **Agent Script:** `src/agent/main.py` (Ollama/Gemini/OpenRouter handler)
 
 ---
@@ -53,6 +53,6 @@ This file tracks the current implementation status, project structure, and key d
   - **Ollama:** Supports local models `qwen3:8b` and `llama3.2:3b`.
 - **TUI Header Info Display:** The top border/header dynamically shows the active provider, model, and workspace (e.g. `Provider: ollama | Model: qwen3:8b | Workspace: /home/masih/...`).
 - **OpenRouter Backend Integration:**
-  - Standard HTTP requests chat stream with SSE token processing in `A-Modular-Kingdom/src/agent/main.py`.
+  - Standard HTTP requests chat stream with SSE token processing in `src/agent/main.py`.
   - Authenticates via your local key file `/home/masih/.openrouter_api_key`.
 - **Context Status Limit:** `/status` command outputs context window limit, estimated used tokens (conversation history + prompt approximation), and remaining tokens.

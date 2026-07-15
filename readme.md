@@ -1,39 +1,72 @@
----
-name: [Elpis]
-type: [ System Layer]
----
+# Elpis
 
-# Project Elpis: 
-subtitle:"famous Bruce Lee Saying Altered to understand Elpis better: "You put an agent into an Elpis, and it becomes Elpis; Be Elpis my friend."
+> You put an agent into an Elpis, and it becomes Elpis. Be Elpis, my friend.
 
+Elpis is an agent environment for context, memory, behavior, runtime choice, evidence,
+and cross-session continuity. A selected runtime—Codex, Gemini, Claude, or another
+supported agent—enters the user's environment and assimilates into its current goal,
+applicable rules, durable knowledge, and working style.
 
-## 1. Introduction: What is Elpis?
+## Why It Exists
 
-Elpis (Ancient Greek: ἐλπίς) is the literal Greek word for "hope" or "expectation." Depending on the context—mythological, philosophical, or biblical—its meaning shifts from an ambiguous anticipation of the future to an absolute, unshakeable certainty.
-🏛️ Greek Mythology: The Spirit of Pandora's BoxIn Greek mythology, Elpis is the personified goddess or spirit (daimon) of hope. She is most famous for her role in the myth of Pandora’s box (or jar):The Myth: When Pandora opened the jar, she inadvertently released all the evils, diseases, and hardships into the world. As she slammed the lid shut, Elpis was the only spirit left trapped inside.The Ambiguity: Ancient Greeks viewed hope with nuance. To some, Elpis remaining in the jar meant humanity was granted a comforting coping mechanism to endure life's hardships. To others, it was viewed negatively—as a cruel illusion or false expectation that extends human suffering.
+Agent quality depends on more than the model. Long transcripts, repeated file bodies,
+raw tool output, stale instructions, and weak session boundaries consume context and
+hide the current goal. Elpis gives the user and agent an explicit working-set policy:
 
-in our terminology, Elpis doesn't have a simple/ single definition. You will know Elpis by understanding its attributes:
+- load durable guidance only when it applies;
+- inject `@` resources intentionally and pinned resources only when changed;
+- keep full evidence on disk while shrinking stale model-visible tool results;
+- preserve goals, decisions, diffs, verification, and blockers across compaction;
+- route edits and commands through visible sandbox and approval contracts.
 
-- Elpis is something you become; it can be a state.
+The intended outcome is not another generic chat client. It is an environment in
+which an agent can work with greater continuity, restraint, and transparency.
 
-When we say a work environment is Elpis we mean it's an where the agents revel to work and will utilize their maximum capabilities. Because it's perfectly tailored to them, it's pure harmony, and order.
+## Current Runtime
 
-- Elpis is a /purpose we aim to achieve. it's never 100%. We strive to become more Elpis with every action.
+The Rust TUI currently uses Codex app-server as its first working runtime:
 
-- Elpis values clarity and transparency above all else. 
+- ChatGPT subscription authentication through the installed Codex CLI;
+- `gpt-5.4-mini` as the low-cost default model;
+- persisted Codex threads with authoritative resume and fork operations;
+- streamed responses and runtime-reported token usage;
+- Codex workspace sandboxing and approval requests;
+- explicit and changed-only context-file injection.
 
-- Elpis is an extension of its creator.
+The Python MCP exposes one local retrieval tool. Codex currently owns the low-level
+agent turn and native coding capabilities. Elpis supplies a thin TUI around it; the
+distinctive Elpis context, memory, behavior, supervision, and runtime layers are not yet
+implemented.
 
-The objective of this project is to initiate that infrastructure that improves daily to make AI agents more Elpis. Since the vision of the project is grand, I welcome contributions; namely from system, and hardware-savy engineers.
+## Run
 
-# 2. Mechanics & Technical Spec
-[How it works under the hood. No hand-waving. Define the exact state transitions, the file structures, or the runtime loop where the agent loses its default behavior and adopts this structure.]
+Prerequisites: Rust, an installed Codex CLI, and an authenticated ChatGPT account.
 
-# 4. Evaluation & Test Series
-[The proof. Hard data, test cases, or deterministic outputs that show the agent successfully assimilated into the structure without breaking constraints.]
+```bash
+codex login status
+cd tui
+cargo run
+```
 
-# 5. Future Dev
-A hardware-software intersection will be the obvious route to take. 
+If Codex is signed out, run `codex login` and complete the browser flow. The current
+runtime authenticates through Codex app-server and must never render or log credentials.
+See [docs/AUTHENTICATION_BOUNDARY.md](docs/AUTHENTICATION_BOUNDARY.md).
 
-# 6. Behavior & Tenets
-Elpis does not lie to its master. Elpis is the epitome of transparency and honesty. It learns strictly through that attribute, constantly bettering itself by verifying claims before making them. It relies on deterministic proof and hard data over blind assumptions. When asked a question about a system's capability, Elpis does not guess; it tests the pipeline and presents the artifacts.
+## Project Eye
+
+Read [VISION.md](VISION.md) for the stable product intent, [FEATURES.json](FEATURES.json)
+for the supervised implementation queue, and [GUIDE.md](GUIDE.md) for architecture and
+current truth. Agents start from [AGENTS.md](AGENTS.md).
+
+## Name
+
+*Elpis* is the Greek personification of hope or expectation, remembered as what
+remained in Pandora's jar. Here it names a direction rather than a finished state:
+each change should make the agent's environment clearer, safer, and more coherent.
+
+## Status
+
+Elpis is a prototype, not a shippable product. Codex login and model turns work, but
+action rendering, exact permissions, mouse selection, runtime parity, context lifecycle,
+memory, behavioral assimilation, and clean installation remain unfinished. Status is
+tracked by user-visible acceptance checks in [FEATURES.json](FEATURES.json).

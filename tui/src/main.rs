@@ -1,4 +1,6 @@
 use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
     io::{self, stdout, Write},
     process::{Command, Stdio},
     sync::mpsc::{self, Sender as MpscSender},
@@ -21,9 +23,9 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 enum AgentType {
-    Amk,
+    Elpis,
     Codex,
     Kiro,
 }
@@ -36,7 +38,7 @@ enum Focus {
     Approval,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 enum MessageSender {
     User,
     Agent,
@@ -50,9 +52,62 @@ enum TuiEvent {
     ProcessExited(i32),
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ChatMessage {
     sender: MessageSender,
     text: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct SessionData {
+    version: u8,
+    messages: Vec<ChatMessage>,
+    codex_thread_id: Option<String>,
+    agent_type: AgentType,
+    provider: String,
+    model: String,
+    injected_context_versions: HashMap<String, u64>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+enum StoredSession {
+    Current(SessionData),
+    Legacy(Vec<ChatMessage>),
+}
+
+#[derive(Debug, Clone)]
+enum CodexThreadAction {
+    Start,
+    Resume(String),
+    Fork(String),
+}
+
+fn home_dir() -> std::path::PathBuf {
+    std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+}
+
+fn elpis_state_dir() -> std::path::PathBuf {
+    let dir = home_dir().join(".elpis");
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
+fn system_prompt_path() -> std::path::PathBuf {
+    elpis_state_dir().join("system_prompt.md")
+}
+
+fn project_root() -> std::path::PathBuf {
+    std::env::var_os("ELPIS_HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .to_path_buf()
+        })
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +116,8 @@ struct ApprovalRequest {
     path: Option<String>,
     content: Option<String>,
     command: Option<String>,
+    response_id: Option<serde_json::Value>,
+    is_codex: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -149,10 +206,18 @@ struct App {
     is_command_reply: bool,
     pending_approval: Option<ApprovalRequest>,
     yolo_mode: bool,
+    session_id: String,
+    codex_thread_id: Option<String>,
+    codex_next_request_id: u64,
+    codex_context_tokens: i64,
+    codex_context_window: i64,
+    pending_codex_input: Option<String>,
+    injected_context_versions: HashMap<String, u64>,
 }
 
 impl App {
     fn new(stdin_tx: MpscSender<String>, system_prompt: String) -> Self {
+        let session_id = Self::generate_session_id();
         Self {
             messages: Vec::new(),
             input: String::new(),
@@ -171,10 +236,11 @@ impl App {
                 ("CODEX_CODING_GUIDELINES.md".to_string(), false),
                 ("ARTIFACT_RULES.md".to_string(), false),
                 ("TERMINAL_AND_GIT_RULES.md".to_string(), false),
+                ("GUIDE.md".to_string(), false),
                 ("readme.md".to_string(), false),
                 ("progress.md".to_string(), false),
             ],
-            agent_type: AgentType::Amk,
+            agent_type: AgentType::Elpis,
             focus: Focus::Input,
             context_cursor: 0,
             completions: Vec::new(),
@@ -185,6 +251,30 @@ impl App {
             is_command_reply: false,
             pending_approval: None,
             yolo_mode: false,
+            session_id,
+            codex_thread_id: None,
+            codex_next_request_id: 10,
+            codex_context_tokens: 0,
+            codex_context_window: 0,
+            pending_codex_input: None,
+            injected_context_versions: HashMap::new(),
+        }
+    }
+
+    fn context_version(content: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        content.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn should_inject_context(&mut self, name: &str, content: &str, explicit: bool) -> bool {
+        let version = Self::context_version(content);
+        let changed = self.injected_context_versions.get(name) != Some(&version);
+        if explicit || changed {
+            self.injected_context_versions.insert(name.to_string(), version);
+            true
+        } else {
+            false
         }
     }
 
@@ -222,6 +312,71 @@ impl App {
         });
 
         self.prune_context();
+        self.save_session();
+    }
+
+    fn get_sessions_dir() -> std::path::PathBuf {
+        let dir = elpis_state_dir().join("sessions");
+        let _ = std::fs::create_dir_all(&dir);
+        dir
+    }
+
+    fn generate_session_id() -> String {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        format!("session_{}", now)
+    }
+
+    fn load_session(&mut self, session_id: &str) -> bool {
+        let path = Self::get_sessions_dir().join(format!("{}.json", session_id));
+        if let Ok(content) = std::fs::read_to_string(path) {
+            if let Ok(stored) = serde_json::from_str::<StoredSession>(&content) {
+                match stored {
+                    StoredSession::Current(session) => {
+                        self.messages = session.messages;
+                        self.codex_thread_id = session.codex_thread_id;
+                        self.agent_type = session.agent_type;
+                        self.provider = session.provider;
+                        self.model = session.model;
+                        self.injected_context_versions = session.injected_context_versions;
+                    }
+                    StoredSession::Legacy(messages) => {
+                        self.messages = messages;
+                        self.codex_thread_id = None;
+                        self.injected_context_versions.clear();
+                    }
+                }
+                self.session_id = session_id.to_string();
+                return true;
+            }
+        }
+        false
+    }
+
+    fn save_session(&self) {
+        let path = Self::get_sessions_dir().join(format!("{}.json", self.session_id));
+        let session = SessionData {
+            version: 2,
+            messages: self.messages.clone(),
+            codex_thread_id: self.codex_thread_id.clone(),
+            agent_type: self.agent_type,
+            provider: self.provider.clone(),
+            model: self.model.clone(),
+            injected_context_versions: self.injected_context_versions.clone(),
+        };
+        if let Ok(serialized) = serde_json::to_string(&session) {
+            let _ = std::fs::write(path, serialized);
+        }
+    }
+
+    fn session_messages(content: &str) -> Vec<ChatMessage> {
+        match serde_json::from_str::<StoredSession>(content) {
+            Ok(StoredSession::Current(session)) => session.messages,
+            Ok(StoredSession::Legacy(messages)) => messages,
+            Err(_) => Vec::new(),
+        }
     }
 
     fn prune_context(&mut self) {
@@ -259,7 +414,7 @@ impl App {
             let is_typing_cmd = parts.len() <= 1 && !self.input.ends_with(' ');
             if is_typing_cmd {
                 let cmd_typed = parts.first().copied().unwrap_or("/");
-                let commands = vec!["/auth", "/model", "/rag", "/yolo"];
+                let commands = vec!["/auth", "/model", "/rag", "/yolo", "/new", "/list", "/resume", "/fork", "/copy", "/diff", "/clear"];
                 for cmd in commands {
                     if cmd.starts_with(cmd_typed) {
                         self.completions.push(cmd.to_string());
@@ -267,7 +422,7 @@ impl App {
                 }
             } else if parts.first() == Some(&"/auth") {
                 // Interactive /auth selection menu:
-                let provs = vec!["ollama", "gemini", "openrouter"];
+                let provs = vec!["chatgpt", "ollama", "gemini", "openrouter"];
                 let selecting_provider = parts.len() == 1 || (parts.len() == 2 && !self.input.ends_with(' '));
 
                 if selecting_provider {
@@ -287,6 +442,7 @@ impl App {
                 };
 
                 let models = match self.provider.as_str() {
+                    "chatgpt" => vec!["gpt-5.4-mini"],
                     "ollama" => vec!["qwen3:8b", "llama3.2:3b"],
                     "gemini" => vec![
                         "gemini-2.5-flash",
@@ -387,10 +543,149 @@ impl App {
         }
     }
 
+    fn send_codex_turn(&mut self, text: String) {
+        let Some(thread_id) = self.codex_thread_id.clone() else {
+            self.pending_codex_input = Some(text);
+            return;
+        };
+        let request_id = self.codex_next_request_id;
+        self.codex_next_request_id += 1;
+        let request = serde_json::json!({
+            "method": "turn/start",
+            "id": request_id,
+            "params": {
+                "threadId": thread_id,
+                "input": [{"type": "text", "text": text}],
+                "model": self.model,
+                "effort": "low"
+            }
+        });
+        if let Some(ref tx) = self.stdin_tx {
+            let _ = tx.send(request.to_string());
+            self.in_reply = true;
+            self.current_reply.clear();
+        }
+    }
+
+    fn send_codex_approval(&self, response_id: serde_json::Value, accepted: bool) {
+        let decision = if accepted { "accept" } else { "decline" };
+        let response = serde_json::json!({
+            "id": response_id,
+            "result": {"decision": decision}
+        });
+        if let Some(ref tx) = self.stdin_tx {
+            let _ = tx.send(response.to_string());
+        }
+    }
+
+    fn handle_codex_message(&mut self, trimmed: &str) -> bool {
+        let Ok(message) = serde_json::from_str::<serde_json::Value>(trimmed) else {
+            return false;
+        };
+
+        if message.get("id").and_then(|id| id.as_u64()) == Some(1) {
+            if let Some(thread_id) = message
+                .pointer("/result/thread/id")
+                .and_then(|value| value.as_str())
+            {
+                self.codex_thread_id = Some(thread_id.to_string());
+                self.backend_connected = true;
+                self.save_session();
+                if let Some(pending) = self.pending_codex_input.take() {
+                    self.send_codex_turn(pending);
+                }
+            }
+            if let Some(error) = message.pointer("/error/message").and_then(|value| value.as_str()) {
+                self.backend_error = Some(error.to_string());
+            }
+            return true;
+        }
+
+        let method = message.get("method").and_then(|value| value.as_str()).unwrap_or("");
+        match method {
+            "turn/started" => {
+                self.in_reply = true;
+                self.current_reply.clear();
+            }
+            "item/agentMessage/delta" => {
+                if let Some(delta) = message.pointer("/params/delta").and_then(|value| value.as_str()) {
+                    self.in_reply = true;
+                    self.current_reply.push_str(delta);
+                }
+            }
+            "item/completed" => {
+                if self.current_reply.is_empty()
+                    && message.pointer("/params/item/type").and_then(|value| value.as_str()) == Some("agentMessage")
+                {
+                    if let Some(text) = message.pointer("/params/item/text").and_then(|value| value.as_str()) {
+                        self.current_reply = text.to_string();
+                    }
+                }
+            }
+            "turn/completed" => {
+                self.in_reply = false;
+                let finished = std::mem::take(&mut self.current_reply);
+                if !finished.trim().is_empty() {
+                    self.add_message(MessageSender::Agent, finished);
+                }
+            }
+            "thread/tokenUsage/updated" => {
+                if let Some(tokens) = message
+                    .pointer("/params/tokenUsage/last/totalTokens")
+                    .and_then(|value| value.as_i64())
+                {
+                    self.codex_context_tokens = tokens;
+                }
+                if let Some(window) = message
+                    .pointer("/params/tokenUsage/modelContextWindow")
+                    .and_then(|value| value.as_i64())
+                {
+                    self.codex_context_window = window;
+                }
+            }
+            "item/commandExecution/requestApproval" | "item/fileChange/requestApproval" => {
+                let response_id = message.get("id").cloned();
+                let is_command = method.contains("commandExecution");
+                let request = ApprovalRequest {
+                    req_type: if is_command { "execute_command" } else { "file_change" }.to_string(),
+                    path: None,
+                    content: None,
+                    command: message.pointer("/params/command").and_then(|value| value.as_str()).map(str::to_string)
+                        .or_else(|| message.pointer("/params/reason").and_then(|value| value.as_str()).map(str::to_string)),
+                    response_id,
+                    is_codex: true,
+                };
+                if self.yolo_mode {
+                    if let Some(response_id) = request.response_id.clone() {
+                        self.send_codex_approval(response_id, true);
+                    }
+                } else {
+                    self.pending_approval = Some(request);
+                    self.focus = Focus::Approval;
+                }
+            }
+            "warning" => {
+                if let Some(warning) = message.pointer("/params/message").and_then(|value| value.as_str()) {
+                    self.add_message(MessageSender::System, warning.to_string());
+                }
+            }
+            _ => {
+                if let Some(error) = message.pointer("/error/message").and_then(|value| value.as_str()) {
+                    self.backend_error = Some(error.to_string());
+                }
+            }
+        }
+        true
+    }
+
     fn handle_stdout_line(&mut self, line: String) {
         debug_log(&format!("[STDOUT] {}", line));
         let trimmed = line.trim();
         if trimmed.is_empty() {
+            return;
+        }
+
+        if self.agent_type == AgentType::Codex && self.handle_codex_message(trimmed) {
             return;
         }
 
@@ -408,6 +703,8 @@ impl App {
                     path,
                     content,
                     command,
+                    response_id: None,
+                    is_codex: false,
                 };
 
                 // If YOLO mode is on, auto-approve immediately
@@ -425,8 +722,8 @@ impl App {
             }
         }
 
-        if self.agent_type == AgentType::Amk {
-            // Match model and workspace info for AMK
+        if self.agent_type == AgentType::Elpis {
+            // Match model and workspace info for Elpis
             if trimmed.starts_with("Workspace:") {
                 self.workspace = trimmed.replacen("Workspace:", "", 1).trim().to_string();
                 self.backend_connected = true;
@@ -448,7 +745,7 @@ impl App {
                 self.model = trimmed.replacen("Using OpenRouter model:", "", 1).trim().to_string();
             }
 
-            // Handle streaming response capture for AMK
+            // Handle streaming response capture for Elpis
             if trimmed.starts_with("Juliette:") {
                 self.in_reply = true;
                 let content = trimmed.replacen("Juliette:", "", 1).trim_start().to_string();
@@ -468,8 +765,7 @@ impl App {
                     }
                     self.is_command_reply = false;
                     // Reload system prompt if modified by agent tools
-                    let sys_prompt_file = "/home/masih/Desktop/f/p/Elpis/tui/system_prompt.md";
-                    if let Ok(content) = std::fs::read_to_string(sys_prompt_file) {
+                    if let Ok(content) = std::fs::read_to_string(system_prompt_path()) {
                         self.system_prompt = content;
                     }
                 } else {
@@ -490,14 +786,18 @@ impl App {
     }
 
     fn read_context_file(&self, filename: &str) -> Option<String> {
+        let codex_home = std::env::var_os("CODEX_HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| home_dir().join(".codex"));
+        let workspace = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
         let path = match filename {
-            "AGENTS.md" => Some("/home/masih/.codex/AGENTS.md"),
-            "CODEX_CODING_GUIDELINES.md" => Some("/home/masih/.codex/CODEX_CODING_GUIDELINES.md"),
-            "ARTIFACT_RULES.md" => Some("/home/masih/.codex/ARTIFACT_RULES.md"),
-            "JULIETTE_RULES.md" => Some("/home/masih/.codex/JULIETTE_RULES.md"),
-            "TERMINAL_AND_GIT_RULES.md" => Some("/home/masih/.codex/TERMINAL_AND_GIT_RULES.md"),
-            "readme.md" => Some("/home/masih/Desktop/f/p/Elpis/readme.md"),
-            "progress.md" => Some("/home/masih/Desktop/f/p/Elpis/progress.md"),
+            "AGENTS.md" => Some(codex_home.join("AGENTS.md")),
+            "CODEX_CODING_GUIDELINES.md" => Some(codex_home.join("CODEX_CODING_GUIDELINES.md")),
+            "ARTIFACT_RULES.md" => Some(codex_home.join("ARTIFACT_RULES.md")),
+            "TERMINAL_AND_GIT_RULES.md" => Some(codex_home.join("TERMINAL_AND_GIT_RULES.md")),
+            "GUIDE.md" => Some(workspace.join("GUIDE.md")),
+            "readme.md" => Some(workspace.join("readme.md")),
+            "progress.md" => Some(workspace.join("progress.md")),
             _ => None,
         };
         path.and_then(|p| std::fs::read_to_string(p).ok())
@@ -521,6 +821,12 @@ impl App {
     /// `/status` output stay consistent. Recomputed live from system prompt + full
     /// chat history + any in-flight streaming reply.
     fn context_percent_left(&self) -> i64 {
+        if self.agent_type == AgentType::Codex && self.codex_context_window > 0 {
+            let remaining = (self.codex_context_window - self.codex_context_tokens).max(0);
+            return ((remaining as f64 / self.codex_context_window as f64) * 100.0)
+                .clamp(0.0, 100.0)
+                .round() as i64;
+        }
         let mut total_chars = self.system_prompt.len();
         for msg in &self.messages {
             total_chars += msg.text.len();
@@ -537,12 +843,37 @@ impl App {
 }
 
 fn debug_log(msg: &str) {
-    if std::env::var_os("AMK_DEBUG").is_none() {
+    if std::env::var_os("ELPIS_DEBUG").is_none() {
         return;
     }
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/amk_tui_stdout.log") {
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/elpis_tui_stdout.log") {
         let _ = writeln!(file, "{}", msg);
     }
+}
+
+fn codex_thread_request(
+    action: &CodexThreadAction,
+    model: &str,
+    caller_cwd: &std::path::Path,
+) -> serde_json::Value {
+    let mut params = serde_json::json!({
+        "model": model,
+        "cwd": caller_cwd,
+        "approvalPolicy": "on-request",
+        "sandbox": "workspace-write"
+    });
+    let method = match action {
+        CodexThreadAction::Start => "thread/start",
+        CodexThreadAction::Resume(thread_id) => {
+            params["threadId"] = serde_json::Value::String(thread_id.clone());
+            "thread/resume"
+        }
+        CodexThreadAction::Fork(thread_id) => {
+            params["threadId"] = serde_json::Value::String(thread_id.clone());
+            "thread/fork"
+        }
+    };
+    serde_json::json!({"method": method, "id": 1, "params": params})
 }
 
 fn start_agent(
@@ -551,39 +882,43 @@ fn start_agent(
     model: &str,
     caller_cwd: std::path::PathBuf,
     event_tx: mpsc::Sender<TuiEvent>,
+    codex_thread_action: CodexThreadAction,
 ) -> Option<(std::process::Child, mpsc::Sender<String>)> {
-    let python_path = "/home/masih/Desktop/f/p/Elpis/.venv/bin/python";
-    let script_path = "src/agent/main.py";
-    let working_dir = "/home/masih/Desktop/f/p/Elpis";
+    let root = project_root();
+    let python_path = root.join(".venv/bin/python");
+    let script_path = root.join("src/agent/main.py");
 
-    debug_log(&format!("[START_AGENT] Spawning agent: {:?}, provider={}, model={}, working_dir={}", agent_type, provider, model, working_dir));
+    debug_log(&format!("[START_AGENT] Spawning agent: {:?}, provider={}, model={}, root={}", agent_type, provider, model, root.display()));
 
-    let (cmd_name, args, dir, is_amk) = match agent_type {
-        AgentType::Amk => {
-            let mut amk_args = vec!["-u".to_string(), script_path.to_string()];
-            amk_args.push("--provider".to_string());
-            amk_args.push(provider.to_string());
+    let (cmd_name, args, dir, is_elpis, is_codex) = match agent_type {
+        AgentType::Elpis => {
+            let mut elpis_args = vec!["-u".to_string(), script_path.display().to_string()];
+            elpis_args.push("--provider".to_string());
+            elpis_args.push(provider.to_string());
             if !model.is_empty() && model != "Detecting..." {
-                amk_args.push("--model".to_string());
-                amk_args.push(model.to_string());
+                elpis_args.push("--model".to_string());
+                elpis_args.push(model.to_string());
             }
             (
-                python_path.to_string(),
-                amk_args,
-                std::path::PathBuf::from(working_dir),
+                python_path.display().to_string(),
+                elpis_args,
+                root.clone(),
                 true,
+                false,
             )
         }
         AgentType::Codex => (
             "codex".to_string(),
-            vec!["exec".to_string()],
+            vec!["app-server".to_string(), "--listen".to_string(), "stdio://".to_string()],
             caller_cwd.clone(),
             false,
+            true,
         ),
         AgentType::Kiro => (
             "kiro-cli".to_string(),
             vec!["chat".to_string()],
             caller_cwd.clone(),
+            false,
             false,
         ),
     };
@@ -596,8 +931,8 @@ fn start_agent(
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
-    if is_amk {
-        cmd.env("AMK_WORKSPACE_ROOT", caller_cwd);
+    if is_elpis {
+        cmd.env("ELPIS_WORKSPACE_ROOT", &caller_cwd);
     }
 
     let mut child = match cmd.spawn() {
@@ -641,6 +976,30 @@ fn start_agent(
         }
     });
 
+    if is_codex {
+        let model = if model.is_empty() || model == "Detecting..." {
+            "gpt-5.4-mini"
+        } else {
+            model
+        };
+        let initialize = serde_json::json!({
+            "method": "initialize",
+            "id": 0,
+            "params": {
+                "clientInfo": {
+                    "name": "elpis",
+                    "title": "Elpis",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        });
+        let initialized = serde_json::json!({"method": "initialized", "params": {}});
+        let start_thread = codex_thread_request(&codex_thread_action, model, &caller_cwd);
+        let _ = stdin_tx.send(initialize.to_string());
+        let _ = stdin_tx.send(initialized.to_string());
+        let _ = stdin_tx.send(start_thread.to_string());
+    }
+
     // Spawn stdout reader thread
     let tx_out = event_tx.clone();
     thread::spawn(move || {
@@ -672,12 +1031,12 @@ fn start_agent(
 
 fn main() -> io::Result<()> {
     // Check/create system prompt file in global folder using .md
-    let sys_prompt_file = "/home/masih/Desktop/f/p/Elpis/tui/system_prompt.md";
-    let system_prompt = if std::path::Path::new(sys_prompt_file).exists() {
-        std::fs::read_to_string(sys_prompt_file).unwrap_or_default()
+    let sys_prompt_file = system_prompt_path();
+    let system_prompt = if sys_prompt_file.exists() {
+        std::fs::read_to_string(&sys_prompt_file).unwrap_or_default()
     } else {
         let default_prompt = "You are a helpful AI assistant. Answer concisely.";
-        let _ = std::fs::write(sys_prompt_file, default_prompt);
+        let _ = std::fs::write(&sys_prompt_file, default_prompt);
         default_prompt.to_string()
     };
 
@@ -687,8 +1046,8 @@ fn main() -> io::Result<()> {
     // Setup communication channels
     let (event_tx, event_rx) = mpsc::channel::<TuiEvent>();
 
-    // Spawn default AMK agent
-    let (mut active_child, stdin_tx) = match start_agent(AgentType::Amk, "ollama", "qwen3:8b", caller_cwd.clone(), event_tx.clone()) {
+    // Start with the ChatGPT-authenticated Codex runtime for a zero-key setup.
+    let (mut active_child, stdin_tx) = match start_agent(AgentType::Codex, "chatgpt", "gpt-5.4-mini", caller_cwd.clone(), event_tx.clone(), CodexThreadAction::Start) {
         Some((child, tx)) => (Some(child), Some(tx)),
         None => {
             println!("Error launching background Python agent process.");
@@ -703,6 +1062,10 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
 
     let mut app = App::new(stdin_tx.expect("Failed to get stdin channel"), system_prompt);
+    app.agent_type = AgentType::Codex;
+    app.provider = "chatgpt".to_string();
+    app.model = "gpt-5.4-mini".to_string();
+    app.workspace = caller_cwd.display().to_string();
     app.backend_connected = true;
 
     loop {
@@ -742,8 +1105,8 @@ fn main() -> io::Result<()> {
                     };
                     app.add_message(MessageSender::System, err_msg.clone());
                     
-                    // For non-AMK runtimes (Codex), exiting concludes the prompt output
-                    if app.agent_type != AgentType::Amk {
+                    // For non-Elpis runtimes (Codex), exiting concludes the prompt output
+                    if app.agent_type != AgentType::Elpis {
                         app.in_reply = false;
                         let finished = std::mem::take(&mut app.current_reply);
                         if !finished.trim().is_empty() {
@@ -888,12 +1251,12 @@ fn main() -> io::Result<()> {
                             }
 
                             if !trimmed.is_empty() {
-                                // Intercept /agent <amk|codex|kiro>
+                                // Intercept /agent <elpis|codex|kiro>
                                 if trimmed.starts_with("/agent ") {
                                     let parts: Vec<&str> = trimmed.split_whitespace().collect();
                                     if parts.len() >= 2 {
                                         let new_agent = match parts[1].to_lowercase().as_str() {
-                                            "amk" => Some(AgentType::Amk),
+                                            "elpis" => Some(AgentType::Elpis),
                                             "codex" => Some(AgentType::Codex),
                                             "kiro" => Some(AgentType::Kiro),
                                             _ => None,
@@ -902,8 +1265,8 @@ fn main() -> io::Result<()> {
                                         if let Some(agent) = new_agent {
                                             app.agent_type = agent;
                                             app.model = match agent {
-                                                AgentType::Amk => "Detecting...".to_string(),
-                                                AgentType::Codex => "gpt-5.5 (OpenAI)".to_string(),
+                                                AgentType::Elpis => "Detecting...".to_string(),
+                                                AgentType::Codex => "gpt-5.4-mini".to_string(),
                                                 AgentType::Kiro => "Kiro Agent (AWS)".to_string(),
                                             };
                                             app.add_message(MessageSender::User, msg.clone());
@@ -918,7 +1281,7 @@ fn main() -> io::Result<()> {
                                             app.is_first_message = true;
 
                                             // Spawn new agent
-                                            if let Some((c, tx)) = start_agent(agent, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone()) {
+                                            if let Some((c, tx)) = start_agent(agent, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone(), CodexThreadAction::Start) {
                                                 active_child = Some(c);
                                                 app.stdin_tx = Some(tx);
                                                 app.backend_connected = true;
@@ -926,7 +1289,7 @@ fn main() -> io::Result<()> {
                                                 app.add_message(MessageSender::System, format!("❌ Failed to launch {:?} agent. Is it installed and on PATH?", agent));
                                             }
                                         } else {
-                                            app.add_message(MessageSender::System, format!("❌ Unknown agent: {}. Choose amk, codex, or kiro.", parts[1]));
+                                            app.add_message(MessageSender::System, format!("❌ Unknown agent: {}. Choose elpis, codex, or kiro.", parts[1]));
                                         }
                                     }
                                     continue;
@@ -936,7 +1299,7 @@ fn main() -> io::Result<()> {
                                 if trimmed.starts_with("/sys ") {
                                     let content = trimmed.replacen("/sys ", "", 1).trim().to_string();
                                     app.system_prompt = content.clone();
-                                    let _ = std::fs::write(sys_prompt_file, &content);
+                                    let _ = std::fs::write(&sys_prompt_file, &content);
                                     app.add_message(MessageSender::User, msg.clone());
                                     app.add_message(MessageSender::System, "⚙️ System prompt updated and saved to system_prompt.md.".to_string());
                                     continue;
@@ -950,12 +1313,323 @@ fn main() -> io::Result<()> {
 
                                     if let Some(reply) = last_reply {
                                         app.system_prompt = reply.clone();
-                                        let _ = std::fs::write(sys_prompt_file, &reply);
+                                        let _ = std::fs::write(&sys_prompt_file, &reply);
                                         app.add_message(MessageSender::User, "/setsys".to_string());
                                         app.add_message(MessageSender::System, "⚙️ Last response set as active system prompt and saved to system_prompt.md.".to_string());
                                     } else {
                                         app.add_message(MessageSender::System, "❌ No response found from agent to use.".to_string());
                                     }
+                                    continue;
+                                }
+
+                                // Intercept /new
+                                if trimmed == "/new" {
+                                    app.messages.clear();
+                                    app.session_id = App::generate_session_id();
+
+                                    // Kill current child process to reset agent memory
+                                    if let Some(mut child) = active_child.take() {
+                                        let _ = child.kill();
+                                        let _ = child.wait();
+                                    }
+                                    app.backend_connected = false;
+                                    app.is_first_message = true;
+                                    app.codex_thread_id = None;
+                                    app.pending_codex_input = None;
+
+                                    // Restart agent
+                                    if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone(), CodexThreadAction::Start) {
+                                        active_child = Some(c);
+                                        app.stdin_tx = Some(tx);
+                                        app.backend_connected = app.agent_type != AgentType::Codex;
+                                        app.add_message(MessageSender::System, format!("🆕 Started new session: {}", app.session_id));
+                                    } else {
+                                        app.add_message(MessageSender::System, "❌ Failed to start agent for the new session.".to_string());
+                                    }
+                                    continue;
+                                }
+
+                                // Intercept /list
+                                if trimmed == "/list" {
+                                    app.add_message(MessageSender::User, "/list".to_string());
+                                    let dir = App::get_sessions_dir();
+                                    if let Ok(entries) = std::fs::read_dir(dir) {
+                                        let mut sessions = Vec::new();
+                                        for entry in entries {
+                                            if let Ok(entry) = entry {
+                                                let path = entry.path();
+                                                if path.extension().map(|e| e == "json").unwrap_or(false) {
+                                                    let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                                                    if let Ok(meta) = entry.metadata() {
+                                                        if let Ok(modified) = meta.modified() {
+                                                            sessions.push((name, modified));
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        sessions.sort_by(|a, b| b.1.cmp(&a.1));
+
+                                        if sessions.is_empty() {
+                                            app.add_message(MessageSender::System, "📭 No saved sessions found.".to_string());
+                                        } else {
+                                            let mut msg_text = "📁 Saved Sessions (newest first):\n".to_string();
+                                            for (idx, (name, modified)) in sessions.iter().enumerate() {
+                                                let mut snippet = "No messages".to_string();
+                                                let path = App::get_sessions_dir().join(format!("{}.json", name));
+                                                if let Ok(content) = std::fs::read_to_string(&path) {
+                                                    let messages = App::session_messages(&content);
+                                                    if let Some(first_user_msg) = messages.iter().find(|m| m.sender == MessageSender::User) {
+                                                        snippet = first_user_msg.text.chars().take(50).collect::<String>();
+                                                        if first_user_msg.text.len() > 50 {
+                                                            snippet.push_str("...");
+                                                        }
+                                                    }
+                                                }
+
+                                                let duration = std::time::SystemTime::now().duration_since(*modified).unwrap_or_default();
+                                                let time_str = if duration.as_secs() < 60 {
+                                                    "just now".to_string()
+                                                } else if duration.as_secs() < 3600 {
+                                                    format!("{}m ago", duration.as_secs() / 60)
+                                                } else if duration.as_secs() < 86400 {
+                                                    format!("{}h ago", duration.as_secs() / 3600)
+                                                } else {
+                                                    format!("{}d ago", duration.as_secs() / 86400)
+                                                };
+
+                                                msg_text.push_str(&format!("  {}. {} ({}) - {}\n", idx + 1, name, time_str, snippet));
+                                            }
+                                            app.add_message(MessageSender::System, msg_text);
+                                        }
+                                    } else {
+                                        app.add_message(MessageSender::System, "❌ Failed to read sessions directory.".to_string());
+                                    }
+                                    continue;
+                                }
+
+                                // Intercept /resume
+                                if trimmed.starts_with("/resume ") || trimmed == "/resume" {
+                                    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                                    if parts.len() < 2 {
+                                        app.add_message(MessageSender::System, "❌ Usage: /resume <session_id> or /resume --last. Use /list to see IDs.".to_string());
+                                        continue;
+                                    }
+
+                                    let target_id = if parts[1] == "--last" {
+                                        let dir = App::get_sessions_dir();
+                                        let mut sessions = Vec::new();
+                                        if let Ok(entries) = std::fs::read_dir(dir) {
+                                            for entry in entries {
+                                                if let Ok(entry) = entry {
+                                                    let path = entry.path();
+                                                    if path.extension().map(|e| e == "json").unwrap_or(false) {
+                                                        let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                                                        if let Ok(meta) = entry.metadata() {
+                                                            if let Ok(modified) = meta.modified() {
+                                                                    sessions.push((name, modified));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        sessions.sort_by(|a, b| b.1.cmp(&a.1));
+                                        sessions.first().map(|s| s.0.clone())
+                                    } else {
+                                        Some(parts[1].to_string())
+                                    };
+
+                                    if let Some(id) = target_id {
+                                        app.add_message(MessageSender::User, trimmed.to_string());
+                                        if app.load_session(&id) {
+                                            let thread_action = if app.agent_type == AgentType::Codex {
+                                                match app.codex_thread_id.clone() {
+                                                    Some(thread_id) => CodexThreadAction::Resume(thread_id),
+                                                    None => {
+                                                        app.add_message(
+                                                            MessageSender::System,
+                                                            "This legacy session has no Codex thread ID and cannot be resumed authoritatively.".to_string(),
+                                                        );
+                                                        continue;
+                                                    }
+                                                }
+                                            } else {
+                                                CodexThreadAction::Start
+                                            };
+                                            if let Some(mut child) = active_child.take() {
+                                                let _ = child.kill();
+                                                let _ = child.wait();
+                                            }
+                                            app.backend_connected = false;
+                                            app.is_first_message = true;
+
+                                            if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone(), thread_action) {
+                                                active_child = Some(c);
+                                                app.stdin_tx = Some(tx);
+                                                app.backend_connected = app.agent_type != AgentType::Codex;
+
+                                                // Non-Codex runtimes still require explicit history replay.
+                                                if app.agent_type != AgentType::Codex {
+                                                    if let Some(ref tx_ref) = app.stdin_tx {
+                                                    for m in &app.messages {
+                                                        let role = match m.sender {
+                                                            MessageSender::User => "user",
+                                                            MessageSender::Agent => "assistant",
+                                                            MessageSender::System => "system",
+                                                        };
+                                                        let _ = tx_ref.send(format!("/inject_history {} {}\n", role, m.text));
+                                                    }
+                                                    }
+                                                }
+
+                                                app.add_message(MessageSender::System, format!("🔄 Resumed session: {}", id));
+                                            } else {
+                                                app.add_message(MessageSender::System, "❌ Failed to restart agent for the resumed session.".to_string());
+                                            }
+                                        } else {
+                                            app.add_message(MessageSender::System, format!("❌ Session not found: {}", id));
+                                        }
+                                    } else {
+                                        app.add_message(MessageSender::System, "❌ No saved sessions found to resume.".to_string());
+                                    }
+                                    continue;
+                                }
+
+                                // Intercept /fork
+                                if trimmed.starts_with("/fork ") || trimmed == "/fork" {
+                                    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                                    if parts.len() < 2 {
+                                        app.add_message(MessageSender::System, "❌ Usage: /fork <session_id> or /fork --last. Use /list to see IDs.".to_string());
+                                        continue;
+                                    }
+
+                                    let target_id = if parts[1] == "--last" {
+                                        let dir = App::get_sessions_dir();
+                                        let mut sessions = Vec::new();
+                                        if let Ok(entries) = std::fs::read_dir(dir) {
+                                            for entry in entries {
+                                                if let Ok(entry) = entry {
+                                                    let path = entry.path();
+                                                    if path.extension().map(|e| e == "json").unwrap_or(false) {
+                                                        let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                                                        if let Ok(meta) = entry.metadata() {
+                                                            if let Ok(modified) = meta.modified() {
+                                                                    sessions.push((name, modified));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        sessions.sort_by(|a, b| b.1.cmp(&a.1));
+                                        sessions.first().map(|s| s.0.clone())
+                                    } else {
+                                        Some(parts[1].to_string())
+                                    };
+
+                                    if let Some(id) = target_id {
+                                        app.add_message(MessageSender::User, trimmed.to_string());
+                                        if app.load_session(&id) {
+                                            let old_id = id;
+                                            let thread_action = if app.agent_type == AgentType::Codex {
+                                                match app.codex_thread_id.clone() {
+                                                    Some(thread_id) => CodexThreadAction::Fork(thread_id),
+                                                    None => {
+                                                        app.add_message(
+                                                            MessageSender::System,
+                                                            "This legacy session has no Codex thread ID and cannot be forked authoritatively.".to_string(),
+                                                        );
+                                                        continue;
+                                                    }
+                                                }
+                                            } else {
+                                                CodexThreadAction::Start
+                                            };
+                                            app.session_id = App::generate_session_id();
+                                            app.codex_thread_id = None;
+
+                                            if let Some(mut child) = active_child.take() {
+                                                let _ = child.kill();
+                                                let _ = child.wait();
+                                            }
+                                            app.backend_connected = false;
+                                            app.is_first_message = true;
+
+                                            if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone(), thread_action) {
+                                                active_child = Some(c);
+                                                app.stdin_tx = Some(tx);
+                                                app.backend_connected = app.agent_type != AgentType::Codex;
+
+                                                // Non-Codex runtimes still require explicit history replay.
+                                                if app.agent_type != AgentType::Codex {
+                                                    if let Some(ref tx_ref) = app.stdin_tx {
+                                                    for m in &app.messages {
+                                                        let role = match m.sender {
+                                                            MessageSender::User => "user",
+                                                            MessageSender::Agent => "assistant",
+                                                            MessageSender::System => "system",
+                                                        };
+                                                        let _ = tx_ref.send(format!("/inject_history {} {}\n", role, m.text));
+                                                    }
+                                                    }
+                                                }
+
+                                                app.save_session();
+
+                                                app.add_message(MessageSender::System, format!("🍴 Forked session {} as new session: {}", old_id, app.session_id));
+                                            } else {
+                                                app.add_message(MessageSender::System, "❌ Failed to restart agent for the forked session.".to_string());
+                                            }
+                                        } else {
+                                            app.add_message(MessageSender::System, format!("❌ Session not found: {}", id));
+                                        }
+                                    } else {
+                                        app.add_message(MessageSender::System, "❌ No saved sessions found to fork.".to_string());
+                                    }
+                                    continue;
+                                }
+
+                                // Intercept /copy
+                                if trimmed == "/copy" {
+                                    app.add_message(MessageSender::User, "/copy".to_string());
+                                    let last_agent = app.messages.iter().rev()
+                                        .find(|m| m.sender == MessageSender::Agent)
+                                        .map(|m| m.text.clone());
+                                    if let Some(reply) = last_agent {
+                                        match copy_to_clipboard(&reply) {
+                                            Ok(_) => app.add_message(MessageSender::System, "📋 Last response copied to clipboard successfully.".to_string()),
+                                            Err(_) => app.add_message(MessageSender::System, "❌ Failed to copy: no clipboard utility found.".to_string()),
+                                        }
+                                    } else {
+                                        app.add_message(MessageSender::System, "❌ No response found from agent to copy.".to_string());
+                                    }
+                                    continue;
+                                }
+
+                                // Intercept /diff
+                                if trimmed == "/diff" {
+                                    app.add_message(MessageSender::User, "/diff".to_string());
+                                    match std::process::Command::new("git").arg("diff").output() {
+                                        Ok(output) => {
+                                            let text = String::from_utf8_lossy(&output.stdout).to_string();
+                                            if text.trim().is_empty() {
+                                                app.add_message(MessageSender::System, "🌳 No changes found in git diff.".to_string());
+                                            } else {
+                                                app.add_message(MessageSender::System, format!("git diff:\n{}", text));
+                                            }
+                                        }
+                                        Err(e) => {
+                                            app.add_message(MessageSender::System, format!("❌ Failed to run git diff: {}", e));
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                // Intercept /clear
+                                if trimmed == "/clear" {
+                                    app.messages.clear();
+                                    app.add_message(MessageSender::System, "🧹 Chat history cleared.".to_string());
                                     continue;
                                 }
 
@@ -972,10 +1646,11 @@ fn main() -> io::Result<()> {
                                 if trimmed.starts_with("/auth ") || trimmed == "/auth" {
                                     let parts: Vec<&str> = trimmed.split_whitespace().collect();
                                     if parts.len() < 2 {
-                                        app.add_message(MessageSender::System, "❌ Usage: /auth <ollama|gemini|openrouter>".to_string());
+                                        app.add_message(MessageSender::System, "❌ Usage: /auth <chatgpt|ollama|gemini|openrouter>".to_string());
                                         continue;
                                     }
                                     let new_provider = match parts[1].to_lowercase().as_str() {
+                                        "chatgpt" | "codex" => Some("chatgpt"),
                                         "ollama" => Some("ollama"),
                                         "gemini" | "gemini-api" => Some("gemini"),
                                         "openrouter" | "open-router" => Some("openrouter"),
@@ -985,10 +1660,14 @@ fn main() -> io::Result<()> {
                                     if let Some(prov) = new_provider {
                                         app.provider = prov.to_string();
                                         app.model = match prov {
+                                            "chatgpt" => "gpt-5.4-mini".to_string(),
                                             "openrouter" => "moonshotai/kimi-k2.6".to_string(),
                                             "gemini" => "gemini-2.5-flash".to_string(),
                                             _ => "qwen3:8b".to_string(),
                                         };
+                                        app.agent_type = if prov == "chatgpt" { AgentType::Codex } else { AgentType::Elpis };
+                                        app.codex_thread_id = None;
+                                        app.pending_codex_input = None;
 
                                         app.add_message(MessageSender::User, msg.clone());
                                         app.add_message(MessageSender::System, format!("🔄 Switched active provider to: {} (Default Model: {})", prov, app.model));
@@ -1002,15 +1681,15 @@ fn main() -> io::Result<()> {
                                         app.is_first_message = true;
 
                                         // Restart agent
-                                        if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone()) {
+                                        if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone(), CodexThreadAction::Start) {
                                             active_child = Some(c);
                                             app.stdin_tx = Some(tx);
-                                            app.backend_connected = true;
+                                            app.backend_connected = app.agent_type != AgentType::Codex;
                                         } else {
                                             app.add_message(MessageSender::System, "❌ Failed to restart agent with the new provider.".to_string());
                                         }
                                     } else {
-                                        app.add_message(MessageSender::System, format!("❌ Unknown provider: {}. Choose ollama, gemini, or openrouter.", parts[1]));
+                                        app.add_message(MessageSender::System, format!("❌ Unknown provider: {}. Choose chatgpt, ollama, gemini, or openrouter.", parts[1]));
                                     }
                                     continue;
                                 }
@@ -1037,7 +1716,7 @@ fn main() -> io::Result<()> {
                                     app.is_first_message = true;
 
                                     // Restart agent
-                                    if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone()) {
+                                    if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone(), CodexThreadAction::Start) {
                                         active_child = Some(c);
                                         app.stdin_tx = Some(tx);
                                         app.backend_connected = true;
@@ -1050,6 +1729,20 @@ fn main() -> io::Result<()> {
                                 // Intercept /status: forward as-is, capture backend's printed reply as a System message
                                 if trimmed == "/status" {
                                     app.add_message(MessageSender::User, msg.clone());
+                                    if app.agent_type == AgentType::Codex {
+                                        let status = if app.codex_context_window > 0 {
+                                            format!(
+                                                "Codex context: {} / {} tokens ({}% left)",
+                                                app.codex_context_tokens,
+                                                app.codex_context_window,
+                                                app.context_percent_left()
+                                            )
+                                        } else {
+                                            "Codex context usage is not available until the first turn completes.".to_string()
+                                        };
+                                        app.add_message(MessageSender::System, status);
+                                        continue;
+                                    }
                                     app.in_reply = true;
                                     app.is_command_reply = true;
                                     app.current_reply.clear();
@@ -1061,7 +1754,7 @@ fn main() -> io::Result<()> {
 
                                 // If child process exited (e.g. Codex single-run), spawn it again before message
                                 if !app.backend_connected {
-                                    if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone()) {
+                                    if let Some((c, tx)) = start_agent(app.agent_type, &app.provider, &app.model, caller_cwd.clone(), event_tx.clone(), CodexThreadAction::Start) {
                                         active_child = Some(c);
                                         app.stdin_tx = Some(tx);
                                         app.backend_connected = true;
@@ -1074,13 +1767,19 @@ fn main() -> io::Result<()> {
                                 let mut context_str = String::new();
                                 let mut active_names = Vec::new();
 
-                                // Scan for @ resource mentions in the message
-                                for (name, _) in &app.context_files {
+                                // Explicit @ mentions are always fresh; persistent selections are
+                                // reinjected only when their content changes.
+                                let context_names: Vec<String> = app.context_files.iter()
+                                    .map(|(name, _)| name.clone())
+                                    .collect();
+                                for name in context_names {
                                     let mention = format!("@{}", name);
                                     if msg.contains(&mention) {
-                                        if let Some(content) = app.read_context_file(name) {
-                                            context_str.push_str(&format!("[Context File: {}]\n{}\n\n", name, content));
-                                            active_names.push(name.clone());
+                                        if let Some(content) = app.read_context_file(&name) {
+                                            if app.should_inject_context(&name, &content, true) {
+                                                context_str.push_str(&format!("[Context File: {}]\n{}\n\n", name, content));
+                                                active_names.push(name);
+                                            }
                                         }
                                     }
                                 }
@@ -1094,8 +1793,10 @@ fn main() -> io::Result<()> {
                                 for name in selected_files {
                                     if !active_names.contains(&name) {
                                         if let Some(content) = app.read_context_file(&name) {
-                                            context_str.push_str(&format!("[Context File: {}]\n{}\n\n", name, content));
-                                            active_names.push(name.clone());
+                                            if app.should_inject_context(&name, &content, false) {
+                                                context_str.push_str(&format!("[Context File: {}]\n{}\n\n", name, content));
+                                                active_names.push(name.clone());
+                                            }
                                         }
                                     }
                                 }
@@ -1116,7 +1817,9 @@ fn main() -> io::Result<()> {
                                     app.add_message(MessageSender::System, format!("📎 Injected context from: {}", active_names.join(", ")));
                                 }
 
-                                if let Some(ref tx) = app.stdin_tx {
+                                if app.agent_type == AgentType::Codex {
+                                    app.send_codex_turn(sent_msg);
+                                } else if let Some(ref tx) = app.stdin_tx {
                                     let _ = tx.send(sent_msg);
                                 }
                             }
@@ -1217,8 +1920,7 @@ fn main() -> io::Result<()> {
                                 app.system_prompt.pop();
                             }
                             KeyCode::Enter => {
-                                let sys_prompt_file = "/home/masih/Desktop/f/p/Elpis/tui/system_prompt.md";
-                                let _ = std::fs::write(sys_prompt_file, &app.system_prompt);
+                                let _ = std::fs::write(system_prompt_path(), &app.system_prompt);
                                 app.messages.push(ChatMessage {
                                     sender: MessageSender::System,
                                     text: "⚙️ System prompt updated and saved to system_prompt.md.".to_string(),
@@ -1230,19 +1932,33 @@ fn main() -> io::Result<()> {
                     }
                     Focus::Approval => match key.code {
                         KeyCode::Char('y') | KeyCode::Char('a') | KeyCode::Enter => {
-                            let _ = std::fs::write("/tmp/elpis_approval_response.json", "{\"status\": \"accept\"}");
-                            if let Some(ref tx) = app.stdin_tx {
-                                let _ = tx.send("{\"status\": \"accept\"}\n".to_string());
+                            if let Some(request) = app.pending_approval.take() {
+                                if request.is_codex {
+                                    if let Some(response_id) = request.response_id {
+                                        app.send_codex_approval(response_id, true);
+                                    }
+                                } else {
+                                    let _ = std::fs::write("/tmp/elpis_approval_response.json", "{\"status\": \"accept\"}");
+                                    if let Some(ref tx) = app.stdin_tx {
+                                        let _ = tx.send("{\"status\": \"accept\"}\n".to_string());
+                                    }
+                                }
                             }
-                            app.pending_approval = None;
                             app.focus = Focus::Input;
                         }
                         KeyCode::Char('n') | KeyCode::Char('r') | KeyCode::Esc => {
-                            let _ = std::fs::write("/tmp/elpis_approval_response.json", "{\"status\": \"reject\"}");
-                            if let Some(ref tx) = app.stdin_tx {
-                                let _ = tx.send("{\"status\": \"reject\"}\n".to_string());
+                            if let Some(request) = app.pending_approval.take() {
+                                if request.is_codex {
+                                    if let Some(response_id) = request.response_id {
+                                        app.send_codex_approval(response_id, false);
+                                    }
+                                } else {
+                                    let _ = std::fs::write("/tmp/elpis_approval_response.json", "{\"status\": \"reject\"}");
+                                    if let Some(ref tx) = app.stdin_tx {
+                                        let _ = tx.send("{\"status\": \"reject\"}\n".to_string());
+                                    }
+                                }
                             }
-                            app.pending_approval = None;
                             app.focus = Focus::Input;
                         }
                         _ => {}
@@ -1332,7 +2048,7 @@ fn ui(f: &mut Frame, app: &App) {
 
     // 1. Render Header
     let header_text = format!(
-        " 🏰 A-MODULAR-KINGDOM AGENT CLIENT | Context: {}% left | Provider: {} | Model: {} | Workspace: {} ",
+        " 🏰 ELPIS AGENT CLIENT | Context: {}% left | Provider: {} | Model: {} | Workspace: {} ",
         app.context_percent_left(), app.provider, app.model, app.workspace
     );
     let header = Paragraph::new(header_text)
@@ -1356,27 +2072,57 @@ fn ui(f: &mut Frame, app: &App) {
     for msg in &app.messages {
         match msg.sender {
             MessageSender::User => {
-                chat_lines.push(Line::from(vec![
-                    Span::styled("👤 You: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                    Span::styled(&msg.text, Style::default().fg(Color::Cyan)),
-                ]));
+                let msg_lines: Vec<&str> = msg.text.split('\n').collect();
+                for (i, msg_line) in msg_lines.iter().enumerate() {
+                    if i == 0 {
+                        chat_lines.push(Line::from(vec![
+                            Span::styled("👤 You: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                            Span::styled(*msg_line, Style::default().fg(Color::Cyan)),
+                        ]));
+                    } else {
+                        chat_lines.push(Line::from(vec![
+                            Span::styled("        ", Style::default()),
+                            Span::styled(*msg_line, Style::default().fg(Color::Cyan)),
+                        ]));
+                    }
+                }
             }
             MessageSender::Agent => {
                 let label = match app.agent_type {
-                    AgentType::Amk => "🤖 Juliette: ",
+                    AgentType::Elpis => "🤖 Juliette: ",
                     AgentType::Codex => "⚙️ Codex: ",
                     AgentType::Kiro => "🧠 Kiro: ",
                 };
-                chat_lines.push(Line::from(vec![
-                    Span::styled(label, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-                    Span::styled(&msg.text, Style::default().fg(Color::White)),
-                ]));
+                let msg_lines: Vec<&str> = msg.text.split('\n').collect();
+                for (i, msg_line) in msg_lines.iter().enumerate() {
+                    if i == 0 {
+                        chat_lines.push(Line::from(vec![
+                            Span::styled(label, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                            Span::styled(*msg_line, Style::default().fg(Color::White)),
+                        ]));
+                    } else {
+                        chat_lines.push(Line::from(vec![
+                            Span::styled(" ".repeat(UnicodeWidthStr::width(label)), Style::default()),
+                            Span::styled(*msg_line, Style::default().fg(Color::White)),
+                        ]));
+                    }
+                }
             }
             MessageSender::System => {
-                chat_lines.push(Line::from(vec![
-                    Span::styled("⚙️ System: ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
-                    Span::styled(&msg.text, Style::default().fg(Color::DarkGray)),
-                ]));
+                let msg_lines: Vec<&str> = msg.text.split('\n').collect();
+                for (i, msg_line) in msg_lines.iter().enumerate() {
+                    if i == 0 {
+                        chat_lines.push(Line::from(vec![
+                            Span::styled("⚙️ System: ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+                            Span::styled(*msg_line, Style::default().fg(Color::DarkGray)),
+                        ]));
+                    } else {
+                        chat_lines.push(Line::from(vec![
+                            Span::styled("           ", Style::default()),
+                            Span::styled(*msg_line, Style::default().fg(Color::DarkGray)),
+                        ]));
+                    }
+                }
             }
         }
         chat_lines.push(Line::from("")); // Add spacer
@@ -1385,14 +2131,24 @@ fn ui(f: &mut Frame, app: &App) {
     // If streaming in real-time, show current reply chunk
     if app.in_reply && !app.current_reply.is_empty() {
         let label = match app.agent_type {
-            AgentType::Amk => "🤖 Juliette (streaming): ",
+            AgentType::Elpis => "🤖 Juliette (streaming): ",
             AgentType::Codex => "⚙️ Codex (streaming): ",
             AgentType::Kiro => "🧠 Kiro (streaming): ",
         };
-        chat_lines.push(Line::from(vec![
-            Span::styled(label, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled(&app.current_reply, Style::default().fg(Color::White)),
-        ]));
+        let msg_lines: Vec<&str> = app.current_reply.split('\n').collect();
+        for (i, msg_line) in msg_lines.iter().enumerate() {
+            if i == 0 {
+                chat_lines.push(Line::from(vec![
+                    Span::styled(label, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::styled(*msg_line, Style::default().fg(Color::White)),
+                ]));
+            } else {
+                chat_lines.push(Line::from(vec![
+                    Span::styled(" ".repeat(UnicodeWidthStr::width(label)), Style::default()),
+                    Span::styled(*msg_line, Style::default().fg(Color::White)),
+                ]));
+            }
+        }
     }
 
     let chat_width = (main_chunks[0].width.saturating_sub(2) as usize).max(1);
@@ -1401,7 +2157,7 @@ fn ui(f: &mut Frame, app: &App) {
         let prefix = match msg.sender {
             MessageSender::User => "👤 You: ",
             MessageSender::Agent => match app.agent_type {
-                AgentType::Amk => "🤖 Juliette: ",
+                AgentType::Elpis => "🤖 Juliette: ",
                 AgentType::Codex => "⚙️ Codex: ",
                 AgentType::Kiro => "🧠 Kiro: ",
             },
@@ -1426,7 +2182,7 @@ fn ui(f: &mut Frame, app: &App) {
 
     if app.in_reply && !app.current_reply.is_empty() {
         let prefix = match app.agent_type {
-            AgentType::Amk => "🤖 Juliette (streaming): ",
+            AgentType::Elpis => "🤖 Juliette (streaming): ",
             AgentType::Codex => "⚙️ Codex (streaming): ",
             AgentType::Kiro => "🧠 Kiro (streaming): ",
         };
@@ -1731,6 +2487,15 @@ fn ui(f: &mut Frame, app: &App) {
                 text.push(Line::from(Span::styled("--- COMMAND ---", Style::default().fg(Color::DarkGray))));
                 text.push(Line::from(Span::styled(format!("  {}", cmd_str), Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))));
             }
+            "file_change" => {
+                let reason = req.command.as_deref().unwrap_or("Modify files in the workspace");
+                text.push(Line::from(vec![
+                    Span::styled("📝 Action: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::from("Allow Codex file changes"),
+                ]));
+                text.push(Line::from(""));
+                text.push(Line::from(reason.to_string()));
+            }
             _ => {
                 text.push(Line::from("Unknown action type."));
             }
@@ -1827,4 +2592,139 @@ mod tests {
         assert_eq!(deleted, vec!["line2"]);
         assert_eq!(added, vec!["line2_modified", "line4"]);
     }
+
+    #[test]
+    fn test_codex_app_server_thread_turn_and_stream() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut app = App::new(tx, "System Prompt".to_string());
+        app.agent_type = AgentType::Codex;
+        app.model = "gpt-5.4-mini".to_string();
+
+        app.handle_stdout_line(r#"{"id":1,"result":{"thread":{"id":"thr_elpis"}}}"#.to_string());
+        assert_eq!(app.codex_thread_id.as_deref(), Some("thr_elpis"));
+
+        app.send_codex_turn("hello".to_string());
+        let request: serde_json::Value = serde_json::from_str(&rx.recv().unwrap()).unwrap();
+        assert_eq!(request["method"], "turn/start");
+        assert_eq!(request["params"]["threadId"], "thr_elpis");
+        assert_eq!(request["params"]["input"][0]["text"], "hello");
+
+        app.handle_stdout_line(r#"{"method":"item/agentMessage/delta","params":{"delta":"hello back"}}"#.to_string());
+        app.handle_stdout_line(r#"{"method":"turn/completed","params":{"threadId":"thr_elpis","turn":{}}}"#.to_string());
+        assert_eq!(app.messages.last().unwrap().text, "hello back");
+    }
+
+    #[test]
+    fn test_codex_token_usage_uses_server_values() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut app = App::new(tx, String::new());
+        app.agent_type = AgentType::Codex;
+        app.handle_stdout_line(
+            r#"{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"last":{"totalTokens":25000},"modelContextWindow":100000}}}"#.to_string(),
+        );
+        assert_eq!(app.codex_context_tokens, 25_000);
+        assert_eq!(app.context_percent_left(), 75);
+    }
+
+    #[test]
+    fn test_selected_context_is_only_reinjected_when_changed() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut app = App::new(tx, String::new());
+        assert!(app.should_inject_context("GUIDE.md", "v1", false));
+        assert!(!app.should_inject_context("GUIDE.md", "v1", false));
+        assert!(app.should_inject_context("GUIDE.md", "v2", false));
+        assert!(app.should_inject_context("GUIDE.md", "v2", true));
+    }
+
+    #[test]
+    fn test_codex_approval_request_is_routed_to_modal() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut app = App::new(tx, String::new());
+        app.agent_type = AgentType::Codex;
+        app.handle_stdout_line(
+            r#"{"method":"item/commandExecution/requestApproval","id":42,"params":{"command":"cargo test"}}"#.to_string(),
+        );
+        let request = app.pending_approval.as_ref().unwrap();
+        assert!(request.is_codex);
+        assert_eq!(request.command.as_deref(), Some("cargo test"));
+        assert_eq!(request.response_id, Some(serde_json::json!(42)));
+        assert_eq!(app.focus, Focus::Approval);
+    }
+
+    #[test]
+    fn test_session_format_preserves_codex_thread_and_reads_legacy() {
+        let session = SessionData {
+            version: 2,
+            messages: vec![ChatMessage {
+                sender: MessageSender::User,
+                text: "continue".to_string(),
+            }],
+            codex_thread_id: Some("thr_saved".to_string()),
+            agent_type: AgentType::Codex,
+            provider: "chatgpt".to_string(),
+            model: "gpt-5.4-mini".to_string(),
+            injected_context_versions: HashMap::new(),
+        };
+        let serialized = serde_json::to_string(&session).unwrap();
+        let stored: StoredSession = serde_json::from_str(&serialized).unwrap();
+        match stored {
+            StoredSession::Current(saved) => {
+                assert_eq!(saved.codex_thread_id.as_deref(), Some("thr_saved"));
+                assert_eq!(saved.messages[0].text, "continue");
+            }
+            StoredSession::Legacy(_) => panic!("current session parsed as legacy"),
+        }
+
+        let legacy = r#"[{"sender":"User","text":"old session"}]"#;
+        assert_eq!(App::session_messages(legacy)[0].text, "old session");
+    }
+
+    #[test]
+    fn test_codex_resume_and_fork_requests_use_authoritative_thread() {
+        let cwd = std::path::Path::new("/tmp/elpis-workspace");
+        let resume = codex_thread_request(
+            &CodexThreadAction::Resume("thr_source".to_string()),
+            "gpt-5.4-mini",
+            cwd,
+        );
+        assert_eq!(resume["method"], "thread/resume");
+        assert_eq!(resume["params"]["threadId"], "thr_source");
+
+        let fork = codex_thread_request(
+            &CodexThreadAction::Fork("thr_source".to_string()),
+            "gpt-5.4-mini",
+            cwd,
+        );
+        assert_eq!(fork["method"], "thread/fork");
+        assert_eq!(fork["params"]["threadId"], "thr_source");
+    }
+}
+
+fn copy_to_clipboard(text: &str) -> Result<(), std::io::Error> {
+    use std::process::Command;
+    // Try wl-copy first (Wayland)
+    if let Ok(mut child) = Command::new("wl-copy").stdin(std::process::Stdio::piped()).spawn() {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = std::io::Write::write_all(&mut stdin, text.as_bytes());
+        }
+        let _ = child.wait();
+        return Ok(());
+    }
+    // Try xclip (X11)
+    if let Ok(mut child) = Command::new("xclip").args(["-selection", "clipboard"]).stdin(std::process::Stdio::piped()).spawn() {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = std::io::Write::write_all(&mut stdin, text.as_bytes());
+        }
+        let _ = child.wait();
+        return Ok(());
+    }
+    // Try xsel (X11 alternative)
+    if let Ok(mut child) = Command::new("xsel").args(["--clipboard", "--input"]).stdin(std::process::Stdio::piped()).spawn() {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = std::io::Write::write_all(&mut stdin, text.as_bytes());
+        }
+        let _ = child.wait();
+        return Ok(());
+    }
+    Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No clipboard utility found"))
 }

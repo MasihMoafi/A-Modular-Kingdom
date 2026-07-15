@@ -1,7 +1,7 @@
 [project]
-name = "a-modular-kingdom"
+name = "elpis"
 version = "0.1.0"
-description = "A modular agentic kingdom with memory, RAG, and web search"
+description = "Elpis agent control layer with a minimal local retrieval MCP"
 dependencies = [
     "mcp",
     "fastmcp",

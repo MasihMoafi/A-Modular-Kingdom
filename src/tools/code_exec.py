@@ -7,7 +7,9 @@ from typing import Dict
 
 def run_code(code: str, timeout_seconds: int = 15) -> str:
     """
-    Execute Python code in a temporary sandbox and return stdout/stderr.
+    Execute Python code in a temporary working directory and return stdout/stderr.
+
+    This isolates temporary files but is not an OS security sandbox.
 
     Returns a JSON string: {"status": "success"|"error", "stdout": str, "stderr": str}
     """
@@ -37,5 +39,4 @@ def run_code(code: str, timeout_seconds: int = 15) -> str:
         return json.dumps({"status": "error", "error": f"Execution timed out after {timeout_seconds}s"})
     except Exception as e:
         return json.dumps({"status": "error", "error": str(e)})
-
 
