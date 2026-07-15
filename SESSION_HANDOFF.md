@@ -51,16 +51,19 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
 - Done: `docs/CODEX_FOUNDATION_MIGRATION.md` pins the candidate Codex revision, maps the
   source modules to preserve, and defines the fork-and-subtract migration and first
   acceptance check.
-- In progress: `foundation-codex-baseline` in `FEATURES.json`; isolated worktree created
-  at `/home/masih/Desktop/f/p/Elpis-foundation` on branch
-  `agent/foundation-codex-baseline`; its checked-out baseline before this import is
-  `7d6d140`.
+- Done: `foundation-codex-baseline` worktree at `/home/masih/Desktop/f/p/Elpis-foundation`
+  on branch `agent/foundation-codex-baseline`.
 - Done for the foundation import: the complete committed `codex-rs/` workspace from
   pinned revision `2e1607ee2fa8099a233df7437adee5f16a741905` is now contained in
   this worktree. Its Apache-2.0 `LICENSE`, `NOTICE`, provenance, upstream crate
   boundaries, and tests are preserved; no features have been subtracted.
 - Done for the build baseline: Codex's documented OpenSSL prerequisite is present and
   the locked imported `codex-tui` package compiles successfully.
+- Done for the launch smoke: `codex-rs/target/debug/codex-tui` starts from the
+  worktree with no donor-path access. `--help` exits 0; a live launch runs for 4 s
+  (killed by timeout). `strace` (617 syscalls) and `strings` confirm zero file opens
+  from `/home/masih/Desktop/f/p/others/codex`. Evidence in
+  `docs/LAUNCH_SMOKE_EVIDENCE.md`.
 - Blocked: none. The incomplete TUI test run is a known verification gap, not a blocker
   for the compilation baseline Masih accepted on 2026-07-15.
 
@@ -101,8 +104,8 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   `pwd`, and created the requested file through a `fileChange` event.
 - Stable file boundaries for action rendering, permissions, and mouse selection are
   recorded in `docs/CODEX_FOUNDATION_MIGRATION.md`.
-- Open risk: the imported foundation has not yet completed its launch and donor-path
-  runtime checks, and the full TUI test suite has not completed.
+- Resolved: the imported foundation launch and donor-path runtime checks are complete;
+  evidence in `docs/LAUNCH_SMOKE_EVIDENCE.md`. Full TUI test suite gap remains.
 - Open risk: deprecated Python memory/tool support modules remain in the repository but
   are no longer imported or exposed by the MCP; delete them only after checking for
   non-MCP callers.
@@ -114,9 +117,9 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
 
 ## Next Action
 
-Launch the compiled copied TUI from this worktree and run the foundation acceptance
-smoke: create a small file, run one command, and prove no runtime file is loaded from
-the donor clone path. Do not subtract, rename, or redesign features yet.
+Begin task 2 (Runtime boundary): keep Codex working through subscription
+authentication, then define the Elpis embedded and external runtime contracts for
+Gemini and Claude paths. Do not subtract, rename, or redesign foundation features yet.
 
 ## Ordered Tasks
 
