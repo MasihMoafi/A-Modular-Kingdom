@@ -14,6 +14,8 @@
       "suggested_agent": "main-high-reasoning",
       "dependencies": [],
       "parallel_safe": false,
+      "branch": "agent/foundation-codex-baseline",
+      "worktree": "/home/masih/Desktop/f/p/Elpis-foundation",
       "file_scope": ["migration worktree", "vendored Codex foundation", "runtime and TUI baseline"],
       "status": "in_progress",
       "user_visible_behavior": "Elpis launches from code contained in its own repository and retains Codex-quality streaming, tools, sessions, and TUI behavior without depending on the donor clone path.",

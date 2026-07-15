@@ -51,7 +51,9 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
 - Done: `docs/CODEX_FOUNDATION_MIGRATION.md` pins the candidate Codex revision, maps the
   source modules to preserve, and defines the fork-and-subtract migration and first
   acceptance check.
-- In progress: `foundation-codex-baseline` in `FEATURES.json`; migration worktree not yet created.
+- In progress: `foundation-codex-baseline` in `FEATURES.json`; isolated worktree created
+  at `/home/masih/Desktop/f/p/Elpis-foundation` on branch
+  `agent/foundation-codex-baseline` from control baseline commit `406f34a`.
 - Blocked: none.
 
 ## Evidence
@@ -85,10 +87,10 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
 
 ## Next Action
 
-Create an isolated foundation worktree from the pinned Codex revision and make the
-first vertical slice pass: Elpis branding/startup, arbitrary mouse selection, readable
-command/file lifecycles, and exact Codex permission presets. Preserve the current dirty
-prototype and both upstream source trees.
+In `/home/masih/Desktop/f/p/Elpis-foundation`, import the pinned committed Codex source
+with attribution and establish the smallest buildable Elpis foundation. Do not subtract
+features yet. First preserve upstream tests and identify stable file boundaries for the
+later action-rendering, permission, and mouse-selection tasks.
 
 ## Ordered Tasks
 
