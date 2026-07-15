@@ -64,6 +64,12 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   (killed by timeout). `strace` (617 syscalls) and `strings` confirm zero file opens
   from `/home/masih/Desktop/f/p/others/codex`. Evidence in
   `docs/LAUNCH_SMOKE_EVIDENCE.md`.
+- Verified: `foundation-codex-baseline` passed its final user-visible acceptance
+  check. The imported TUI completed an authenticated Codex turn
+  `019f6616-842c-7b90-9b48-844406cd496f`, visibly ran `pwd`, created the requested
+  harmless marker file, and displayed the verified working directory and exact
+  marker content. The marker file was removed. Evidence in
+  `docs/FOUNDATION_CODEX_BASELINE_EVIDENCE.md`.
 - Blocked: none. The incomplete TUI test run is a known verification gap, not a blocker
   for the compilation baseline Masih accepted on 2026-07-15.
 
@@ -106,6 +112,11 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   recorded in `docs/CODEX_FOUNDATION_MIGRATION.md`.
 - Resolved: the imported foundation launch and donor-path runtime checks are complete;
   evidence in `docs/LAUNCH_SMOKE_EVIDENCE.md`. Full TUI test suite gap remains.
+- Final foundation acceptance: the repository-built imported TUI used the existing
+  authenticated Codex account to run `pwd`, create
+  `.elpis-foundation-acceptance-test.txt`, and verify its exact
+  `ELPIS_FOUNDATION_CODEX_BASELINE_OK` content. An independent check passed and the
+  test file was removed. `FEATURES.json` now marks the feature `verified`.
 - Open risk: deprecated Python memory/tool support modules remain in the repository but
   are no longer imported or exposed by the MCP; delete them only after checking for
   non-MCP callers.
@@ -117,9 +128,8 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
 
 ## Next Action
 
-Begin task 2 (Runtime boundary): keep Codex working through subscription
-authentication, then define the Elpis embedded and external runtime contracts for
-Gemini and Claude paths. Do not subtract, rename, or redesign foundation features yet.
+Stop at the verified foundation checkpoint. Runtime-boundary work has not begun;
+wait for Masih to select the next priority before changing runtime contracts.
 
 ## Ordered Tasks
 

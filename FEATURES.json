@@ -17,14 +17,18 @@
       "branch": "agent/foundation-codex-baseline",
       "worktree": "/home/masih/Desktop/f/p/Elpis-foundation",
       "file_scope": ["migration worktree", "vendored Codex foundation", "runtime and TUI baseline"],
-      "status": "in_progress",
+      "status": "verified",
       "user_visible_behavior": "Elpis launches from code contained in its own repository and retains Codex-quality streaming, tools, sessions, and TUI behavior without depending on the donor clone path.",
       "acceptance": [
         "Build and launch Elpis from a clean checkout.",
         "Create a file and run a command through the Codex runtime.",
         "Prove no runtime file is loaded from the donor clone directory."
       ],
-      "evidence": ["docs/CODEX_FOUNDATION_MIGRATION.md"]
+      "evidence": [
+        "docs/CODEX_FOUNDATION_MIGRATION.md",
+        "docs/LAUNCH_SMOKE_EVIDENCE.md",
+        "docs/FOUNDATION_CODEX_BASELINE_EVIDENCE.md"
+      ]
     },
     {
       "id": "action-rendering",
