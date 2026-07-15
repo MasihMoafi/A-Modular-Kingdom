@@ -96,6 +96,7 @@ mod approval_events;
 mod ascii_animation;
 mod bottom_pane;
 mod branch_summary;
+mod branding;
 mod chatwidget;
 mod cli;
 mod clipboard_copy;

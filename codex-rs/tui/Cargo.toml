@@ -6,7 +6,7 @@ license.workspace = true
 autobins = false
 
 [[bin]]
-name = "codex-tui"
+name = "elpis"
 path = "src/main.rs"
 
 [[bin]]

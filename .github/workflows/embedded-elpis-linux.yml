@@ -1,0 +1,85 @@
+name: Embedded Elpis Linux binary
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/elpis-embedded-launcher
+    paths:
+      - .github/workflows/embedded-elpis-linux.yml
+      - codex-rs/**
+      - scripts/install-elpis-binary.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: embedded-elpis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and verify Elpis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: codex-rs
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bubblewrap \
+            libcap-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+
+      - name: Restore Cargo cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            codex-rs/target
+          key: embedded-elpis-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock', 'codex-rs/rust-toolchain.toml') }}
+
+      - name: Compile focused TUI tests
+        run: cargo test -p codex-tui --lib --locked --no-run
+
+      - name: Verify Elpis branding
+        run: cargo test -p codex-tui --lib --locked onboarding::welcome::tests::welcome_renders_animation_on_first_draw -- --exact
+
+      - name: Build Elpis binary
+        run: cargo build -p codex-tui --bin elpis --locked
+
+      - name: Verify executable identity
+        run: |
+          target/debug/elpis --help
+          test "$(target/debug/elpis --version | awk '{print $1}')" = "elpis"
+
+      - name: Reduce artifact size
+        run: strip target/debug/elpis
+
+      - name: Upload Elpis binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: elpis-linux-x86_64
+          path: codex-rs/target/debug/elpis
+          if-no-files-found: error
+          retention-days: 7

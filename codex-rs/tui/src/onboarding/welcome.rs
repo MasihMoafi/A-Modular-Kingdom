@@ -12,6 +12,7 @@ use ratatui::widgets::Wrap;
 use std::cell::Cell;
 
 use crate::ascii_animation::AsciiAnimation;
+use crate::branding::PRODUCT_NAME;
 use crate::key_hint::KeyBindingListExt;
 use crate::onboarding::keys;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
@@ -94,8 +95,8 @@ impl WidgetRef for &WelcomeWidget {
         lines.push(Line::from(vec![
             "  ".into(),
             "Welcome to ".into(),
-            "Codex".bold(),
-            ", OpenAI's command-line coding agent".into(),
+            PRODUCT_NAME.bold(),
+            ", with Codex as the active runtime".into(),
         ]));
 
         Paragraph::new(lines)
@@ -150,6 +151,7 @@ mod tests {
 
         let welcome_row = row_containing(&buf, "Welcome");
         assert_eq!(welcome_row, Some(frame_lines + 1));
+        assert_eq!(row_containing(&buf, PRODUCT_NAME), welcome_row);
     }
 
     #[test]
