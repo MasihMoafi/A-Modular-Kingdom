@@ -80,6 +80,11 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   `codex-tui` library-test target and passed all four contract tests without using
   Masih's workstation. The broader multi-runtime feature remains `in_progress` because
   Gemini and Claude adapters are not implemented.
+- Defined: Gemini CLI over ACP is the first non-Codex adapter. The legacy Python Gemini
+  path is not reusable as the product runtime; it duplicates the agent loop, requires an
+  API key, does not stream Gemini output, contains absolute paths, and lacks a declared
+  SDK dependency. The bounded contract and acceptance check are in
+  `docs/GEMINI_RUNTIME_CONTRACT.md`.
 
 ## Evidence
 
@@ -137,12 +142,15 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   `docs/RUNTIME_BOUNDARY_WIP_EVIDENCE.md`. GitHub Actions run
   `29442993318` compiled the test target and passed all four focused tests at commit
   `033c00f`; `FEATURES.json` remains `in_progress` because no non-Codex adapter exists.
+- Gemini inventory: installed `@google/gemini-cli` version `0.50.0` provides ACP over
+  stdio with authentication, new/load session, prompt, cancellation, model/mode changes,
+  MCP, and a proxied filesystem. No live Gemini turn was run during contract work.
 
 ## Next Action
 
-Define the smallest first non-Codex adapter contract and acceptance test before coding
-it. Inventory the existing Gemini path first; do not alter Codex's native loop or the
-authentication-only boundary.
+Implement the smallest Gemini ACP transport seam: launch the executable, negotiate
+capabilities, create/load a session, send/cancel a prompt, and surface protocol/process
+errors. Keep it isolated from Codex dispatch and defer tool/permission integration.
 
 ## Ordered Tasks
 

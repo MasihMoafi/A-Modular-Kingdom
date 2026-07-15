@@ -87,6 +87,8 @@
       "evidence": [
         "Codex launches by default; older Python provider paths exist but parity is unverified.",
         "The focused Codex runtime-boundary compile and four contract tests passed in GitHub Actions run 29442993318; non-Codex adapters remain unimplemented.",
+        "Gemini CLI over ACP is the selected first non-Codex contract; implementation and user-visible acceptance remain pending.",
+        "docs/GEMINI_RUNTIME_CONTRACT.md",
         "docs/RUNTIME_BOUNDARY_WIP_EVIDENCE.md"
       ]
     },
