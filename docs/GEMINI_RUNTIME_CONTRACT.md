@@ -5,6 +5,21 @@
 The user can explicitly select Gemini, complete a visible turn, close Elpis, and resume
 the same Elpis session without routing the turn through Codex.
 
+## Implementation Status
+
+- Implemented: process launch, JSON-RPC request/notification transport, capability
+  negotiation, authentication request, new/load session, prompt streaming callback,
+  cancellation, bounded unsupported-client-capability rejection, and visible errors.
+- Verified: the installed Gemini CLI completed a real ACP `initialize` handshake and
+  reported protocol 1, version `0.50.0`, and load-session support.
+- Verified remotely: formatting, locked `codex-tui` compilation, the four Codex runtime
+  boundary tests, and three Gemini transport tests passed in GitHub Actions run
+  [29444377633](https://github.com/MasihMoafi/Elpis/actions/runs/29444377633).
+- Not accepted: live prompts currently receive Google HTTP 403. This occurred with
+  ACP's `auto` model and after explicitly selecting its advertised
+  `gemini-3.5-flash`; no tool or file action was requested. The TUI is not wired to the
+  adapter yet.
+
 ## Challenged Decisions
 
 | Candidate | Decision | Reason |
@@ -31,6 +46,8 @@ the same Elpis session without routing the turn through Codex.
   input and output.
 - The first slice supports `initialize`, `authenticate`, `session/new`,
   `session/prompt`, `session/cancel`, and `session/load`.
+- Model choice must use ACP `session/set_model` after new/load session. The installed
+  CLI continued to report `auto` when launched with a command-line `--model` value.
 - Elpis records the Gemini session ID only as adapter state. The Elpis session and its
   provider-neutral transcript remain the project truth.
 - Unexpected process exit, malformed protocol messages, and unsupported capabilities
@@ -79,4 +96,3 @@ permission parity retain their own acceptance checks.
 - Installed ACP guide:
   `/usr/local/node/lib/node_modules/@google/gemini-cli/bundle/docs/cli/acp-mode.md`.
 - Existing legacy paths inspected: `src/agent/main.py` and `tui/src/main.rs`.
-

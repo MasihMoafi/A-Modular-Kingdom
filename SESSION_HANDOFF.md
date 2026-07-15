@@ -85,6 +85,10 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   API key, does not stream Gemini output, contains absolute paths, and lacks a declared
   SDK dependency. The bounded contract and acceptance check are in
   `docs/GEMINI_RUNTIME_CONTRACT.md`.
+- Implemented and remotely verified: the isolated Gemini ACP transport launches the
+  process, negotiates capabilities, supports auth/new/load/prompt/cancel, streams
+  notifications to a callback, rejects unsupported client requests without hanging,
+  and surfaces protocol errors. It is not connected to runtime dispatch or the TUI.
 
 ## Evidence
 
@@ -144,13 +148,20 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   `033c00f`; `FEATURES.json` remains `in_progress` because no non-Codex adapter exists.
 - Gemini inventory: installed `@google/gemini-cli` version `0.50.0` provides ACP over
   stdio with authentication, new/load session, prompt, cancellation, model/mode changes,
-  MCP, and a proxied filesystem. No live Gemini turn was run during contract work.
+  MCP, and a proxied filesystem.
+- GitHub Actions run `29444377633` passed Rust formatting, locked `codex-tui`
+  compilation, four Codex boundary tests, and three Gemini transport tests in 4m45s.
+- Live ACP `initialize` passed against installed Gemini CLI `0.50.0`. Live prompt
+  attempts then received Google HTTP 403 with both ACP `auto` and explicitly selected
+  advertised model `gemini-3.5-flash`. No tools or file changes were requested. ACP
+  ignored the launch-time `--model` value and requires `session/set_model` after
+  new/load session.
 
 ## Next Action
 
-Implement the smallest Gemini ACP transport seam: launch the executable, negotiate
-capabilities, create/load a session, send/cancel a prompt, and surface protocol/process
-errors. Keep it isolated from Codex dispatch and defer tool/permission integration.
+Add explicit ACP `session/set_model`, then connect `RuntimeKind::Gemini` to the shared
+TUI event/session path using mocked ACP responses first. Do not retry a live Gemini turn
+until the Google 403 access issue is resolved; keep tools and permissions disabled.
 
 ## Ordered Tasks
 
