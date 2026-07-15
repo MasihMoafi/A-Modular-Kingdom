@@ -165,11 +165,7 @@ impl GeminiAcpClient {
 
     pub async fn authenticate(&mut self, method_id: &str) -> Result<(), GeminiAcpError> {
         self.connection
-            .request(
-                "authenticate",
-                json!({ "methodId": method_id }),
-                |_| {},
-            )
+            .request("authenticate", json!({ "methodId": method_id }), |_| {})
             .await?;
         Ok(())
     }
@@ -389,7 +385,9 @@ mod tests {
                 .await
                 .expect("write notification");
             agent_write
-                .write_all(b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"stopReason\":\"end_turn\"}}\n")
+                .write_all(
+                    b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"stopReason\":\"end_turn\"}}\n",
+                )
                 .await
                 .expect("write response");
         });
@@ -422,7 +420,11 @@ mod tests {
 
         let agent = tokio::spawn(async move {
             let mut lines = BufReader::new(agent_read).lines();
-            lines.next_line().await.expect("read request").expect("request");
+            lines
+                .next_line()
+                .await
+                .expect("read request")
+                .expect("request");
             agent_write
                 .write_all(b"{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"fs/read_text_file\",\"params\":{}}\n")
                 .await

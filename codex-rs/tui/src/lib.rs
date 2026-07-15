@@ -119,8 +119,8 @@ mod external_agent_config_migration_model;
 mod external_editor;
 mod file_search;
 mod frames;
-mod get_git_diff;
 mod gemini_acp;
+mod get_git_diff;
 mod git_action_directives;
 mod goal_display;
 mod goal_files;
@@ -218,17 +218,17 @@ use crate::startup_hooks_review::load_startup_hooks_review_entry;
 use crate::startup_hooks_review::maybe_run_startup_hooks_review;
 use crate::tui::Tui;
 pub use cli::Cli;
+use codex_arg0::Arg0DispatchPaths;
 pub use gemini_acp::GeminiAcpClient;
 pub use gemini_acp::GeminiAcpError;
 pub use gemini_acp::GeminiAcpInitialize;
 pub use gemini_acp::GeminiAcpSession;
-pub use runtime_contract::CapabilityOwner;
-pub use runtime_contract::RuntimeKind;
-pub use runtime_contract::RuntimeOwnership;
-use codex_arg0::Arg0DispatchPaths;
 pub use markdown_render::render_markdown_text;
 pub use public_widgets::composer_input::ComposerAction;
 pub use public_widgets::composer_input::ComposerInput;
+pub use runtime_contract::CapabilityOwner;
+pub use runtime_contract::RuntimeKind;
+pub use runtime_contract::RuntimeOwnership;
 // (tests access modules directly within the crate)
 
 const TUI_LOG_FILE_NAME: &str = "codex-tui.log";
@@ -862,13 +862,7 @@ pub async fn run_main(
 ) -> std::io::Result<AppExitInfo> {
     match cli.runtime {
         RuntimeKind::Codex => {
-            run_codex_main(
-                cli,
-                arg0_paths,
-                loader_overrides,
-                explicit_remote_endpoint,
-            )
-            .await
+            run_codex_main(cli, arg0_paths, loader_overrides, explicit_remote_endpoint).await
         }
     }
 }
