@@ -16,6 +16,17 @@ Pinned candidate revision:
 The donor working tree has unrelated edits. Import only committed content from the
 pinned revision; never copy its working-tree state or pull/reset over those edits.
 
+## Imported Baseline
+
+The committed `codex-rs/` tree from the pinned revision is imported at the repository
+root. Its Apache-2.0 `LICENSE` and `NOTICE` are retained inside that directory, and
+`codex-rs/ELPIS_UPSTREAM.md` records provenance. The existing prototype remains in
+`tui/` until the imported foundation reaches its current working milestone.
+
+No feature subtraction or Elpis-specific renaming is part of this baseline import.
+Crate and module boundaries remain upstream-shaped so the later action-rendering,
+permission, and mouse-selection work can stay isolated and retain upstream tests.
+
 ## Product Boundary
 
 Keep one Elpis-owned execution environment:
@@ -55,6 +66,20 @@ Codex's present provider definition supports the OpenAI Responses wire format. I
 not by itself a native Gemini/Claude abstraction. Elpis therefore needs an agent-runtime
 contract plus optional provider adapters, similar to OpenClaw's separation of model,
 provider, and runtime.
+
+## Stable Task Boundaries
+
+Keep these ownership seams intact until the baseline acceptance check passes:
+
+| Task | Primary files | Preserved contract and tests |
+| --- | --- | --- |
+| Action rendering | `codex-rs/tui/src/chatwidget/command_lifecycle.rs`, `tool_lifecycle.rs`, `exec_state.rs`, `exec_cell/`, `history_cell/patches.rs`, `diff_render.rs` | Own command/file lifecycle projection and rendered cells. Keep colocated unit tests and `snapshots/` fixtures with any change. Treat `chatwidget/protocol.rs` as the shared event-routing seam. |
+| Permissions | `codex-rs/protocol/src/protocol.rs`, `protocol/src/models.rs`, `utils/approval-presets/`, `core/src/safety.rs`, `core/src/tools/sandboxing.rs`, `sandboxing/`, `linux-sandbox/`, `execpolicy/`, `tui/src/app_server_session.rs`, `tui/src/chatwidget/permissions_menu.rs`, `permission_popups.rs`, `bottom_pane/approval_overlay.rs` | Own permission types, preset selection, enforcement, and approval UI. Preserve crate tests plus approval snapshots; do not alter rendering lifecycle files while changing policy. |
+| Mouse selection and copy | `codex-rs/tui/src/tui.rs`, `tui/event_stream.rs`, `app/input.rs`, `app/event_dispatch.rs`, `app_event.rs`, `chatwidget.rs` raw-output methods, `history_cell/mod.rs` raw lines, `insert_history.rs` | Codex deliberately skips mouse events and does not enable mouse capture, leaving selection to the terminal. Raw scrollback supplies copy-faithful lines. Preserve `history_cell/tests.rs`, raw-mode chatwidget tests/snapshots, and terminal-mode tests. |
+
+`chatwidget.rs` and `chatwidget/protocol.rs` are shared seams, not general cleanup areas.
+Rendering owns lifecycle routing; mouse-selection work owns only raw-output state and
+copy-friendly transcript projection. Coordinate before changing either seam.
 
 ## Exact Permission Baseline
 

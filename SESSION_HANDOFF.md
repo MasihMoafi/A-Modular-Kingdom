@@ -53,44 +53,70 @@ Gemini, and Claude adapters, and add an OpenClaw-derived context and memory syst
   acceptance check.
 - In progress: `foundation-codex-baseline` in `FEATURES.json`; isolated worktree created
   at `/home/masih/Desktop/f/p/Elpis-foundation` on branch
-  `agent/foundation-codex-baseline` from control baseline commit `406f34a`.
-- Blocked: none.
+  `agent/foundation-codex-baseline`; its checked-out baseline before this import is
+  `7d6d140`.
+- Done for the foundation import: the complete committed `codex-rs/` workspace from
+  pinned revision `2e1607ee2fa8099a233df7437adee5f16a741905` is now contained in
+  this worktree. Its Apache-2.0 `LICENSE`, `NOTICE`, provenance, upstream crate
+  boundaries, and tests are preserved; no features have been subtracted.
+- Done for the build baseline: Codex's documented OpenSSL prerequisite is present and
+  the locked imported `codex-tui` package compiles successfully.
+- Blocked: none. The incomplete TUI test run is a known verification gap, not a blocker
+  for the compilation baseline Masih accepted on 2026-07-15.
 
 ## Evidence
 
-- Changed for the latest step: `AGENTS.md`, `VISION.md`, `FEATURES.json`, `GUIDE.md`,
-  `REQUIREMENTS.md`, `readme.md`, `docs/AUTHENTICATION_BOUNDARY.md`,
-  `docs/CONTEXT_AND_SESSIONS.md`, `docs/CODEX_FOUNDATION_MIGRATION.md`,
-  `docs/UPSTREAM_CAPABILITY_MAP.md`, `docs/AGENT_DISPATCH.md`,
-  `tui/docs/ELPIS_INSPIRATION.md`, and this handoff.
-  These are control/documentation corrections; no runtime code was changed.
+- Changed for the foundation checkpoint: imported `codex-rs/` at the pinned commit,
+  retained its license/notice and added `codex-rs/ELPIS_UPSTREAM.md`; updated
+  `docs/CODEX_FOUNDATION_MIGRATION.md` and this handoff. No imported runtime behavior
+  was changed.
 - Minimal MCP smoke: one advertised tool, exactly two parameters, no prompts or
   resources, and successful retrieval from `GUIDE.md`.
 - Codex MCP configuration no longer carries the obsolete `MCP_PROFILE` switch.
 - Current verification: 10 Rust tests passed and
   `.venv/bin/python -m compileall -q src` passed.
-- `FEATURES.json` parses successfully. Whole-worktree `git diff --check` remains noisy
-  because pre-existing edits in `src/agent/main.py` contain trailing whitespace.
+- Imported-source integrity matches the pinned committed `codex-rs/` tree exactly,
+  excluding the added local provenance/license files and build output.
+- `cargo metadata --manifest-path codex-rs/Cargo.toml --no-deps` passed, and
+  `cargo test --manifest-path codex-rs/Cargo.toml -p codex-utils-approval-presets
+  --locked` passed.
+- Codex's pinned build setup requires `pkg-config` and OpenSSL development files.
+  Ubuntu `libssl-dev` 3.0.13-0ubuntu3.11 was installed; `pkg-config --modversion
+  openssl` now returns `3.0.13`.
+- `CC=/usr/bin/cc CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=/usr/bin/cc cargo
+  build --manifest-path codex-rs/Cargo.toml -p codex-tui --locked` passed in 5m41s.
+- Known test gap: plain `cargo test -p codex-tui --locked` first aborted on a stack
+  overflow because it omitted Codex's documented `RUST_MIN_STACK=8388608`. The exact
+  failed test passed with that setting. A full rerun then progressed through the 3,068
+  library tests but hung in
+  `ide_context::ipc::tests::fetch_ide_context_does_not_fall_back_after_primary_protocol_error`
+  and was stopped. Per Masih's direction, do not install or compile `cargo-nextest`;
+  accept successful TUI compilation as this baseline and retain the hang as a gap.
+- `FEATURES.json` parses successfully. The edited migration and handoff documents pass
+  `git diff --check`; the imported upstream tree retains intentional whitespace in
+  fixtures, prompts, patches, and snapshots, so whole-import `diff --check` is noisy.
 - Authentication smoke: installed Codex `0.144.4` returned account type `chatgpt` with
   OpenAI authentication required through `account/read`; no thread or turn was started.
 - Earlier live verification: a resumed Codex thread recalled its prior codeword, ran
   `pwd`, and created the requested file through a `fileChange` event.
-- Open risk: without the installed Codex executable, the current OpenAI prototype cannot
-  act as a coding agent; the donor foundation has not yet been copied into Elpis.
+- Stable file boundaries for action rendering, permissions, and mouse selection are
+  recorded in `docs/CODEX_FOUNDATION_MIGRATION.md`.
+- Open risk: the imported foundation has not yet completed its launch and donor-path
+  runtime checks, and the full TUI test suite has not completed.
 - Open risk: deprecated Python memory/tool support modules remain in the repository but
   are no longer imported or exposed by the MCP; delete them only after checking for
   non-MCP callers.
 - Open risk: the TUI's `/yolo` label is inaccurate and toggling it does not recreate or
   reconfigure the current Codex thread. The prototype always starts with Codex's Default
   policy (`on-request` plus workspace write).
-- Worktree contains earlier user/agent changes and is intentionally uncommitted.
+- The foundation import is committed on `agent/foundation-codex-baseline`; inspect
+  `git log -1` for the checkpoint hash. Build output under `codex-rs/target/` is ignored.
 
 ## Next Action
 
-In `/home/masih/Desktop/f/p/Elpis-foundation`, import the pinned committed Codex source
-with attribution and establish the smallest buildable Elpis foundation. Do not subtract
-features yet. First preserve upstream tests and identify stable file boundaries for the
-later action-rendering, permission, and mouse-selection tasks.
+Launch the compiled copied TUI from this worktree and run the foundation acceptance
+smoke: create a small file, run one command, and prove no runtime file is loaded from
+the donor clone path. Do not subtract, rename, or redesign features yet.
 
 ## Ordered Tasks
 
@@ -115,5 +141,7 @@ later action-rendering, permission, and mouse-selection tasks.
 - Do not remove Codex/ChatGPT login; it is the required authentication boundary.
 - Do not mistake a compact TUI rendering for reduced model context.
 - Do not expose the full Python MCP profile to Codex.
+- Do not install or compile `cargo-nextest`; successful imported-TUI compilation is the
+  accepted baseline, and the hanging TUI test is a recorded gap.
 - Do not retain raw searches, file reads, command output, or failed probes after their
   conclusion and source pointer have been recorded.
