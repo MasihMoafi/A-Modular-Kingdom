@@ -258,12 +258,13 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Pets
             | SlashCommand::Raw
+            | SlashCommand::TestApproval
             | SlashCommand::Usage
             | SlashCommand::Vim => false,
             SlashCommand::SandboxReadRoot => cfg!(target_os = "windows"),
             SlashCommand::Copy => !cfg!(target_os = "android"),
             SlashCommand::App => cfg!(any(target_os = "macos", target_os = "windows")),
-            SlashCommand::Rollout | SlashCommand::TestApproval => cfg!(debug_assertions),
+            SlashCommand::Rollout => cfg!(debug_assertions),
             _ => true,
         }
     }
@@ -320,6 +321,7 @@ mod tests {
             "plan",
             "pets",
             "raw",
+            "test-approval",
             "usage",
             "vim",
         ] {

@@ -80,44 +80,6 @@ pub(crate) fn padded_emoji(emoji: &str) -> String {
 }
 
 #[derive(Debug)]
-struct TooltipHistoryCell {
-    tip: String,
-    cwd: PathBuf,
-}
-
-impl TooltipHistoryCell {
-    fn new(tip: String, cwd: &Path) -> Self {
-        Self {
-            tip,
-            cwd: cwd.to_path_buf(),
-        }
-    }
-}
-
-impl HistoryCell for TooltipHistoryCell {
-    fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
-        let indent = "  ";
-        let indent_width = UnicodeWidthStr::width(indent);
-        let wrap_width = usize::from(width.max(1))
-            .saturating_sub(indent_width)
-            .max(1);
-        let mut lines: Vec<Line<'static>> = Vec::new();
-        append_markdown(
-            &format!("**Tip:** {}", self.tip),
-            Some(wrap_width),
-            Some(self.cwd.as_path()),
-            &mut lines,
-        );
-
-        prefix_lines(lines, indent.into(), indent.into())
-    }
-
-    fn raw_lines(&self) -> Vec<Line<'static>> {
-        vec![Line::from(format!("Tip: {}", self.tip))]
-    }
-}
-
-#[derive(Debug)]
 pub struct SessionInfoCell(CompositeHistoryCell);
 
 impl HistoryCell for SessionInfoCell {
@@ -143,8 +105,8 @@ pub(crate) fn new_session_info(
     requested_model: &str,
     session: &ThreadSessionState,
     is_first_event: bool,
-    tooltip_override: Option<String>,
-    auth_plan: Option<PlanType>,
+    _tooltip_override: Option<String>,
+    _auth_plan: Option<PlanType>,
     show_fast_status: bool,
 ) -> SessionInfoCell {
     // Header box rendered as history (so it appears at the very top)
@@ -197,13 +159,6 @@ pub(crate) fn new_session_info(
 
         parts.push(Box::new(PlainHistoryCell { lines: help_lines }));
     } else {
-        if config.show_tooltips
-            && let Some(tooltips) = tooltip_override
-                .or_else(|| tooltips::get_tooltip(auth_plan, show_fast_status))
-                .map(|tip| TooltipHistoryCell::new(tip, &config.cwd))
-        {
-            parts.push(Box::new(tooltips));
-        }
         if requested_model != session.model.as_str() {
             let lines = vec![
                 "model changed:".magenta().bold().into(),

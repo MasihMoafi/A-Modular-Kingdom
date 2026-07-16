@@ -613,7 +613,7 @@ fn ps_output_empty_snapshot() {
 }
 
 #[tokio::test]
-async fn session_info_uses_availability_nux_tooltip_override() {
+async fn session_info_ignores_startup_tooltip_override() {
     let config = test_config().await;
     let cell = new_session_info(
         &config,
@@ -626,7 +626,7 @@ async fn session_info_uses_availability_nux_tooltip_override() {
     );
 
     let rendered = render_transcript(&cell).join("\n");
-    assert!(rendered.contains("Model just became available"));
+    assert!(!rendered.contains("Model just became available"));
 }
 
 #[tokio::test]
