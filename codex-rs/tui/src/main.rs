@@ -112,11 +112,7 @@ fn append_provider_override(config_overrides: &mut CliConfigOverrides, provider:
         }
         "gemini-flash" => {
             push_string_override(config_overrides, "model_provider", "openrouter");
-            push_string_override(
-                config_overrides,
-                "model",
-                OPENROUTER_GEMINI_FLASH_MODEL,
-            );
+            push_string_override(config_overrides, "model", OPENROUTER_GEMINI_FLASH_MODEL);
         }
         provider => push_string_override(config_overrides, "model_provider", provider),
     }
