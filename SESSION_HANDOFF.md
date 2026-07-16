@@ -7,8 +7,8 @@ remove only Masih's approved unwanted features without losing retained Codex beh
 
 ## Current State
 
-- Canonical code baseline before this checkpoint: `main` at `419384d`; `origin/main`
-  matches.
+- Canonical `main` includes the startup fix (`3e06042`), superseded Python-tool
+  deletion (`d5396b1`), and visual/reduction task definition (`d0167e2`).
 - The installed `elpis` is the contained Codex-derived TUI, not the archived prototype
   and not code loaded from the donor Codex clone.
 - Verified foundation behavior includes ChatGPT authentication, streaming tool/file
@@ -83,12 +83,12 @@ not unrelated foundations.
 - Proven-unused Python tool deletion is committed as `d5396b1`.
 - Git cleanup: only `/home/masih/Desktop/f/p/Elpis` remains as a normal worktree.
   `archive/pre-cleanup-20260716` preserves every unique runtime, prototype, old local,
-  and Jules branch tip without merging those trees into `main`. GitHub should retain
-  only `main` and that archive branch after the cleanup batch.
+  and Jules branch tip without merging those trees into `main`. Local Git and GitHub
+  now retain only `main` and that archive branch.
 - Verification: MCP initialize and tools/list pass with exactly one tool and the narrow
   schema; `.venv/bin/python -m compileall -q src`, `jq -e . FEATURES.json`, and
   `git diff --check` pass. No Rust build is required for this Python service change.
-- Startup performance is accepted. No push has been performed.
+- Startup performance is accepted. Canonical changes and the archive are pushed.
 
 ## Next Action
 
