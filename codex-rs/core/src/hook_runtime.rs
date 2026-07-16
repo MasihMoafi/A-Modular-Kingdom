@@ -370,6 +370,22 @@ pub(crate) async fn run_pre_compact_hooks(
     turn_context: &Arc<TurnContext>,
     trigger: CompactionTrigger,
 ) -> PreCompactHookOutcome {
+    let config = sess.get_config().await;
+    if let Err(error) = crate::elpis_context::sync_continuity_before_compaction(
+        config.memories.root.as_ref().map(|root| root.as_path()),
+        turn_context.cwd.as_path(),
+    )
+    .await
+    {
+        let event = EventMsg::Error(codex_protocol::protocol::ErrorEvent {
+            message: format!(
+                "Elpis could not safely save session continuity before compaction: {error}"
+            ),
+            codex_error_info: Some(CodexErrorInfo::Other),
+        });
+        sess.send_event(turn_context, event).await;
+        return PreCompactHookOutcome::Stopped;
+    }
     let request = codex_hooks::PreCompactRequest {
         session_id: sess.session_id().into(),
         turn_id: turn_context.sub_id.clone(),

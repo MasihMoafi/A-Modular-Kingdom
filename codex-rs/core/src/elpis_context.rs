@@ -71,6 +71,24 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         .collect()
 }
 
+pub async fn sync_continuity_before_compaction(
+    memories_root: Option<&Path>,
+    cwd: &Path,
+) -> std::io::Result<()> {
+    let Some(workspace_dir) = workspace_context_dir(memories_root, cwd) else {
+        return Ok(());
+    };
+    for name in ["GOAL.md", "ES.md"] {
+        let path = workspace_dir.join(name);
+        match tokio::fs::OpenOptions::new().read(true).open(&path).await {
+            Ok(file) => file.sync_all().await?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
 fn workspace_key(cwd: &Path) -> String {
     let slug = cwd
         .file_name()
@@ -169,6 +187,23 @@ mod tests {
         assert!(prompt.contains("Ship Elpis"));
         assert!(prompt.contains("Next: visible context"));
         assert!(!prompt.contains("must not load"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pre_compaction_sync_accepts_present_or_missing_files() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = Path::new("/tmp/project");
+        let workspace = workspace_context_dir(Some(&memories), cwd).expect("workspace path");
+        tokio::fs::create_dir_all(&workspace).await?;
+        tokio::fs::write(workspace.join("GOAL.md"), "Ship Elpis").await?;
+
+        sync_continuity_before_compaction(Some(&memories), cwd).await?;
+        assert_eq!(
+            tokio::fs::read_to_string(workspace.join("GOAL.md")).await?,
+            "Ship Elpis"
+        );
         Ok(())
     }
 }
