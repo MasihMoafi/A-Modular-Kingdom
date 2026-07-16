@@ -6,6 +6,8 @@ on:
     branches:
       - main
       - agent/elpis-embedded-launcher
+    tags:
+      - "v*"
     paths:
       - .github/workflows/embedded-elpis-linux.yml
       - codex-rs/**
@@ -81,6 +83,9 @@ jobs:
       - name: Verify Elpis memory path defaults
         run: cargo test -p codex-tui --bin elpis --locked elpis_memories_defaults_precede_user_config
 
+      - name: Verify provider selection flag
+        run: cargo test -p codex-tui --bin elpis --locked provider_flag_is_limited_and_becomes_a_config_override
+
       - name: Verify Elpis memory reset boundary
         run: cargo test -p codex-app-server --test all --locked memory_reset_clears_memory_files_and_rows_preserves_threads
 
@@ -108,7 +113,7 @@ jobs:
       - name: Verify executable identity
         run: |
           target/debug/elpis --help
-          test "$(target/debug/elpis --version | awk '{print $1}')" = "elpis"
+          test "$(target/debug/elpis --version)" = "elpis 0.1.0"
 
       - name: Reduce artifact size
         run: strip target/debug/elpis
@@ -120,3 +125,30 @@ jobs:
           path: codex-rs/target/debug/elpis
           if-no-files-found: error
           retention-days: 7
+
+  release:
+    name: Publish tagged Linux binary
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified Elpis binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: elpis-linux-x86_64
+          path: dist
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv dist/elpis dist/elpis-linux-x86_64
+          sha256sum dist/elpis-linux-x86_64 > dist/elpis-linux-x86_64.sha256
+          gh release create "$GITHUB_REF_NAME" \
+            dist/elpis-linux-x86_64 \
+            dist/elpis-linux-x86_64.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --generate-notes \
+            --title "Elpis $GITHUB_REF_NAME"

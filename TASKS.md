@@ -64,9 +64,12 @@ product, but must not claim unfinished behavior is available.
   session policy, and provider choice.
 - Proof: complete and resume one task through each first-release path.
 
-### F6. Release readiness — not started
+### F6. Release readiness — in progress
 
 - Install, authenticate, launch, and complete a first task from a clean environment.
+- Implemented pending verification: the Elpis binary reports `0.1.0`; tagged builds
+  publish a checksummed Linux x86_64 release asset, and the installer verifies then
+  atomically installs it.
 - Proof: clean-machine acceptance without repository-specific paths.
 
 ## Important — valuable after the foundation

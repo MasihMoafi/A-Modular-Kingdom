@@ -42,6 +42,10 @@ fn format_exit_messages(exit_info: AppExitInfo, color_enabled: bool) -> Vec<Stri
 #[derive(Parser, Debug)]
 #[command(name = "elpis")]
 struct TopCli {
+    /// Select a first-release Elpis provider without editing configuration.
+    #[arg(long, value_parser = ["openai", "openrouter"])]
+    provider: Option<String>,
+
     #[clap(flatten)]
     config_overrides: CliConfigOverrides,
 
@@ -69,6 +73,16 @@ fn prepend_elpis_memories_defaults(
     );
 }
 
+fn append_provider_override(config_overrides: &mut CliConfigOverrides, provider: Option<&str>) {
+    let Some(provider) = provider else {
+        return;
+    };
+    let provider = toml::Value::String(provider.to_string());
+    config_overrides
+        .raw_overrides
+        .push(format!("model_provider={provider}"));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,11 +108,27 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn provider_flag_is_limited_and_becomes_a_config_override() {
+        let parsed = TopCli::try_parse_from(["elpis", "--provider", "openrouter"])
+            .expect("OpenRouter provider flag");
+        let mut overrides = parsed.config_overrides;
+        append_provider_override(&mut overrides, parsed.provider.as_deref());
+        assert_eq!(
+            overrides.raw_overrides,
+            vec!["model_provider=\"openrouter\"".to_string()]
+        );
+
+        assert!(TopCli::try_parse_from(["elpis", "--provider", "unknown"]).is_err());
+    }
 }
 
 fn main() -> anyhow::Result<()> {
     arg0_dispatch_or_else(|arg0_paths: Arg0DispatchPaths| async move {
-        let top_cli = TopCli::parse();
+        let mut top_cli = TopCli::parse();
+        let provider = top_cli.provider.clone();
+        append_provider_override(&mut top_cli.config_overrides, provider.as_deref());
         let mut inner = top_cli.inner;
         inner
             .config_overrides

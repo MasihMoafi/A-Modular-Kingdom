@@ -4118,7 +4118,7 @@ dependencies = [
 
 [[package]]
 name = "codex-tui"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "app_test_support",
