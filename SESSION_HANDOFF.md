@@ -43,6 +43,13 @@ remove only Masih's approved unwanted features without losing retained Codex beh
   (source version `2026.7.2`). The sole global command package and its systemd service
   were replaced with stable `2026.7.1`; the Codex plugin is also `2026.7.1`, and the
   gateway health check passes. User data and configuration were preserved.
+- The first color-only branding pass remained structurally Codex-like and is not accepted as
+  complete. Elpis's primary color is amber, between orange and yellow; the installed successor
+  build must use that palette rather than violet.
+- `/rag` was missing during the foundation migration. Commit `28409f9` restores visible
+  `/rag <query>` and `/rag <path> -- <query>` routing to the existing `elpis-rag`
+  `query_knowledge_base` tool. The tool now also tells runtimes to use it autonomously for broad
+  semantic discovery, then use exact reads before editing code.
 
 ## Approved Command And Feature Contract
 
@@ -98,16 +105,14 @@ not unrelated foundations.
 
 ## Next Action
 
-Apply the appearance-only Elpis identity pass to the existing Ratatui TUI. Centralize a
-small Elpis palette, then apply it to the title, focused input border, selected menu
-rows, user-message accent, status symbols, and popup borders. Do not change layout,
-wording, information, commands, keyboard/mouse behavior, or runtime behavior. Verify
-through the remote Rust workflow and a local visual smoke using the downloaded artifact;
-do not run Cargo locally.
+Install the artifact from GitHub Actions run `29502821295`, then have Masih verify that
+`/rag` appears and that `/rag what makes Elpis distinct?` visibly calls
+`query_knowledge_base` and returns sourced chunks. Keep the feature `partial` until this
+user-visible check passes; do not claim that prompt routing alone proves a live tool call.
 
-Keep this separate from continued Codex feature subtraction. The next subtraction task
-after the visual pass is the lowest-risk residual `tooltips` and `test-approval`
-implementation.
+After RAG acceptance, resume the lowest-risk subtraction: delete the now-unreferenced
+`tooltips` system, `/test-approval` implementation, and proven unused imports in one
+remotely verified task. Keep larger plan/personality/vim/raw removal separate.
 
 Then proceed in `FEATURES.json` order: context sovereignty, session continuity,
 cross-session memory, `/auto` routing, behavioral enforcement, dictation, additional

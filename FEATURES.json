@@ -4,7 +4,7 @@
   "difficulty_values": ["easy", "medium", "hard"],
   "rule": "Only mark verified after the user-visible acceptance check passes and evidence is recorded.",
   "parallel_rule": "Use a separate worktree per task; parallelize only when dependencies are verified and file ownership does not overlap.",
-  "current_priority": "foundation-subtraction",
+  "current_priority": "internal-rag",
   "inherited_capabilities": [
     "Codex command and file lifecycle rendering",
     "Read Only, Default, and Full Access permission modes",
@@ -57,8 +57,21 @@
       "evidence": ["dd36256 removes the superseded root TUI, old Python agent main, and obsolete Debian builder.", "3e06042 restores a fast RAG-only MCP surface with exactly query_knowledge_base.", "The following subtraction deletes the now-unreferenced Python memory, shell, web, speech, parser, and tool-execution modules and removes their declared packages and dependencies.", "b135e7a changes Codex command discoverability and names but does not fully delete most implementations.", "419384d removes startup-tip rendering and hides test-approval; residual Codex implementation still requires audit.", "GitHub Actions run 29486136493 passed for 419384d."]
     },
     {
-      "id": "context-sovereignty",
+      "id": "internal-rag",
       "priority": 4,
+      "title": "Direct and autonomous internal RAG",
+      "difficulty": "medium",
+      "suggested_agent": "main",
+      "dependencies": ["foundation-codex-baseline"],
+      "parallel_safe": false,
+      "status": "partial",
+      "user_visible_behavior": "The user can run /rag against the workspace or a selected path, and the active runtime may retrieve relevant chunks autonomously when this saves context.",
+      "acceptance": ["Confirm /rag appears in the command menu.", "Run one workspace query and one explicit-path query and observe query_knowledge_base tool activity and sourced results.", "Confirm code work follows retrieved paths with exact search or file reads before editing."],
+      "evidence": ["MCP initialize and tools/list expose exactly query_knowledge_base with autonomous-use and exact-read guidance.", "GitHub Actions run 29502821295 passes both RAG slash-routing tests and the full focused TUI compile." ]
+    },
+    {
+      "id": "context-sovereignty",
+      "priority": 5,
       "title": "Receipts, expiry, and visible model context",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -70,7 +83,7 @@
     },
     {
       "id": "session-continuity",
-      "priority": 5,
+      "priority": 6,
       "title": "Persistent goal, checkpoints, and exact or lean continuation",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -82,7 +95,7 @@
     },
     {
       "id": "cross-session-memory",
-      "priority": 6,
+      "priority": 7,
       "title": "Curated cross-session memory",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -94,7 +107,7 @@
     },
     {
       "id": "auto-model-routing",
-      "priority": 7,
+      "priority": 8,
       "title": "Transparent /auto model routing",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -106,7 +119,7 @@
     },
     {
       "id": "behavioral-assimilation",
-      "priority": 8,
+      "priority": 9,
       "title": "Enforced creator and project behavior",
       "difficulty": "medium",
       "suggested_agent": "flash-or-main",
@@ -118,7 +131,7 @@
     },
     {
       "id": "visual-identity",
-      "priority": 9,
+      "priority": 10,
       "title": "Elpis visual identity without content changes",
       "difficulty": "medium",
       "suggested_agent": "Terra-or-Flash-class",
@@ -130,7 +143,7 @@
     },
     {
       "id": "dictation",
-      "priority": 10,
+      "priority": 11,
       "title": "Voice dictation into the composer",
       "difficulty": "medium",
       "suggested_agent": "flash-or-main",
@@ -142,7 +155,7 @@
     },
     {
       "id": "additional-runtimes",
-      "priority": 11,
+      "priority": 12,
       "title": "Gemini, Claude, and other runtime adapters",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -155,7 +168,7 @@
     },
     {
       "id": "release-ready",
-      "priority": 12,
+      "priority": 13,
       "title": "Installable and shippable product",
       "difficulty": "medium",
       "suggested_agent": "Terra-or-Flash-class",
