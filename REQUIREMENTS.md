@@ -1,190 +1,118 @@
 # Elpis Product Requirements
 
-This file preserves Masih's requirements across sessions. It separates confirmed
-requirements from proposed solutions and unresolved questions. A feature is not
-"implemented" until its user-visible behavior is proven.
+This file preserves confirmed product requirements and current proof. A feature is not
+implemented until its user-visible behavior is verified.
 
 ## Working Agreement
 
-- Convert scattered product direction into a cohesive, prioritized list.
-- Do not treat every question or exploratory idea as an approved task.
-- Put unclear choices under **Open Decisions** and discuss them before making a
-  choice that materially changes the product.
-- Point out drift, contradictions, unnecessary complexity, and better options.
-- Keep required work ahead of nice-to-haves.
-- Record verification evidence, not confidence.
+- Keep required work ahead of speculative features.
+- Challenge unnecessary complexity and solution-first requests.
+- Record evidence rather than confidence.
+- Prefer small, reversible changes and the smallest useful verification.
 
 ## Confirmed Requirements
 
-### R1. Elpis is the provider-neutral TUI and agent environment
+### R1. Provider-neutral Elpis environment
 
-Elpis presents one coding-agent interface whose model and runtime can be OpenAI/Codex,
-Gemini, Claude, or another supported system. Elpis owns the surrounding TUI, runtime
-selection, context projection, durable memory, provider-neutral session mirror,
-behavioral policy, and evidence.
+Elpis owns the TUI, provider/runtime selection, context projection, durable memory,
+provider-neutral continuity, behavioral policy, permissions bridge, and evidence. A selected
+runtime may own its low-level model loop and native tools, but authentication must never
+silently transfer Elpis-owned state or product identity to that runtime.
 
-The selected runtime may own its low-level model loop and native capabilities. When
-Codex is selected, Codex may own its native tools, thread, and compaction; Elpis must
-keep its surrounding control layer and make this ownership visible. Authentication
-alone must never silently choose Codex as the runtime for another provider.
+### R2. Visible and controlled agency
 
-Codex is the Rust implementation foundation and source donor. Required code is copied
-into Elpis; the finished product must not depend on the separate Codex clone directory.
-Codex/ChatGPT subscription login authenticates Codex-backed OpenAI use. It must not make
-Codex the universal Elpis runtime or transfer Elpis-wide context, memory, session, and
-behavior policy to Codex.
+Commands and file changes follow explicit permission and sandbox policies. The interface
+must preserve changed paths, diffs, command status, failures, and verification evidence.
 
-### R2. Consequential actions are controlled and visible
+### R3. Deliberate context lifecycle
 
-File changes and commands must follow an explicit permission policy. The interface
-must show what the agent is reading, changing, or running; show useful progress and
-results; and preserve evidence such as changed paths, diffs, command status, and
-verification. A compact display must not hide what actually happened.
+Elpis must know what the model receives. Rules, goal, selected files, conversation, tool
+output, and memory have visible sources, sizes, reasons, and lifetimes. Stale exploration
+leaves the next request only after its conclusion and exact evidence pointer are retained.
+A length threshold alone is not a complete context policy.
 
-### R3. Context is deliberately managed inside a session
+### R4. Exact and lean continuity
 
-Elpis must know exactly what the model receives. Rules, goals, selected files,
-conversation, tool output, and memory must have visible sources and sizes. Old searches,
-file reads, command output, and failed attempts must leave the next model request after
-their useful conclusion is recorded. Full evidence remains available on disk.
+The active goal, decisions, constraints, changed files, verification, blockers, and next
+action survive restarts. Elpis supports exact native-thread resume and lean continuation from
+a compact portable checkpoint.
 
-### R4. Work survives between sessions without replaying everything
+### R5. Curated memory
 
-Elpis must preserve the active goal, accepted requirements, decisions, changed files,
-verification, blockers, and next action. It must support both exact continuation and a
-lean continuation made from a checkpoint plus recent conversation. Starting a new
-session must not silently lose project intent.
+Memory stores reusable facts and proven procedures, not transcripts. Promotion requires
+repeated useful recall across distinct contexts. Memory remains searchable, attributable,
+reviewable, deletable, and bounded. Deleted or faded facts enter a searchable archive before
+baseline reset; archive failure must stop the reset.
 
-### R5. Memory is curated, searchable, and distinct from session state
+### R6. Enforceable creator and project rules
 
-Memory stores reusable facts, preferences, decisions, and proven procedures. It is not
-a transcript dump. Detailed notes remain searchable on disk; only a small relevant
-selection enters a model request. Durable memory should be reviewed or promoted by a
-clear rule, with source information and a way to remove stale entries.
-
-### R6. User behavior and project rules are enforceable
-
-Applicable `AGENTS.md`, product requirements, project guidance, and selected behavioral
-rules must reach the model and action layer. Hard safety rules must be enforced by code,
-not merely described in a prompt.
+Applicable `AGENTS.md`, project requirements, and behavioral rules reach the model and action
+layer. Hard safety rules are enforced by code where prompts are insufficient.
 
 ### R7. Claims require proof
 
-Documentation must distinguish current behavior from intended behavior. Each required
-feature needs a focused user-visible check before it is marked working.
+Documentation separates implemented behavior, remote tests, and outstanding user acceptance.
+Design documents and hidden code are not proof.
 
-### R8. Internal RAG is available directly and autonomously
+### R8. Internal read-only RAG
 
-`/rag <query>` searches the current workspace, while `/rag <path> -- <query>` targets
-a selected folder. The active runtime may also call the same RAG tool autonomously when
-broad semantic retrieval would reduce context load. RAG identifies relevant chunks and
-source paths; code edits must still use exact search or file reads for current positions.
+`/rag <query>` searches the workspace and `/rag <path> -- <query>` targets a folder. The
+runtime may call the same read-only tool autonomously for broad discovery. Exact current-file
+evidence remains required before editing.
 
-For broad repository questions that need both semantic discovery and exact evidence,
-Elpis should run at most one RAG query concurrently with exact search or file reads.
-Each activity must remain separately visible and correctly paired with its result. Skip
-speculative RAG for named-file lookups and simple edits; timeouts or cancellation must
-not block exact work or admit stale RAG output into later context.
+### R9. Proportionate, measured development cycle
 
-Elpis's primary visual identity uses amber, between orange and yellow, not purple.
+Ordinary changes receive focused first-release checks. Exhaustive inherited TUI/app-server
+regression runs nightly, manually, and for releases unless the change directly touches that
+surface. CI must not edit source or create status-only commits. Dependency deletion follows
+Cargo timing evidence and product optionality, not crate names.
 
-## First-Release Work, In Order
+### R10. Distinctive continuity-first identity
 
-1. **Clean the canonical repository**
-   - The pinned foundation import is complete; do not rebuild its mature behavior.
-   - Remove only code proven obsolete or explicitly approved for removal.
-   - Keep the repository, documents, branches, and worktrees understandable.
-2. **Verify internal RAG**
-   - Verify direct workspace and path queries and autonomous use for broad discovery.
-   - Mark retrieval read-only so Codex may schedule it beside exact reads or searches.
-   - Require exact current-file evidence before code edits.
-3. **Implement the memory foundation**
-   - Reconcile the inherited Codex Rust memory pipeline with the selected OpenClaw
-     behaviors before writing new machinery.
-   - Provide curated long-term memory, dated notes, selective retrieval,
-     pre-compaction flush, provenance, review, and deletion.
-4. **Implement the context and session engine**
-   - Full transcript on disk; small model-visible working set.
-   - Expiring tool output, compact records, a visible context list, checkpoints,
-     compaction, exact/lean continuation, fork, and rollback.
-5. **Verify the first-release provider boundary**
-   - Support OpenAI subscription and OpenRouter for the first release.
-   - Elpis owns context, memory, session policy, and provider choice.
-6. **Ship the first release**
-   - Install, authenticate, launch, recover, and complete a task from a clean machine.
+Elpis uses an amber visual identity and visibly separates runtime, model, context, memory,
+permissions, and evidence. `docs/UI_IDENTITY.md` is the acceptance contract, not proof that
+those surfaces already ship.
+
+## First-Release Order
+
+1. Keep the canonical repository and verification cycle clean.
+2. Preserve accepted internal RAG behavior.
+3. Finish memory acceptance, including archive, review, deletion, and reset.
+4. Finish exact/lean context and session acceptance; replace the length-only cleaner.
+5. Verify authenticated OpenAI and OpenRouter task/resume paths.
+6. Implement the persistent identity line and coherent amber foundation.
+7. Install and complete a real task from a clean environment, then tag `v0.1.0`.
 
 ## Current Verified Truth
 
 | Area | Current state |
 | --- | --- |
-| Canonical source | `main` is the contained Codex-derived Elpis foundation. The former prototype is preserved as a named historical tip inside `archive/pre-cleanup-20260716`. |
-| Installed command | `elpis` resolves to `/home/masih/.local/bin/elpis`, built remotely from this repository. |
-| ChatGPT login and Codex turn | Working through the imported native Codex implementation. |
-| Commands, patches, and activity display | Inherited from Codex and exercised in the authenticated foundation acceptance turn. |
-| Permission modes and sandboxing | Inherited from Codex; no Elpis reimplementation is required. A focused all-mode acceptance matrix remains useful before release. |
-| Mouse selection/copy | Inherited from the Codex TUI; Masih confirmed the old prototype limitation does not apply to this foundation. |
-| Native sessions and compaction | Inherited for exact Codex-owned threads; Elpis adds provider-neutral portable continuity for fresh threads. |
-| Context list and compact records | Implemented pending acceptance. `/status` reports admitted rules, goal, checkpoint, and memory summary with size, lifetime, and reason. |
-| Compaction/checkpoints/lean continuation | Implemented pending acceptance. Portable `GOAL.md` and `ES.md` are admitted into fresh threads and synced before compaction; exact resume retains the native thread. |
-| Inherited Codex memory | A substantial Rust extraction, consolidation, retrieval, citation, and artifact pipeline is present and enabled by default; Elpis acceptance has not been run. |
-| OpenClaw-style memory | In progress. Recall counting and promotion are remotely verified. Elpis-owned storage, age-aware diverse retrieval, semantic fallback, and hard artifact-size limits are implemented pending remote verification. Ordinary memory files plus the confirmed reset-all action provide review/deletion; end-to-end acceptance remains. |
-| `/auto` model routing | Nice-to-have and not implemented. Product documents may describe the intended behavior but must not claim availability. |
-| Gemini/other runtimes | Experimental Gemini ACP work is preserved as a named historical tip inside `archive/pre-cleanup-20260716`; it is not merged into `main`. |
+| Canonical source | `main` contains the Codex-derived Rust foundation; the former prototype is archived. |
+| Execution, patches, permissions, sandboxing | Inherited from Codex and exercised in the foundation acceptance turn. |
+| Internal RAG | Accepted complete for workspace, explicit-path, and autonomous read-only retrieval. |
+| Portable context | `GOAL.md`, `ES.md`, fresh-thread admission, `/status`, and focused remote checks exist; exact/lean user acceptance remains. |
+| Context cleaner | Partial: tool outputs over 1,000 characters are replaced, but lifecycle semantics, conclusions, pointers, and focused tests are missing. |
+| Durable memory | Roots, promotion, bounds, ranked retrieval, and focused remote tests exist; related/unrelated recall and review/reset acceptance remain. |
+| Memory archive | Implemented; the build-cycle branch propagates archive failures and adds a deleted-line regression. |
+| Provider launcher | OpenAI, OpenRouter, Bedrock, Ollama, LM Studio, and Claude/Gemini OpenRouter aliases are tested at configuration level. |
+| Native Claude/Gemini | Not implemented. Current shortcuts use OpenRouter. |
+| Provider-aware `/model` UI | Not implemented. |
+| UI identity | Naming and runtime title exist; amber styling, identity line, continuity event, and evidence-first completion remain. |
+| Remote build | Run `29534784054` passed; the pre-optimization cycle was about 21 minutes and the artifact was 102,988,260 bytes. |
+| `/auto` routing | Deferred and not implemented. |
 
-## Target State Layout
+## State Layout
 
-Memory and portable context use the Elpis-owned roots below. Provider-neutral full
-session mirroring remains future work beyond the first context slice:
+- `~/.elpis/context/workspaces/<workspace>/GOAL.md` — active goal.
+- `~/.elpis/context/workspaces/<workspace>/ES.md` — compact latest checkpoint.
+- `~/.elpis/memories/MEMORY.md` — curated durable memory.
+- `~/.elpis/memories/archive.md` — append-only faded/deleted evidence.
+- `~/.elpis/state/memories_1.sqlite` — recall, promotion, and consolidation state.
+- Provider transcripts and workspace artifacts remain the exact evidence sources.
 
-- `REQUIREMENTS.md`: project requirements and unresolved product choices.
-- `~/.elpis/.../sessions/`: complete append-only event history.
-- `~/.elpis/.../checkpoints/`: goal, decisions, changes, verification, blocker, next action.
-- `~/.elpis/.../GOAL.md`: current persistent goal and acceptance criteria.
-- `~/.elpis/context/workspaces/<workspace>/ES.md`: compact latest session checkpoint;
-  exact turn evidence remains in the provider transcript.
-- `~/.elpis/memories/MEMORY.md`: compact, curated long-term memory.
-- `~/.elpis/state/memories_1.sqlite`: recall, promotion, and consolidation state.
-- `~/.elpis/.../memory/YYYY-MM-DD.md`: detailed working notes and session summaries,
-  searched when relevant rather than always injected.
-- `~/.elpis/.../DREAMS.md`: optional later review surface for suggested promotions.
+## Deferred Decisions
 
-## Open Decisions
-
-### D1. Foundation migration shape
-
-Resolved: the pinned Codex Rust foundation lives under `codex-rs/`; `main` uses it as
-the canonical Elpis baseline, and the former prototype is preserved as a named
-historical tip inside `archive/pre-cleanup-20260716`. Continue by subtraction.
-
-### D2. Persistent goal
-
-Recommended: keep one active goal with measurable acceptance criteria, while checkpoints
-record previous goals and outcomes. Decide whether Elpis may update the goal from clear
-conversation or only after explicit user confirmation.
-
-### D3. Automatic memory writes
-
-Resolved: automatically write detailed session notes and pre-compaction notes. New
-material may enter compact long-term memory after at least three recalls across two
-distinct contexts. Memory remains reviewable and deletable by the user.
-
-### D4. Default continuation
-
-Recommended: exact resume while the context is healthy; lean continuation when context
-pressure is high or the user requests it. The switch and its evidence should be visible.
-
-### D5. Automatic model-routing policy — deferred
-
-`/auto` is not required for the first release. If implemented later, its classifier,
-tier boundaries, eligible model pool, fallback behavior, and manual override must remain
-visible.
-
-## Nice-To-Haves After The Foundation
-
-- Dream narratives and scheduled "dreaming" reports. Scored promotion itself belongs
-  in the required memory foundation; the narrative metaphor does not.
-- Visual context map.
-- Rich themes, animation, and additional presentation polish beyond clear action events.
-- Agent personalities beyond enforceable project behavior.
-- Voice input/output and background scheduled work.
-- `/auto` model routing.
+- Whether goal changes require explicit confirmation.
+- Default threshold for switching from exact to lean continuation.
+- Native Anthropic and Google adapter order.
+- `/auto`, dreaming reports, voice, rich animation, and scheduled work.
