@@ -55,6 +55,31 @@ async fn reset_memory_workspace_baseline_removes_generated_diff() {
 }
 
 #[tokio::test]
+async fn reset_memory_workspace_baseline_archives_deleted_lines() {
+    let home = TempDir::new().expect("tempdir");
+    let root = home.path().join("memories");
+    fs::create_dir_all(&root).expect("create memory root");
+    fs::write(root.join("MEMORY.md"), "keep\narchive this fact\n").expect("write memory");
+    prepare_memory_workspace(&root)
+        .await
+        .expect("prepare memory workspace");
+
+    fs::write(root.join("MEMORY.md"), "keep\n").expect("remove memory line");
+    reset_memory_workspace_baseline(&root)
+        .await
+        .expect("reset baseline");
+
+    let archive = fs::read_to_string(root.join("archive.md")).expect("read archive");
+    assert!(archive.starts_with("# Elpis Memory Archive\n"));
+    assert!(archive.contains("archive this fact"));
+    assert!(!archive.contains("--- a/MEMORY.md"));
+    let diff = memory_workspace_diff(&root)
+        .await
+        .expect("load workspace diff");
+    assert_eq!(diff.changes, Vec::new());
+}
+
+#[tokio::test]
 async fn prepare_memory_workspace_recovers_unusable_git_dir() {
     let home = TempDir::new().expect("tempdir");
     let root = home.path().join("memories");
