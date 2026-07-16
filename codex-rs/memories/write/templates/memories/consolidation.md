@@ -192,8 +192,11 @@ Rules:
 - Existing durable memories are reviewed for staleness and evidence as usual; do not delete
   an existing item solely because older metadata lacks the promotion fields.
 - You should always make sure `MEMORY.md` and `memory_summary.md` exist and are up to date.
+- `MEMORY.md` must not exceed {{ max_durable_memory_chars }} characters. When near the limit,
+  remove stale, duplicated, low-utility, or weakly supported material before adding new material.
 - `memory_summary.md` must start with the exact line `v1`; if it does not, rewrite the entire
   file rather than patching the previous summary in place.
+- `memory_summary.md` must not exceed {{ max_memory_summary_chars }} characters.
 - Follow the format and schema of the artifacts below.
 - Do not target fixed counts (memory blocks, task groups, topics, or bullets). Let the
   signal determine the granularity and depth.
@@ -402,7 +405,7 @@ What to write:
 - It is acceptable for `MEMORY.md` to preserve user preferences that are very general, general,
   or slightly specific, as long as they plausibly help on similar future runs. What matters is
   whether they save user keystrokes and reduce repeated steering.
-- `MEMORY.md` does not need to be aggressively short. It is the durable operational middle layer:
+- Within its hard size limit, `MEMORY.md` is the durable operational middle layer:
   richer and more concrete than `memory_summary.md`, but more consolidated than a rollout summary.
 - When the evidence supports several actionable preferences, prefer a longer list of sharper
   bullets over one or two broad summary bullets.

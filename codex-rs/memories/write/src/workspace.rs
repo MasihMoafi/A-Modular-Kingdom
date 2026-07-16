@@ -5,6 +5,9 @@ use codex_git_utils::ensure_git_baseline_repository;
 use codex_git_utils::reset_git_repository;
 use std::path::Path;
 
+pub(crate) const MAX_DURABLE_MEMORY_CHARS: usize = 30_000;
+pub(crate) const MAX_MEMORY_SUMMARY_CHARS: usize = 10_000;
+
 /// Prepares the memory directory for git-baseline diffing.
 ///
 /// This keeps an existing usable `.git/` baseline intact. It initializes a new git baseline when the
@@ -48,16 +51,16 @@ pub async fn reset_memory_workspace_baseline(root: &Path) -> anyhow::Result<()> 
 /// Verifies that a completed consolidation run left the required memory artifacts in place.
 pub async fn validate_consolidation_artifacts(root: &Path) -> anyhow::Result<()> {
     let memory_path = root.join("MEMORY.md");
-    let memory_metadata = tokio::fs::metadata(&memory_path).await.with_context(|| {
+    let memory = tokio::fs::read_to_string(&memory_path).await.with_context(|| {
         format!(
             "read consolidated memory artifact {}",
             memory_path.display()
         )
     })?;
     anyhow::ensure!(
-        memory_metadata.is_file(),
-        "consolidated memory artifact is not a file: {}",
-        memory_path.display()
+        memory.chars().count() <= MAX_DURABLE_MEMORY_CHARS,
+        "consolidated memory artifact exceeds {MAX_DURABLE_MEMORY_CHARS} characters: {}",
+        memory_path.display(),
     );
 
     let summary_path = root.join("memory_summary.md");
@@ -68,6 +71,11 @@ pub async fn validate_consolidation_artifacts(root: &Path) -> anyhow::Result<()>
         summary.lines().next() == Some("v1"),
         "memory summary artifact does not start with v1: {}",
         summary_path.display()
+    );
+    anyhow::ensure!(
+        summary.chars().count() <= MAX_MEMORY_SUMMARY_CHARS,
+        "memory summary artifact exceeds {MAX_MEMORY_SUMMARY_CHARS} characters: {}",
+        summary_path.display(),
     );
 
     Ok(())

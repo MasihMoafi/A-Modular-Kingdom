@@ -68,4 +68,6 @@ fn build_consolidation_prompt_points_to_workspace_diff_and_extension_tree() {
         memory_extensions_root.display()
     )));
     assert!(prompt.contains("workspace diff shows deleted extension resource files"));
+    assert!(prompt.contains("30000 characters"));
+    assert!(prompt.contains("10000 characters"));
 }

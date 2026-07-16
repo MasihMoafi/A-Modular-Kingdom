@@ -46,6 +46,8 @@ pub fn build_consolidation_prompt(memory_root: &Path) -> String {
     let memory_root = memory_root.display().to_string();
     let memory_extensions_root = memory_extensions_root.display().to_string();
     let phase2_workspace_diff_file = crate::workspace_diff::FILENAME.to_string();
+    let max_durable_memory_chars = crate::workspace::MAX_DURABLE_MEMORY_CHARS.to_string();
+    let max_memory_summary_chars = crate::workspace::MAX_MEMORY_SUMMARY_CHARS.to_string();
     let memory_extensions_folder_structure = if memory_extensions_exist {
         render_memory_extensions_block(
             &MEMORY_EXTENSIONS_FOLDER_STRUCTURE_TEMPLATE,
@@ -77,6 +79,8 @@ pub fn build_consolidation_prompt(memory_root: &Path) -> String {
                 "phase2_workspace_diff_file",
                 phase2_workspace_diff_file.as_str(),
             ),
+            ("max_durable_memory_chars", max_durable_memory_chars.as_str()),
+            ("max_memory_summary_chars", max_memory_summary_chars.as_str()),
         ])
         .unwrap_or_else(|err| {
             warn!("failed to render memories consolidation prompt template: {err}");

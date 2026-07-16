@@ -91,3 +91,41 @@ async fn validate_consolidation_artifacts_rejects_invalid_summary() {
 
     assert!(err.to_string().contains("does not start with v1"));
 }
+
+#[tokio::test]
+async fn validate_consolidation_artifacts_rejects_oversized_memory() {
+    let home = TempDir::new().expect("tempdir");
+    let root = home.path().join("memories");
+    fs::create_dir_all(&root).expect("create memory root");
+    fs::write(
+        root.join("MEMORY.md"),
+        "x".repeat(super::MAX_DURABLE_MEMORY_CHARS + 1),
+    )
+    .expect("write memory");
+    fs::write(root.join("memory_summary.md"), "v1\n").expect("write summary");
+
+    let err = validate_consolidation_artifacts(&root)
+        .await
+        .expect_err("oversized memory should fail validation");
+
+    assert!(err.to_string().contains("exceeds 30000 characters"));
+}
+
+#[tokio::test]
+async fn validate_consolidation_artifacts_rejects_oversized_summary() {
+    let home = TempDir::new().expect("tempdir");
+    let root = home.path().join("memories");
+    fs::create_dir_all(&root).expect("create memory root");
+    fs::write(root.join("MEMORY.md"), "memory").expect("write memory");
+    fs::write(
+        root.join("memory_summary.md"),
+        format!("v1\n{}", "x".repeat(super::MAX_MEMORY_SUMMARY_CHARS)),
+    )
+    .expect("write summary");
+
+    let err = validate_consolidation_artifacts(&root)
+        .await
+        .expect_err("oversized summary should fail validation");
+
+    assert!(err.to_string().contains("exceeds 10000 characters"));
+}
