@@ -80,6 +80,12 @@ a selected folder. The active runtime may also call the same RAG tool autonomous
 broad semantic retrieval would reduce context load. RAG identifies relevant chunks and
 source paths; code edits must still use exact search or file reads for current positions.
 
+For broad repository questions that need both semantic discovery and exact evidence,
+Elpis should run at most one RAG query concurrently with exact search or file reads.
+Each activity must remain separately visible and correctly paired with its result. Skip
+speculative RAG for named-file lookups and simple edits; timeouts or cancellation must
+not block exact work or admit stale RAG output into later context.
+
 Elpis's primary visual identity uses amber, between orange and yellow, not purple.
 
 ## Required Work, In Order

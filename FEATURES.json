@@ -4,7 +4,7 @@
   "difficulty_values": ["easy", "medium", "hard"],
   "rule": "Only mark verified after the user-visible acceptance check passes and evidence is recorded.",
   "parallel_rule": "Use a separate worktree per task; parallelize only when dependencies are verified and file ownership does not overlap.",
-  "current_priority": "internal-rag",
+  "current_priority": "multi-tool-activity",
   "inherited_capabilities": [
     "Codex command and file lifecycle rendering",
     "Read Only, Default, and Full Access permission modes",
@@ -70,12 +70,38 @@
       "evidence": ["MCP initialize and tools/list expose exactly query_knowledge_base with autonomous-use and exact-read guidance.", "GitHub Actions run 29502821295 passes both RAG slash-routing tests and the full focused TUI compile." ]
     },
     {
-      "id": "context-sovereignty",
+      "id": "multi-tool-activity",
       "priority": 5,
+      "title": "Truthful concurrent tool activity",
+      "difficulty": "hard",
+      "suggested_agent": "main-high-reasoning",
+      "dependencies": ["foundation-codex-baseline"],
+      "parallel_safe": false,
+      "status": "in_progress",
+      "user_visible_behavior": "Concurrent commands, exact searches, and MCP calls remain separately visible and each completion updates the correct activity.",
+      "acceptance": ["Start two MCP calls and one exact-search call before either MCP call finishes.", "Complete the calls in reverse order and show exactly one correctly paired start/result per call ID.", "Cancel the turn and show every unfinished activity as cancelled without accepting stale results."],
+      "evidence": ["The current TUI has one active_cell; a second MCP start flushes it, so parallel execution cannot yet be displayed truthfully."]
+    },
+    {
+      "id": "parallel-rag-exploration",
+      "priority": 6,
+      "title": "Selective parallel RAG and exact exploration",
+      "difficulty": "hard",
+      "suggested_agent": "main-high-reasoning",
+      "dependencies": ["internal-rag", "multi-tool-activity"],
+      "parallel_safe": false,
+      "status": "not_started",
+      "user_visible_behavior": "For broad repository questions, Elpis may run one RAG query beside exact search or reads, then combine semantic findings with current file and line evidence.",
+      "acceptance": ["A broad repository question starts RAG and exact search before either completes.", "A named-file or simple-edit request does not trigger speculative RAG.", "A timed-out RAG call does not block exact search or enter later context.", "Duplicate RAG intent within one turn produces one call."],
+      "evidence": ["Codex core already admits read-only tools concurrently; query_knowledge_base still needs a readOnlyHint after truthful multi-tool rendering exists."]
+    },
+    {
+      "id": "context-sovereignty",
+      "priority": 7,
       "title": "Receipts, expiry, and visible model context",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
-      "dependencies": ["foundation-subtraction"],
+      "dependencies": ["foundation-subtraction", "multi-tool-activity"],
       "parallel_safe": false,
       "status": "not_started",
       "user_visible_behavior": "The user can see why each context item is present, its size and lifetime, and what replaces it when it expires.",
@@ -83,7 +109,7 @@
     },
     {
       "id": "session-continuity",
-      "priority": 6,
+      "priority": 8,
       "title": "Persistent goal, checkpoints, and exact or lean continuation",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -95,7 +121,7 @@
     },
     {
       "id": "cross-session-memory",
-      "priority": 7,
+      "priority": 9,
       "title": "Curated cross-session memory",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -107,7 +133,7 @@
     },
     {
       "id": "auto-model-routing",
-      "priority": 8,
+      "priority": 10,
       "title": "Transparent /auto model routing",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -119,7 +145,7 @@
     },
     {
       "id": "behavioral-assimilation",
-      "priority": 9,
+      "priority": 11,
       "title": "Enforced creator and project behavior",
       "difficulty": "medium",
       "suggested_agent": "flash-or-main",
@@ -131,7 +157,7 @@
     },
     {
       "id": "visual-identity",
-      "priority": 10,
+      "priority": 12,
       "title": "Elpis visual identity without content changes",
       "difficulty": "medium",
       "suggested_agent": "Terra-or-Flash-class",
@@ -143,7 +169,7 @@
     },
     {
       "id": "dictation",
-      "priority": 11,
+      "priority": 13,
       "title": "Voice dictation into the composer",
       "difficulty": "medium",
       "suggested_agent": "flash-or-main",
@@ -155,7 +181,7 @@
     },
     {
       "id": "additional-runtimes",
-      "priority": 12,
+      "priority": 14,
       "title": "Gemini, Claude, and other runtime adapters",
       "difficulty": "hard",
       "suggested_agent": "main-high-reasoning",
@@ -168,7 +194,7 @@
     },
     {
       "id": "release-ready",
-      "priority": 13,
+      "priority": 15,
       "title": "Installable and shippable product",
       "difficulty": "medium",
       "suggested_agent": "Terra-or-Flash-class",
