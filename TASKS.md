@@ -18,8 +18,10 @@ product, but must not claim unfinished behavior is available.
 - `/rag <query>` and `/rag <path> -- <query>` exist.
 - The MCP advertises its sole RAG tool as read-only, allowing the inherited Codex
   scheduler to run it beside other read-only exploration.
-- Remaining: verify both paths against the live tool, verify autonomous retrieval for a
-  broad question, and ensure exact file reads are used before edits.
+- Backend workspace and explicit-path queries both return sourced chunks; the
+  explicit-path query correctly answered from `docs/CONTEXT_AND_SESSIONS.md`.
+- Remaining: verify both slash-command paths in the installed TUI, verify autonomous
+  retrieval for a broad question, and ensure exact file reads are used before edits.
 - Proof: one visible successful example for each path plus one autonomous example.
 
 ### F3. Context and session continuity — not started
@@ -71,6 +73,6 @@ product, but must not claim unfinished behavior is available.
 
 ## Current Action
 
-Complete F2's three live acceptance examples. Do not begin memory implementation until
+Complete F2's three installed-TUI acceptance examples. Do not begin memory implementation until
 the existing Codex and OpenClaw memory pipelines have been compared and Masih approves
 the resulting behavioral contract.

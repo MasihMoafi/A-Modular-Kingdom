@@ -34,6 +34,9 @@ provider-neutral context/session continuity, and durable memory.
 - `PYTHONPATH=src .venv/bin/python` import of `rag.qdrant_backend`: passed.
 - `.venv/bin/python -m pytest -q tests/test_rag_mcp_host.py`: passed.
 - MCP initialize and `tools/list`: passed with exactly one read-only RAG tool.
+- Direct backend explicit-path RAG query: passed in 8.6 seconds with correct sourced
+  context/session results.
+- Direct backend workspace RAG query: passed in 8.5 seconds with sourced project results.
 - `git diff --check`: passed.
 - No local Cargo or Rust compilation was run.
 
@@ -45,8 +48,9 @@ provider-neutral context/session continuity, and durable memory.
 
 ## Next Action
 
-Complete foundational task F2 with three live acceptance checks: direct workspace
-query, explicit-path query, and autonomous retrieval for a broad question.
+Complete foundational task F2 in the installed TUI with three live acceptance checks:
+direct workspace query, explicit-path query, and autonomous retrieval for a broad
+question. Backend-level workspace and path checks already pass.
 
 Do not continue memory implementation until the existing Codex Rust pipeline and the
 current OpenClaw pipeline have been compared and Masih approves the behavioral contract.
