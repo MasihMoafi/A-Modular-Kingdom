@@ -59,7 +59,8 @@ Codex clone directory at runtime.
 The active foundation strategy is **fork and subtract**: keep the pinned Codex
 execution and TUI paths intact, remove unwanted
 OpenAI-specific product surfaces in small tested steps, and introduce a provider
-subsystems piecemeal or revive the archived hand-grown prototype.
+subsystem only after the foundation is stable. Do not revive the archived hand-grown
+prototype as the active runtime.
 
 ### OpenClaw: context and continuity reference
 
@@ -214,6 +215,53 @@ Current priority is stabilization by subtraction: identify obsolete or unwanted 
 remove one bounded surface at a time, and remotely rebuild and smoke-test after each
 deletion. Feature additions, context design, memory design, `/auto` routing, and visual
 restyling follow only after this baseline is lean and trustworthy.
+
+The currently installed build includes the command-surface changes from `b135e7a` and
+the startup-tip/test-command changes from `419384d`. Most unwanted commands were made
+undiscoverable, not fully deleted from the Rust implementation; this does **not** satisfy
+the approved subtraction requirement. Complete removal must proceed feature by feature
+without deleting shared machinery required by retained behavior.
+
+### Startup performance
+
+Typing `elpis` currently takes about five seconds before the TUI is usable; the archived
+prototype took under one second. This is a real product regression and must be measured
+from process start to first usable frame. Do not describe PyTorch as part of the Rust
+TUI: it belongs to the separate Python RAG service and its effect on launch has not been
+proven. Profile startup with configured services enabled and disabled before changing
+code, then optimize the measured blocking path. The first target is a usable frame in
+under one second, with optional services allowed to finish visibly in the background.
+
+The July 16 startup audit found that the registered `elpis-rag` process was still the
+old unified MCP: it advertised 21 unrelated memory, shell, web, speech, document, and
+RAG tools and imported the memory/Qdrant stack before answering Codex. The working-tree
+replacement exposes only `query_knowledge_base` and answers the MCP handshake using
+Python's standard library. Its measured handshake is about 0.04 seconds, a profiled
+Elpis launch scheduled its first frame in 0.049 seconds, and Masih confirmed that the
+fresh launch is fast. Startup performance is accepted.
+
+The one-tool host was not a new product decision: it already existed on
+`archive/legacy-prototype-20260716`. During the Codex-foundation transition, canonical
+`main` inherited an older unified host from the embedded-launcher line where extra tools
+defaulted on, while the minimal host remained on the archive branch. This was a migration
+regression, not a Codex TUI cost.
+
+RAG indexing is not startup work. `rag.fetch` is imported only after an explicit query.
+On that first query it loads Torch and embedding models, then loads an existing persisted
+index or scans and indexes the requested folder when no usable index exists. If indexing
+is later moved to a background job, it must not block or visually take over the TUI; the
+previous usable index should remain available until replacement is complete.
+
+### Product scope already decided
+
+- UI work is appearance-only for now: colors and styling may change, but Codex-quality
+  content, rendering, and interactions must remain.
+- Dictation is a required future feature. First audit the contained Codex source for an
+  existing speech-to-text path; otherwise specify a visible, consent-based Whisper
+  integration. Dictation must insert editable text and must not auto-submit it.
+- Kiro may be researched for reusable ideas only after its actual source availability,
+  language, license, and performance claims are verified. Do not assume it is open
+  source or copyable.
 
 ## Engineering Rules
 
