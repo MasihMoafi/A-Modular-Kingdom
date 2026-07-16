@@ -72,7 +72,6 @@ pub enum SlashCommand {
     Stop,
     Clear,
     Personality,
-    TestApproval,
     #[strum(serialize = "subagents")]
     MultiAgents,
     // Debugging commands.
@@ -144,7 +143,6 @@ impl SlashCommand {
             SlashCommand::Plugins => "browse plugins",
             SlashCommand::Logout => "log out of Codex",
             SlashCommand::Rollout => "print the rollout file path",
-            SlashCommand::TestApproval => "test approval request",
         }
     }
 
@@ -245,7 +243,6 @@ impl SlashCommand {
             | SlashCommand::Side
             | SlashCommand::Btw => true,
             SlashCommand::Rollout => true,
-            SlashCommand::TestApproval => true,
             SlashCommand::Agent | SlashCommand::MultiAgents => true,
             SlashCommand::Theme | SlashCommand::Pets => false,
         }
@@ -263,7 +260,6 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Pets
             | SlashCommand::Raw
-            | SlashCommand::TestApproval
             | SlashCommand::Usage
             | SlashCommand::Vim => false,
             SlashCommand::SandboxReadRoot => cfg!(target_os = "windows"),
@@ -326,7 +322,6 @@ mod tests {
             "plan",
             "pets",
             "raw",
-            "test-approval",
             "usage",
             "vim",
         ] {
