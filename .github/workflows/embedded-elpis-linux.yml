@@ -49,7 +49,10 @@ jobs:
           rustup set profile minimal
           rustup toolchain install 1.95.0 --component rustfmt --no-self-update
 
-      - name: Check Rust formatting
+      - name: Format Rust
+        run: cargo fmt --all
+
+      - name: Verify Rust formatting
         run: cargo fmt --all --check
 
       - name: Restore Cargo cache
@@ -128,7 +131,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Record main build result
+      - name: Record main build result and formatting
         if: always() && github.ref == 'refs/heads/main'
         working-directory: .
         env:
@@ -147,6 +150,9 @@ jobs:
           EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "${BUILD_STATUS}" = "success" ]; then
+            git add codex-rs
+          fi
           git add .github/builds/latest-main.json
           if ! git diff --cached --quiet; then
             git commit -m "ci: record main build ${GITHUB_RUN_ID} [skip ci]"
