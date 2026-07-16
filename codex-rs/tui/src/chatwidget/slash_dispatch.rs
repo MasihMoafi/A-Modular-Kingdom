@@ -377,7 +377,7 @@ impl ChatWidget {
             SlashCommand::Memories => {
                 self.open_memories_popup();
             }
-            SlashCommand::Quit | SlashCommand::Exit => {
+            SlashCommand::Quit => {
                 self.request_quit_without_confirmation();
             }
             SlashCommand::Logout => {
@@ -1078,7 +1078,6 @@ impl ChatWidget {
             | SlashCommand::AutoReview
             | SlashCommand::Memories
             | SlashCommand::Quit
-            | SlashCommand::Exit
             | SlashCommand::Logout
             | SlashCommand::Mention
             | SlashCommand::Skills

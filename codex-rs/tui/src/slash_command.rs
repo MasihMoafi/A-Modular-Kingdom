@@ -64,7 +64,6 @@ pub enum SlashCommand {
     Plugins,
     Logout,
     Quit,
-    Exit,
     Feedback,
     Rollout,
     Ps,
@@ -97,7 +96,7 @@ impl SlashCommand {
             SlashCommand::Clear => "clear the terminal and start a new chat",
             SlashCommand::Fork => "fork the current chat",
             SlashCommand::App => "continue this session in Codex Desktop",
-            SlashCommand::Quit | SlashCommand::Exit => "quit Elpis",
+            SlashCommand::Quit => "quit Elpis",
             SlashCommand::Copy => "copy last response as markdown",
             SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
             SlashCommand::Diff => "show git diff (including untracked files)",
@@ -239,7 +238,6 @@ impl SlashCommand {
             | SlashCommand::Feedback
             | SlashCommand::Ide
             | SlashCommand::Quit
-            | SlashCommand::Exit
             | SlashCommand::Side
             | SlashCommand::Btw => true,
             SlashCommand::Rollout => true,
@@ -251,7 +249,6 @@ impl SlashCommand {
     fn is_visible(self) -> bool {
         match self {
             SlashCommand::Archive
-            | SlashCommand::Exit
             | SlashCommand::Memories
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate
