@@ -918,16 +918,26 @@ impl ModelClient {
             for item in input.iter_mut() {
                 match item {
                     ResponseItem::FunctionCallOutput { output, .. } => {
-                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) = output.body {
+                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
+                            output.body
+                        {
                             if text.len() > 1000 {
-                                *text = format!("[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]", text.len());
+                                *text = format!(
+                                    "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
+                                    text.len()
+                                );
                             }
                         }
                     }
                     ResponseItem::CustomToolCallOutput { output, .. } => {
-                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) = output.body {
+                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
+                            output.body
+                        {
                             if text.len() > 1000 {
-                                *text = format!("[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]", text.len());
+                                *text = format!(
+                                    "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
+                                    text.len()
+                                );
                             }
                         }
                     }

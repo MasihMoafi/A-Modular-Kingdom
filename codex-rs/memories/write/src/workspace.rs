@@ -56,7 +56,9 @@ pub async fn reset_memory_workspace_baseline(root: &Path) -> anyhow::Result<()> 
         if !deleted_lines.is_empty() {
             let archive_path = root.join("archive.md");
             let mut archive_content = if archive_path.exists() {
-                tokio::fs::read_to_string(&archive_path).await.unwrap_or_default()
+                tokio::fs::read_to_string(&archive_path)
+                    .await
+                    .unwrap_or_default()
             } else {
                 "# Elpis Memory Archive\n\n".to_string()
             };
