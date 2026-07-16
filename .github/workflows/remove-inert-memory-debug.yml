@@ -1,3 +1,4 @@
+# One-time surgical migration; deletes itself after success.
 name: Remove inert memory debug commands
 
 on:
@@ -86,8 +87,7 @@ jobs:
                   text = text.replace(block, "")
               path.write_text(text)
 
-          workflow = Path(".github/workflows/remove-inert-memory-debug.yml")
-          workflow.unlink()
+          Path(".github/workflows/remove-inert-memory-debug.yml").unlink()
           PY
 
       - name: Commit surgical deletion
