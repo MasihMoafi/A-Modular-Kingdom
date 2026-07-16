@@ -49,10 +49,10 @@ use crate::key_hint::KeyBinding;
 use crate::key_hint::KeyBindingListExt;
 use crate::motion::MotionMode;
 use crate::motion::shimmer_text;
-use crate::style::popup_border_style;
 use crate::onboarding::keys;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
 use crate::onboarding::onboarding_screen::StepStateProvider;
+use crate::style::popup_border_style;
 use crate::tui::FrameRequester;
 
 /// Marks buffer cells that have cyan+underlined style as an OSC 8 hyperlink.

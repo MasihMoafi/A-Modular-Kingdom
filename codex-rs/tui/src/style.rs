@@ -162,9 +162,7 @@ mod tests {
 
     #[test]
     fn accent_style_uses_violet_on_dark_or_unknown_backgrounds() {
-        let expected = Style::default()
-            .fg(best_color(DARK_BG_PRIMARY_RGB))
-            .bold();
+        let expected = Style::default().fg(best_color(DARK_BG_PRIMARY_RGB)).bold();
 
         assert_eq!(accent_style_for(Some((0, 0, 0))), expected);
         assert_eq!(accent_style_for(/*terminal_bg*/ None), expected);
