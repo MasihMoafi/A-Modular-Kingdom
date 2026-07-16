@@ -21,18 +21,21 @@ product, but must not claim unfinished behavior is available.
   explicit-path query correctly answered from `docs/CONTEXT_AND_SESSIONS.md`.
 - Proof: one visible successful example for each path plus one autonomous example.
 
-### F3. Context and session continuity — in progress
+### F3. Context and session continuity — implemented, acceptance pending
 
 - Keep goals, constraints, decisions, changed files, evidence, and the next action.
 - Expire raw searches, reads, and command output after retaining a compact conclusion
   and source pointer.
 - Support truthful exact resume and lean continuation across sessions and providers.
-- Implemented pending remote verification: Elpis mirrors goal changes into a portable
+- Elpis mirrors goal changes into a portable
   workspace `GOAL.md` and writes a compact `ES.md` checkpoint after every completed turn.
   `ES.md` keeps the latest result, changed paths, command outcomes, and a pointer to the
   exact provider transcript without copying raw diffs or command output.
-- Next: admit `GOAL.md` and `ES.md` into lean/fresh turns, then show the admitted context
-  sources and sizes in the existing status surface.
+- Fresh threads automatically admit `GOAL.md` and `ES.md`; exact resumes retain the native
+  thread. Elpis syncs the portable checkpoint before compaction and stops if that safety
+  write fails.
+- `/status` shows admitted rules, goal, checkpoint, and memory summary sources with their
+  sizes, lifetimes, and reasons.
 - Proof: resume one task exactly and one task leanly without replaying irrelevant work.
 
 ### F4. Durable memory — in progress
@@ -83,6 +86,7 @@ product, but must not claim unfinished behavior is available.
 
 ## Current Action
 
-Finish remote verification of durable memory and the first portable context/checkpoint
-slice. Then implement lean continuation and the visible context list. Do not add dream
-narratives, scheduling, or an MCP memory adapter to the first release.
+Finish remote verification, install the verified binary, and run the context and memory
+acceptance checks. Then close the OpenAI/OpenRouter boundary and clean-install release
+path. Do not add dream narratives, scheduling, or an MCP memory adapter to the first
+release.

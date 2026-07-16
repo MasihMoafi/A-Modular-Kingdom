@@ -90,6 +90,9 @@ jobs:
       - name: Verify lean continuity prompt
         run: cargo test -p codex-core --lib --locked elpis_context::tests
 
+      - name: Verify OpenRouter authentication boundary
+        run: cargo test -p codex-model-provider-info --locked openrouter
+
       - name: Compile focused TUI tests
         run: cargo test -p codex-tui --lib --locked --no-run
 

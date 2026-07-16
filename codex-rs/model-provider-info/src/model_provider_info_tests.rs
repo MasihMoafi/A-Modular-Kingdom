@@ -342,6 +342,20 @@ fn test_built_in_model_providers_include_amazon_bedrock() {
 }
 
 #[test]
+fn test_built_in_openrouter_uses_separate_api_key_auth() {
+    let providers = built_in_model_providers(/*openai_base_url*/ None);
+    let provider = providers
+        .get(OPENROUTER_PROVIDER_ID)
+        .expect("OpenRouter provider should be built in");
+
+    assert_eq!(provider.name, "OpenRouter");
+    assert_eq!(provider.base_url.as_deref(), Some(OPENROUTER_BASE_URL));
+    assert_eq!(provider.env_key.as_deref(), Some("OPENROUTER_API_KEY"));
+    assert!(!provider.requires_openai_auth);
+    assert_eq!(provider.wire_api, WireApi::Responses);
+}
+
+#[test]
 fn test_merge_configured_model_providers_adds_custom_provider() {
     let custom_provider = ModelProviderInfo {
         name: "Custom".to_string(),

@@ -19,16 +19,13 @@ compact record containing the useful conclusion, source pointer, effect on the p
 verification result. Exact file contents and logs are reread from their durable source
 when needed; they are not kept merely because the agent once saw them.
 
-The planned context list must show each active item, its source, approximate size,
+The context list shows each active portable item, its source, approximate size,
 lifetime, admission reason, and replacement record. Removing an item from the visible
 TUI is not sufficient; it must be omitted from the next model-visible request.
 
-The temporary Codex adapter owns its bootstrap thread, so compacting the Elpis display
-alone cannot reduce that thread's model context. The Elpis context engine must assemble
-the intended working set before every turn and project it into the selected runtime.
-For a Codex-owned thread, Elpis must also coordinate native compaction or deliberately
-start a lean replacement thread; it must not pretend that a smaller mirror changed
-Codex's internal thread state.
+The contained Codex runtime owns exact thread history. Elpis coordinates native
+compaction and admits its portable goal and checkpoint when starting a fresh lean thread;
+it does not pretend that changing the visible display changed an existing thread.
 
 ## Session Persistence
 
@@ -69,9 +66,9 @@ working tree and the last recorded check. It performs the single next action rat
 repeating completed exploration. The handoff is replaced when state advances and removed
 when the objective is complete.
 
-## Implementation Order
+## Acceptance Order
 
-1. Add compact records for search, read, command, and file-change events.
-2. Add the visible context list and omit expired turn material from new requests.
-3. Add checkpoint generation and user-controlled exact/lean continuation.
-4. Connect curated memory only after the checkpoint boundary is reliable.
+1. Verify exact resume retains the native thread.
+2. Verify a fresh thread receives only the portable goal and compact checkpoint.
+3. Verify `/status` names every portable source and its admission reason.
+4. Verify curated memory appears only for a related task and remains absent otherwise.

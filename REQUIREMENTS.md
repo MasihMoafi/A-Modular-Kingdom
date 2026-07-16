@@ -123,9 +123,9 @@ Elpis's primary visual identity uses amber, between orange and yellow, not purpl
 | Commands, patches, and activity display | Inherited from Codex and exercised in the authenticated foundation acceptance turn. |
 | Permission modes and sandboxing | Inherited from Codex; no Elpis reimplementation is required. A focused all-mode acceptance matrix remains useful before release. |
 | Mouse selection/copy | Inherited from the Codex TUI; Masih confirmed the old prototype limitation does not apply to this foundation. |
-| Native sessions and compaction | Inherited for Codex-owned threads. Elpis-wide provider-neutral continuity is not implemented. |
-| Context list and compact records | In progress. A compact per-turn `ES.md` checkpoint is implemented pending remote verification; the visible admitted-context list remains. |
-| Compaction/checkpoints/lean continuation | In progress. Portable workspace `GOAL.md` and `ES.md` files are implemented pending remote verification; automatic admission and lean continuation remain. |
+| Native sessions and compaction | Inherited for exact Codex-owned threads; Elpis adds provider-neutral portable continuity for fresh threads. |
+| Context list and compact records | Implemented pending acceptance. `/status` reports admitted rules, goal, checkpoint, and memory summary with size, lifetime, and reason. |
+| Compaction/checkpoints/lean continuation | Implemented pending acceptance. Portable `GOAL.md` and `ES.md` are admitted into fresh threads and synced before compaction; exact resume retains the native thread. |
 | Inherited Codex memory | A substantial Rust extraction, consolidation, retrieval, citation, and artifact pipeline is present and enabled by default; Elpis acceptance has not been run. |
 | OpenClaw-style memory | In progress. Recall counting and promotion are remotely verified. Elpis-owned storage, age-aware diverse retrieval, semantic fallback, and hard artifact-size limits are implemented pending remote verification. Ordinary memory files plus the confirmed reset-all action provide review/deletion; end-to-end acceptance remains. |
 | `/auto` model routing | Nice-to-have and not implemented. Product documents may describe the intended behavior but must not claim availability. |
@@ -133,8 +133,8 @@ Elpis's primary visual identity uses amber, between orange and yellow, not purpl
 
 ## Target State Layout
 
-Memory uses the Elpis-owned roots below. Session and context paths remain target behavior
-until the context engine is implemented:
+Memory and portable context use the Elpis-owned roots below. Provider-neutral full
+session mirroring remains future work beyond the first context slice:
 
 - `REQUIREMENTS.md`: project requirements and unresolved product choices.
 - `~/.elpis/.../sessions/`: complete append-only event history.

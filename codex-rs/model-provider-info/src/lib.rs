@@ -36,6 +36,9 @@ const OPENAI_PROVIDER_NAME: &str = "OpenAI";
 const OPENAI_ACTOR_AUTHORIZATION_HEADER: &str = "x-openai-actor-authorization";
 pub const OPENAI_PROVIDER_ID: &str = "openai";
 pub const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
+const OPENROUTER_PROVIDER_NAME: &str = "OpenRouter";
+pub const OPENROUTER_PROVIDER_ID: &str = "openrouter";
+pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 const AMAZON_BEDROCK_PROVIDER_NAME: &str = "Amazon Bedrock";
 pub const AMAZON_BEDROCK_PROVIDER_ID: &str = "amazon-bedrock";
 pub const AMAZON_BEDROCK_GPT_5_5_MODEL_ID: &str = "openai.gpt-5.5";
@@ -363,6 +366,33 @@ impl ModelProviderInfo {
         }
     }
 
+    pub fn create_openrouter_provider() -> ModelProviderInfo {
+        ModelProviderInfo {
+            name: OPENROUTER_PROVIDER_NAME.into(),
+            base_url: Some(OPENROUTER_BASE_URL.into()),
+            env_key: Some("OPENROUTER_API_KEY".into()),
+            env_key_instructions: Some(
+                "Set OPENROUTER_API_KEY to an OpenRouter API key before launching Elpis.".into(),
+            ),
+            experimental_bearer_token: None,
+            auth: None,
+            aws: None,
+            wire_api: WireApi::Responses,
+            query_params: None,
+            http_headers: Some(HashMap::from([(
+                "X-OpenRouter-Title".to_string(),
+                "Elpis".to_string(),
+            )])),
+            env_http_headers: None,
+            request_max_retries: None,
+            stream_max_retries: None,
+            stream_idle_timeout_ms: None,
+            websocket_connect_timeout_ms: None,
+            requires_openai_auth: false,
+            supports_websockets: false,
+        }
+    }
+
     pub fn create_amazon_bedrock_provider(
         aws: Option<ModelProviderAwsAuthInfo>,
     ) -> ModelProviderInfo {
@@ -432,6 +462,7 @@ pub fn built_in_model_providers(
 ) -> HashMap<String, ModelProviderInfo> {
     use ModelProviderInfo as P;
     let openai_provider = P::create_openai_provider(openai_base_url);
+    let openrouter_provider = P::create_openrouter_provider();
     let amazon_bedrock_provider = P::create_amazon_bedrock_provider(/*aws*/ None);
 
     // We do not want to be in the business of adjucating which third-party
@@ -440,6 +471,7 @@ pub fn built_in_model_providers(
     // `model_providers` in config.toml to add their own providers.
     [
         (OPENAI_PROVIDER_ID, openai_provider),
+        (OPENROUTER_PROVIDER_ID, openrouter_provider),
         (AMAZON_BEDROCK_PROVIDER_ID, amazon_bedrock_provider),
         (
             OLLAMA_OSS_PROVIDER_ID,

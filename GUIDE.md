@@ -212,11 +212,11 @@ Verified foundation:
   are preserved as named tips inside `archive/pre-cleanup-20260716`; they are not part
   of canonical `main`.
 
-Current foundation work is memory followed by context continuity. Elpis-owned memory
-storage, promotion, bounded retrieval, and portable `GOAL.md`/`ES.md` context files are
-being remotely verified. Lean continuation and a visible admitted-context list are next.
-Visual identity, provider expansion, pruning, and `/auto` routing follow the foundational
-memory/context acceptance checks.
+Current foundation work is memory plus context acceptance. Elpis-owned memory storage,
+promotion, bounded retrieval, portable `GOAL.md`/`ES.md`, lean fresh-thread admission,
+pre-compaction protection, and the visible admitted-context list are implemented pending
+remote verification. Visual identity, provider expansion, pruning, and `/auto` routing
+follow the foundational memory/context acceptance checks.
 
 The currently installed build includes the command-surface changes from `b135e7a` and
 the startup-tip/test-command changes from `419384d`. Most unwanted commands were made
