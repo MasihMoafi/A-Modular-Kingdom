@@ -6,6 +6,13 @@ use std::path::PathBuf;
 const MAX_GOAL_CHARS: usize = 6_000;
 const MAX_CHECKPOINT_CHARS: usize = 8_000;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContinuitySource {
+    pub name: &'static str,
+    pub path: PathBuf,
+    pub bytes: u64,
+}
+
 pub fn workspace_context_dir(memories_root: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
     let elpis_home = memories_root?.parent()?;
     Some(
@@ -44,6 +51,24 @@ pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -
          message when it changes the task.\n\n{}",
         sections.join("\n\n")
     ))
+}
+
+pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<ContinuitySource> {
+    let Some(workspace_dir) = workspace_context_dir(memories_root, cwd) else {
+        return Vec::new();
+    };
+    ["GOAL.md", "ES.md"]
+        .into_iter()
+        .filter_map(|name| {
+            let path = workspace_dir.join(name);
+            let metadata = std::fs::metadata(&path).ok()?;
+            (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
+                name,
+                path,
+                bytes: metadata.len(),
+            })
+        })
+        .collect()
 }
 
 fn workspace_key(cwd: &Path) -> String {
@@ -107,6 +132,24 @@ mod tests {
             workspace_context_dir(Some(memories), Path::new("/a/project")),
             workspace_context_dir(Some(memories), Path::new("/b/project"))
         );
+    }
+
+    #[test]
+    fn source_list_contains_only_nonempty_portable_context_files() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = Path::new("/tmp/project");
+        let workspace = workspace_context_dir(Some(&memories), cwd).expect("workspace path");
+        std::fs::create_dir_all(&workspace)?;
+        std::fs::write(workspace.join("GOAL.md"), "Ship Elpis")?;
+        std::fs::write(workspace.join("ES.md"), "")?;
+        std::fs::write(workspace.join("raw.log"), "hidden")?;
+
+        let sources = continuity_sources(Some(&memories), cwd);
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].name, "GOAL.md");
+        assert_eq!(sources[0].bytes, 10);
+        Ok(())
     }
 
     #[tokio::test]

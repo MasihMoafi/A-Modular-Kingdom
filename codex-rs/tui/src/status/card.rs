@@ -111,6 +111,7 @@ struct StatusHistoryCell {
     directory: PathBuf,
     permissions: String,
     agents_summary: Arc<RwLock<String>>,
+    continuity_sources: Vec<codex_core::elpis_context::ContinuitySource>,
     collaboration_mode: Option<String>,
     model_provider: Option<String>,
     remote_connection: Option<RemoteConnectionStatus>,
@@ -352,6 +353,10 @@ impl StatusHistoryCell {
             refreshing_rate_limits,
         }));
         let agents_summary = Arc::new(RwLock::new(agents_summary));
+        let continuity_sources = codex_core::elpis_context::continuity_sources(
+            config.memories.root.as_ref().map(|root| root.as_path()),
+            config.cwd.as_path(),
+        );
 
         (
             Self {
@@ -369,6 +374,7 @@ impl StatusHistoryCell {
                 forked_from,
                 token_usage,
                 agents_summary,
+                continuity_sources,
                 rate_limit_state: rate_limit_state.clone(),
             },
             StatusHistoryHandle { rate_limit_state },
@@ -770,6 +776,9 @@ impl HistoryCell for StatusHistoryCell {
         if self.collaboration_mode.is_some() {
             push_label(&mut labels, &mut seen, "Collaboration mode");
         }
+        for source in &self.continuity_sources {
+            push_label(&mut labels, &mut seen, source.name);
+        }
         push_label(&mut labels, &mut seen, "Token usage");
         if self.token_usage.context_window.is_some() {
             push_label(&mut labels, &mut seen, "Context window");
@@ -833,6 +842,15 @@ impl HistoryCell for StatusHistoryCell {
         lines.push(formatter.line("Directory", vec![Span::from(directory_value)]));
         lines.push(formatter.line("Permissions", vec![Span::from(self.permissions.clone())]));
         lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
+        for source in &self.continuity_sources {
+            lines.push(formatter.line(
+                source.name,
+                vec![
+                    Span::from(source.path.display().to_string()),
+                    Span::from(format!(" ({} bytes)", source.bytes)).dim(),
+                ],
+            ));
+        }
 
         if let Some(account_value) = account_value {
             lines.push(formatter.line("Account", vec![Span::from(account_value)]));
