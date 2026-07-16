@@ -1,0 +1,8 @@
+{
+  "run_id": "29534593722",
+  "run_attempt": "1",
+  "status": "failure",
+  "commit": "ca881f95d418082ceed7ec3ec2a5b17be5c1f5a5",
+  "workflow": "Embedded Elpis Linux binary",
+  "artifact": "elpis-linux-x86_64"
+}
