@@ -80,9 +80,11 @@ not unrelated foundations.
 - No subagents are active. Use one worktree per genuinely parallel task, but keep the
   immediate blocker with the main agent.
 - Startup fix is committed as `3e06042`.
-- Current deletion changes: `pyproject.toml`, `src/agent/query_parser.py`,
-  `src/agent/tool_execution.py`, `src/memory/`, `src/tools/`, `GUIDE.md`,
-  `FEATURES.json`, and this handoff.
+- Proven-unused Python tool deletion is committed as `d5396b1`.
+- Git cleanup: only `/home/masih/Desktop/f/p/Elpis` remains as a normal worktree.
+  `archive/pre-cleanup-20260716` preserves every unique runtime, prototype, old local,
+  and Jules branch tip without merging those trees into `main`. GitHub should retain
+  only `main` and that archive branch after the cleanup batch.
 - Verification: MCP initialize and tools/list pass with exactly one tool and the narrow
   schema; `.venv/bin/python -m compileall -q src`, `jq -e . FEATURES.json`, and
   `git diff --check` pass. No Rust build is required for this Python service change.
@@ -90,9 +92,20 @@ not unrelated foundations.
 
 ## Next Action
 
-Commit the proven-unused Python tool and memory deletion as its own checkpoint. Then
-choose whether the next bounded task is the appearance-only UI pass or continued Codex
-feature subtraction; do not mix those changes in one commit.
+Apply the appearance-only Elpis identity pass to the existing Ratatui TUI. Centralize a
+small Elpis palette, then apply it to the title, focused input border, selected menu
+rows, user-message accent, status symbols, and popup borders. Do not change layout,
+wording, information, commands, keyboard/mouse behavior, or runtime behavior. Verify
+through the remote Rust workflow and a local visual smoke using the downloaded artifact;
+do not run Cargo locally.
+
+Keep this separate from continued Codex feature subtraction. The next subtraction task
+after the visual pass is the lowest-risk residual `tooltips` and `test-approval`
+implementation.
+
+Then proceed in `FEATURES.json` order: context sovereignty, session continuity,
+cross-session memory, `/auto` routing, behavioral enforcement, dictation, additional
+runtimes, and release readiness.
 
 ## After Startup Is Understood
 
@@ -110,3 +123,9 @@ each step: hidden is not deleted, and CI passing is not user acceptance.
   `elpis-rag`; it has one tool only.
 - Do not change UI content or layout while performing the visual identity pass.
 - Do not prioritize Gemini or rewrite inherited Codex capabilities.
+- Do not describe the removed Python features as one-for-one Codex UI features. Codex
+  covers shell, files, code execution, approvals, and optional web search; Elpis
+  dictation and its own memory design remain future work.
+- Do not create a branch or worktree without a bounded task and an owner.
+- Do not replace Ratatui or copy Kiro's Code OSS interface. Elpis already has the right
+  terminal UI framework; Kiro is useful for workflow ideas, not as a drop-in TUI source.

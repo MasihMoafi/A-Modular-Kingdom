@@ -211,10 +211,11 @@ Verified foundation:
 - Gemini/runtime-boundary experiments are parked on `agent/runtime-boundary` and are
   not part of canonical `main`.
 
-Current priority is stabilization by subtraction: identify obsolete or unwanted code,
-remove one bounded surface at a time, and remotely rebuild and smoke-test after each
-deletion. Feature additions, context design, memory design, `/auto` routing, and visual
-restyling follow only after this baseline is lean and trustworthy.
+Current stabilization has two separate lanes: complete the approved feature subtraction
+in small remotely verified commits, and give the inherited Ratatui interface an
+appearance-only Elpis identity without changing its information or behavior. The visual
+identity pass is the immediate user-visible task. Context design, memory design, `/auto`
+routing, and other feature additions remain later work.
 
 The currently installed build includes the command-surface changes from `b135e7a` and
 the startup-tip/test-command changes from `419384d`. Most unwanted commands were made
@@ -224,13 +225,11 @@ without deleting shared machinery required by retained behavior.
 
 ### Startup performance
 
-Typing `elpis` currently takes about five seconds before the TUI is usable; the archived
-prototype took under one second. This is a real product regression and must be measured
-from process start to first usable frame. Do not describe PyTorch as part of the Rust
-TUI: it belongs to the separate Python RAG service and its effect on launch has not been
-proven. Profile startup with configured services enabled and disabled before changing
-code, then optimize the measured blocking path. The first target is a usable frame in
-under one second, with optional services allowed to finish visibly in the background.
+Typing `elpis` previously took about five seconds before the TUI was usable; the archived
+prototype took under one second. The regression is now resolved. Do not describe PyTorch
+as part of the Rust TUI: it belongs to the separate Python RAG service and is loaded only
+for an explicit RAG query. Keep the startup target below one second, with optional
+services forbidden from blocking the first usable frame.
 
 The July 16 startup audit found that the registered `elpis-rag` process was still the
 old unified MCP: it advertised 21 unrelated memory, shell, web, speech, document, and
@@ -261,6 +260,8 @@ RAG MCP.
 
 ### Product scope already decided
 
+- The active terminal interface is Codex's contained Rust TUI and already uses Ratatui.
+  Elpis does not need a UI-framework rewrite for the visual identity pass.
 - UI work is appearance-only for now: colors and styling may change, but Codex-quality
   content, rendering, and interactions must remain.
 - Dictation is a required future feature. First audit the contained Codex source for an
@@ -282,6 +283,11 @@ RAG MCP.
 - Record what is implemented separately from what is intended.
 - Treat `main` as canonical. Read archive branches only when historical prototype
   behavior is specifically needed.
+- Keep one normal local worktree. Create a temporary worktree only for an approved,
+  genuinely parallel task; remove it after its useful commit is merged or archived.
+- Push accepted canonical checkpoints to `main`. Historical or abandoned branch tips
+  belong in the single `archive/pre-cleanup-20260716` history branch, not in a growing
+  set of active-looking branches.
 
 ## Verification
 
