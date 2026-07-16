@@ -847,7 +847,11 @@ impl HistoryCell for StatusHistoryCell {
                 source.name,
                 vec![
                     Span::from(source.path.display().to_string()),
-                    Span::from(format!(" ({} bytes)", source.bytes)).dim(),
+                    Span::from(format!(
+                        " ({} bytes; {}; {})",
+                        source.bytes, source.lifetime, source.reason
+                    ))
+                    .dim(),
                 ],
             ));
         }

@@ -80,6 +80,12 @@ pub(crate) fn compose_agents_summary(config: &Config, paths: &[PathUri]) -> Stri
         } else {
             normalize_agents_display_path(p)
         };
+        let display = match std::fs::metadata(p) {
+            Ok(metadata) if metadata.is_file() => {
+                format!("{display} ({} bytes; durable rules)", metadata.len())
+            }
+            _ => display,
+        };
         rels.push(display);
     }
 

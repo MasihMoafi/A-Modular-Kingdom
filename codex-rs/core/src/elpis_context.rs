@@ -11,6 +11,8 @@ pub struct ContinuitySource {
     pub name: &'static str,
     pub path: PathBuf,
     pub bytes: u64,
+    pub lifetime: &'static str,
+    pub reason: &'static str,
 }
 
 pub fn workspace_context_dir(memories_root: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
@@ -54,21 +56,44 @@ pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -
 }
 
 pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<ContinuitySource> {
-    let Some(workspace_dir) = workspace_context_dir(memories_root, cwd) else {
+    let Some(memories_root) = memories_root else {
         return Vec::new();
     };
-    ["GOAL.md", "ES.md"]
-        .into_iter()
-        .filter_map(|name| {
-            let path = workspace_dir.join(name);
-            let metadata = std::fs::metadata(&path).ok()?;
-            (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
-                name,
-                path,
-                bytes: metadata.len(),
-            })
+    let Some(workspace_dir) = workspace_context_dir(Some(memories_root), cwd) else {
+        return Vec::new();
+    };
+    [
+        (
+            "GOAL.md",
+            workspace_dir.join("GOAL.md"),
+            "durable",
+            "active workspace goal",
+        ),
+        (
+            "ES.md",
+            workspace_dir.join("ES.md"),
+            "task",
+            "lean session checkpoint",
+        ),
+        (
+            "memory_summary.md",
+            memories_root.join("memory_summary.md"),
+            "durable",
+            "cross-session memory",
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(name, path, lifetime, reason)| {
+        let metadata = std::fs::metadata(&path).ok()?;
+        (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
+            name,
+            path,
+            bytes: metadata.len(),
+            lifetime,
+            reason,
         })
-        .collect()
+    })
+    .collect()
 }
 
 pub async fn sync_continuity_before_compaction(
@@ -167,6 +192,7 @@ mod tests {
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].name, "GOAL.md");
         assert_eq!(sources[0].bytes, 10);
+        assert_eq!(sources[0].lifetime, "durable");
         Ok(())
     }
 

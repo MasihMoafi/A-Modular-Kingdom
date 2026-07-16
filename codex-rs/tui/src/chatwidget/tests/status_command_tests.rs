@@ -123,7 +123,7 @@ async fn status_command_renders_native_and_foreign_instruction_sources() {
         other => panic!("expected status output, got {other:?}"),
     };
     assert!(
-        rendered.contains(&format!("AGENTS.md, {foreign_display}")),
+        rendered.contains("AGENTS.md (") && rendered.contains(foreign_display),
         "expected /status to show native-relative and environment-native foreign paths, got: {rendered}"
     );
     assert!(
