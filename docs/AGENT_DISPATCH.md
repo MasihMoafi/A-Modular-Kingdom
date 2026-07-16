@@ -3,7 +3,7 @@
 ## Rule
 
 Use one coordinator and one worktree per implementation task. The coordinator owns
-`VISION.md`, `REQUIREMENTS.md`, `FEATURES.json`, architecture decisions, task ordering,
+`VISION.md`, `REQUIREMENTS.md`, `TASKS.md`, architecture decisions, task ordering,
 integration, and the final acceptance decision. Worker agents implement bounded tasks;
 they do not redefine the product.
 
@@ -27,7 +27,7 @@ worktree, reviews its result, and integrates it. Masih only decides product beha
 ## Worktree Workflow
 
 1. Start only from the shared committed control baseline.
-2. Select one task from `FEATURES.json` whose dependencies are `verified`.
+2. Select the Current Action from `TASKS.md` after verifying its dependencies.
 3. Create one branch and worktree named for that task.
 4. Give the worker the task fields, exact file scope, non-goals, and acceptance test.
 5. Require the worker to return changed files, checks run, evidence, risks, and commit.

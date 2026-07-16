@@ -5,7 +5,7 @@
 - Read `VISION.md`; it is the stable product intent.
 - Read `GUIDE.md`; it is the architecture source of truth.
 - Read `REQUIREMENTS.md`; it separates confirmed requirements from open product choices.
-- Read `FEATURES.json`; work only on `current_priority` unless Masih changes priority.
+- Read `TASKS.md`; work only on its Current Action unless Masih changes priority.
 - Read `docs/AGENT_DISPATCH.md` before delegating work or creating a worktree.
 - Read `SESSION_HANDOFF.md` when it exists, then verify its claims before continuing.
 - Obey the global rules in `/home/masih/.codex/AGENTS.md`. The development-harness
@@ -21,7 +21,7 @@
 - Summarize terminal output; do not carry raw logs once their result is known.
 - After edits, retain the diff and verification result; reread file bodies on demand.
 - Do not add slash commands unless Masih explicitly selects them.
-- Worker agents must not edit `VISION.md`, `REQUIREMENTS.md`, `FEATURES.json`, or
+- Worker agents must not edit `VISION.md`, `REQUIREMENTS.md`, `TASKS.md`, or
   `SESSION_HANDOFF.md`; the coordinator owns those files.
 - Do not delegate to Jules. The coordinator selects and manages any other worker model
   and its worktree; Masih does not need to manage them.
@@ -29,8 +29,8 @@
 ## Definition Of Done
 
 - Behavior is implemented, not merely documented.
-- A feature becomes `verified` only when its acceptance check passes and evidence is
-  added to `FEATURES.json`.
+- A feature becomes complete only when its acceptance check passes and evidence is
+  recorded in `TASKS.md`.
 - Rust changes pass `cargo test`; Python changes pass the narrowest relevant test and
   `.venv/bin/python -m compileall -q src`.
 - Known gaps and skipped checks are stated plainly.

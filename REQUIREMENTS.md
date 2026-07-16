@@ -88,32 +88,30 @@ not block exact work or admit stale RAG output into later context.
 
 Elpis's primary visual identity uses amber, between orange and yellow, not purple.
 
-## Required Work, In Order
+## First-Release Work, In Order
 
-1. **Stabilize and subtract from the imported Codex foundation**
+1. **Clean the canonical repository**
    - The pinned foundation import is complete; do not rebuild its mature behavior.
-   - Archive and remove the superseded prototype only after proving it is not used.
-   - Inventory Codex surfaces as keep, remove, or decide-later.
-   - Delete one bounded surface at a time and preserve commands, patches, permissions,
-     sandboxing, mouse interaction, sessions, and authentication with remote checks.
-2. **Implement the context and session engine**
+   - Remove only code proven obsolete or explicitly approved for removal.
+   - Keep the repository, documents, branches, and worktrees understandable.
+2. **Verify internal RAG**
+   - Verify direct workspace and path queries and autonomous use for broad discovery.
+   - Mark retrieval read-only so Codex may schedule it beside exact reads or searches.
+   - Require exact current-file evidence before code edits.
+3. **Implement the context and session engine**
    - Full transcript on disk; small model-visible working set.
-   - Expiring tool output, compact receipts, visible context ledger, checkpoints,
+   - Expiring tool output, compact records, a visible context list, checkpoints,
      compaction, exact/lean continuation, fork, and rollback.
-3. **Implement the memory foundation**
-   - Curated long-term memory, dated working notes, search and selective retrieval,
-     pre-compaction memory flush, provenance, review, and deletion.
-4. **Add automatic model routing**
-   - `/auto` chooses a suitable model from a user-approved pool for each task.
-   - The choice, reason, cost/quality tier, and manual override remain visible.
-   - Start with explicit easy/medium/hard tiers; do not hide routing behind login.
-5. **Create the provider boundary**
-   - Keep OpenAI/Codex as the first working runtime with subscription authentication.
-   - Add Gemini and Claude adapters without duplicating the TUI, tools, permissions,
-     context, sessions, or memory engine.
-6. **Complete required coding-agent capabilities**
-   - Web research, image/file inputs where supported, interruption/cancellation,
-     reliable errors, configuration, and recovery after restart.
+4. **Implement the memory foundation**
+   - Reconcile the inherited Codex Rust memory pipeline with the selected OpenClaw
+     behaviors before writing new machinery.
+   - Provide curated long-term memory, dated notes, selective retrieval,
+     pre-compaction flush, provenance, review, and deletion.
+5. **Verify the first-release provider boundary**
+   - Support OpenAI subscription and OpenRouter for the first release.
+   - Elpis owns context, memory, session policy, and provider choice.
+6. **Ship the first release**
+   - Install, authenticate, launch, recover, and complete a task from a clean machine.
 
 ## Current Verified Truth
 
@@ -126,11 +124,11 @@ Elpis's primary visual identity uses amber, between orange and yellow, not purpl
 | Permission modes and sandboxing | Inherited from Codex; no Elpis reimplementation is required. A focused all-mode acceptance matrix remains useful before release. |
 | Mouse selection/copy | Inherited from the Codex TUI; Masih confirmed the old prototype limitation does not apply to this foundation. |
 | Native sessions and compaction | Inherited for Codex-owned threads. Elpis-wide provider-neutral continuity is not implemented. |
-| Context ledger and receipts | Specified in docs; not implemented. |
+| Context list and compact records | Specified in docs; not implemented. |
 | Compaction/checkpoints/lean continuation | Specified in docs; not implemented. |
-| Long-term memory | Not implemented in the canonical Codex-derived path. |
-| OpenClaw-style memory | Not implemented. Source inspection confirms OpenClaw combines pruning, guarded compaction, dated append-only flushes, hybrid retrieval, and scored long-term promotion. Elpis currently has none of that complete pipeline. |
-| `/auto` model routing | Required but not implemented. It means per-task model selection from a configured pool, not authentication. |
+| Inherited Codex memory | A substantial Rust extraction, consolidation, retrieval, citation, and artifact pipeline is present and enabled by default; Elpis acceptance has not been run. |
+| OpenClaw-style memory | Not integrated. OpenClaw adds pruning, guarded compaction, dated append-only flushes, hybrid retrieval, and scored promotion that must be reconciled with the inherited Rust pipeline. |
+| `/auto` model routing | Nice-to-have and not implemented. Product documents may describe the intended behavior but must not claim availability. |
 | Gemini/other runtimes | Experimental Gemini ACP work is preserved as a named historical tip inside `archive/pre-cleanup-20260716`; it is not merged into `main`. |
 
 ## Proposed State Layout
@@ -171,11 +169,11 @@ memory. Decide how much automatic promotion is acceptable.
 Recommended: exact resume while the context is healthy; lean continuation when context
 pressure is high or the user requests it. The switch and its evidence should be visible.
 
-### D5. Automatic model-routing policy
+### D5. Automatic model-routing policy — deferred
 
-The `/auto` outcome is confirmed, but the classifier, tier boundaries, eligible model
-pool, fallback behavior, and whether routing occurs per user message or per delegated
-subtask require design after foundation stabilization.
+`/auto` is not required for the first release. If implemented later, its classifier,
+tier boundaries, eligible model pool, fallback behavior, and manual override must remain
+visible.
 
 ## Nice-To-Haves After The Foundation
 
@@ -185,3 +183,4 @@ subtask require design after foundation stabilization.
 - Rich themes, animation, and additional presentation polish beyond clear action events.
 - Agent personalities beyond enforceable project behavior.
 - Voice input/output and background scheduled work.
+- `/auto` model routing.

@@ -1,7 +1,7 @@
 # Agent Prompt: Elpis Codebase Reduction Audit
 
 Work in `/home/masih/Desktop/f/p/Elpis`. Read `AGENTS.md`, `GUIDE.md`,
-`SESSION_HANDOFF.md`, and `FEATURES.json` first. Verify the checkout before making any
+`SESSION_HANDOFF.md`, and `TASKS.md` first. Verify the checkout before making any
 claim.
 
 ## Goal

@@ -91,7 +91,7 @@ pre-compaction flush writes dated append-only notes; hybrid search retrieves onl
 relevant excerpts; repeated useful recalls may be promoted into bounded long-term
 memory. Dreaming is optional scheduled review and promotion on top of that foundation.
 
-Elpis's concrete context-receipt and session-checkpoint contract lives in
+Elpis's concrete context-record and session-checkpoint contract lives in
 `docs/CONTEXT_AND_SESSIONS.md`.
 
 ## Runtime Architecture
@@ -149,10 +149,10 @@ Do not turn `GUIDE.md` into an exploration log. Promote one distilled fact only 
 durable enough to change how future agents should work on Elpis; replace stale guidance
 instead of accumulating discoveries.
 
-### 4. Tool and file receipts
+### 4. Compact tool and file records
 
 Keep full events in the on-disk transcript. The model-visible working set should
-replace stale bulky results with compact receipts containing:
+replace stale bulky results with compact records containing:
 
 - operation and target;
 - success/failure and exit status;
@@ -190,7 +190,7 @@ user can answer: "Why is this in context?"
 
 An API call does not receive previous messages by magic. Either Elpis resends the chosen
 working context, or a provider stores a thread and reconstructs it. Elpis must keep its
-own provider-neutral session record and context ledger even when a provider also offers
+own provider-neutral session record and context list even when a provider also offers
 thread IDs. Resume, fork, rollback, and compaction must therefore have Elpis semantics,
 with provider thread IDs treated as adapter-specific state rather than the project truth.
 

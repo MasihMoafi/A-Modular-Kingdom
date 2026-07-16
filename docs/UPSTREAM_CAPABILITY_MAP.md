@@ -27,5 +27,5 @@ and native compaction. OpenClaw retains model/runtime selection, channels, sessi
 the transcript mirror, projected context, OpenClaw dynamic tools, approvals, and output
 delivery. Elpis should adopt this explicit layered ownership model.
 
-No capability should enter `FEATURES.json` as implemented merely because an upstream
+No capability should enter `TASKS.md` as implemented merely because an upstream
 project has it. It becomes an Elpis feature only after the Elpis acceptance check passes.

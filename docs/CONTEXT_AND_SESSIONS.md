@@ -15,12 +15,12 @@ Every admitted item has a lifetime:
 - **turn:** searches, directory listings, file reads, command output, and failed probes.
 
 Turn material expires after it answers its question. Before eviction, Elpis creates a
-receipt containing the useful conclusion, source pointer, effect on the plan, and any
+compact record containing the useful conclusion, source pointer, effect on the plan, and any
 verification result. Exact file contents and logs are reread from their durable source
 when needed; they are not kept merely because the agent once saw them.
 
-The planned context ledger must show each active item, its source, approximate size,
-lifetime, admission reason, and replacement receipt. Removing an item from the visible
+The planned context list must show each active item, its source, approximate size,
+lifetime, admission reason, and replacement record. Removing an item from the visible
 TUI is not sufficient; it must be omitted from the next model-visible request.
 
 The temporary Codex adapter owns its bootstrap thread, so compacting the Elpis display
@@ -61,7 +61,7 @@ when the objective is complete.
 
 ## Implementation Order
 
-1. Add compact receipts for search, read, command, and file-change events.
-2. Add the visible context ledger and omit expired turn material from new requests.
+1. Add compact records for search, read, command, and file-change events.
+2. Add the visible context list and omit expired turn material from new requests.
 3. Add checkpoint generation and user-controlled exact/lean continuation.
 4. Connect curated memory only after the checkpoint boundary is reliable.
