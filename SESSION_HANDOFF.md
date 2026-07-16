@@ -39,6 +39,10 @@ remove only Masih's approved unwanted features without losing retained Codex beh
   dependencies. Codex owns the removed general agent capabilities.
 - Gemini/runtime-boundary work is preserved as a named historical tip inside
   `archive/pre-cleanup-20260716` and is the least important current work.
+- The official OpenClaw source reference was refreshed to clean commit `dd58667b`
+  (source version `2026.7.2`). The sole global command package and its systemd service
+  were replaced with stable `2026.7.1`; the Codex plugin is also `2026.7.1`, and the
+  gateway health check passes. User data and configuration were preserved.
 
 ## Approved Command And Feature Contract
 
@@ -79,6 +83,8 @@ not unrelated foundations.
 - Do not compile Rust locally; it disrupts Masih's workstation. Use the remote workflow.
 - No subagents are active. Use one worktree per genuinely parallel task, but keep the
   immediate blocker with the main agent.
+- Do not use Jules; Masih finds it too slow. The coordinator chooses worker models and
+  manages their worktrees without requiring Masih to supervise Git mechanics.
 - Startup fix is committed as `3e06042`.
 - Proven-unused Python tool deletion is committed as `d5396b1`.
 - Git cleanup: only `/home/masih/Desktop/f/p/Elpis` remains as a normal worktree.

@@ -104,7 +104,7 @@ feature needs a focused user-visible check before it is marked working.
 
 | Area | Current state |
 | --- | --- |
-| Canonical source | `main` is the contained Codex-derived Elpis foundation. The former prototype is archived at `archive/legacy-prototype-20260716`. |
+| Canonical source | `main` is the contained Codex-derived Elpis foundation. The former prototype is preserved as a named historical tip inside `archive/pre-cleanup-20260716`. |
 | Installed command | `elpis` resolves to `/home/masih/.local/bin/elpis`, built remotely from this repository. |
 | ChatGPT login and Codex turn | Working through the imported native Codex implementation. |
 | Commands, patches, and activity display | Inherited from Codex and exercised in the authenticated foundation acceptance turn. |
@@ -116,7 +116,7 @@ feature needs a focused user-visible check before it is marked working.
 | Long-term memory | Not implemented in the canonical Codex-derived path. |
 | OpenClaw-style memory | Not implemented. Source inspection confirms OpenClaw combines pruning, guarded compaction, dated append-only flushes, hybrid retrieval, and scored long-term promotion. Elpis currently has none of that complete pipeline. |
 | `/auto` model routing | Required but not implemented. It means per-task model selection from a configured pool, not authentication. |
-| Gemini/other runtimes | Experimental Gemini ACP work is parked on `agent/runtime-boundary`; it is not merged into `main`. |
+| Gemini/other runtimes | Experimental Gemini ACP work is preserved as a named historical tip inside `archive/pre-cleanup-20260716`; it is not merged into `main`. |
 
 ## Proposed State Layout
 
@@ -136,33 +136,27 @@ This is a proposal, not yet approved:
 ### D1. Foundation migration shape
 
 Resolved: the pinned Codex Rust foundation lives under `codex-rs/`; `main` uses it as
-the canonical Elpis baseline, and the former prototype is preserved on
-`archive/legacy-prototype-20260716`. Continue by subtraction.
+the canonical Elpis baseline, and the former prototype is preserved as a named
+historical tip inside `archive/pre-cleanup-20260716`. Continue by subtraction.
 
-### D2. ES file
-
-Clarify what `ES` means and whether it should be one file per session, one rolling
-project file, or a folder. Recommended role: a human-readable checkpoint/session-summary
-surface, not the long-term memory store and not the full transcript.
-
-### D3. Persistent goal
+### D2. Persistent goal
 
 Recommended: keep one active goal with measurable acceptance criteria, while checkpoints
 record previous goals and outcomes. Decide whether Elpis may update the goal from clear
 conversation or only after explicit user confirmation.
 
-### D4. Automatic memory writes
+### D3. Automatic memory writes
 
 Recommended: automatically write detailed session notes and pre-compaction notes, but
 require stronger evidence or user review before promoting them into compact long-term
 memory. Decide how much automatic promotion is acceptable.
 
-### D5. Default continuation
+### D4. Default continuation
 
 Recommended: exact resume while the context is healthy; lean continuation when context
 pressure is high or the user requests it. The switch and its evidence should be visible.
 
-### D6. Automatic model-routing policy
+### D5. Automatic model-routing policy
 
 The `/auto` outcome is confirmed, but the classifier, tier boundaries, eligible model
 pool, fallback behavior, and whether routing occurs per user message or per delegated

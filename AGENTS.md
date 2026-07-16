@@ -23,6 +23,8 @@
 - Do not add slash commands unless Masih explicitly selects them.
 - Worker agents must not edit `VISION.md`, `REQUIREMENTS.md`, `FEATURES.json`, or
   `SESSION_HANDOFF.md`; the coordinator owns those files.
+- Do not delegate to Jules. The coordinator selects and manages any other worker model
+  and its worktree; Masih does not need to manage them.
 
 ## Definition Of Done
 

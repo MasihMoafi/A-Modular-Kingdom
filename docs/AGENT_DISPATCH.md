@@ -14,12 +14,15 @@ agents increase speed only when tasks are genuinely independent.
 
 | Difficulty | Characteristics | Preferred worker |
 | --- | --- | --- |
-| Easy | One localized behavior, known solution, low-risk change, narrow test | Jules |
-| Medium | Several files, bounded design choice, adaptation of an existing pattern | Flash 3.5 or Jules with a precise task |
+| Easy | One localized behavior, known solution, low-risk change, narrow test | Fast low-cost worker (Luna-class) |
+| Medium | Several files, bounded design choice, adaptation of an existing pattern | Balanced worker (Terra/Flash-class) |
 | Hard | Architecture, runtime ownership, security, permissions, context/memory semantics, migration, cross-cutting interfaces | Main high-reasoning model |
 
 Escalate a task when investigation reveals a broader interface or product decision.
 Do not let a worker quietly expand scope.
+
+Do not use Jules. The coordinator chooses the worker model, creates and removes its
+worktree, reviews its result, and integrates it. Masih only decides product behavior.
 
 ## Worktree Workflow
 

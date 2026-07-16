@@ -67,13 +67,15 @@ prototype as the active runtime.
 Primary source is the current shallow clone at
 `/home/masih/Desktop/f/p/others/openclaw-upstream`. The older May 26 source archive is
 `/home/masih/Desktop/f/p/others/openclaw-main`.
+The primary clone was refreshed from the official repository on 2026-07-16 at
+`dd58667b` (source version `2026.7.2`).
 Read implementation and tests, not only explanatory documents. The main source areas
 are:
 
-- live context pruning: `src/agents/pi-hooks/context-pruning/`;
+- live context pruning: `src/agents/agent-hooks/context-pruning/`;
 - pre-compaction memory flush: `src/auto-reply/reply/memory-flush.ts` and
   `agent-runner-memory.ts`;
-- guarded compaction: `src/agents/pi-hooks/compaction-safeguard.ts`;
+- guarded compaction: `src/agents/agent-hooks/compaction-safeguard.ts`;
 - search and retrieval: `extensions/memory-core/src/memory/`;
 - dated notes, long-term promotion, size budgets, and dreaming:
   `extensions/memory-core/src/flush-plan.ts`, `short-term-promotion.ts`,
