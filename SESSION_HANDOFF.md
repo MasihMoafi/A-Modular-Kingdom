@@ -2,89 +2,53 @@
 
 ## Goal
 
-Ship a clean first Elpis release whose distinctive foundations are internal RAG,
-provider-neutral context/session continuity, and durable memory.
+Ship Elpis `0.1.0` with internal RAG, portable context continuity, durable memory,
+OpenAI subscription authentication, OpenRouter support, and a clean release path.
 
 ## Current State
 
-- `main` and `origin/main` are synchronized at `6f8a92e`. GitHub Actions run
-  `29520985653` is verifying memory plus the first context slice.
-- The Gemini cleanup was useful: it restored the required RAG proxy helper and removed
-  obsolete `VectorIndex` code, unused notebook splitting functions, `/test-approval`,
-  and `/exit`. The Python import and compile checks pass.
-- The merged worker worktree and branch were removed. Only the main worktree remains;
-  the intentional `archive/pre-cleanup-20260716` branch preserves old history.
-- `TASKS.md` replaces the rejected JSON tracker and orders work as foundational,
-  important, and nice-to-have.
-- The Codex-derived TUI, permissions, tool rendering, sessions, compaction, mouse
-  selection, and ChatGPT authentication remain the execution foundation.
-- Repository cleanup and internal RAG are accepted as complete by Masih.
-- The Python MCP exposes only the read-only `query_knowledge_base` tool; `/rag` routing
-  and autonomous retrieval are retained behavior.
-- The interrupted external memory task made no local project change. The current local
-  implementation adds distinct recall-context tracking and a 3-recall/2-context gate
-  before new short-term evidence may enter durable `MEMORY.md`.
-- Important correction: `codex-rs/memories/` already provides an enabled-by-default
-  Rust pipeline for rollout extraction, consolidation, retrieval, citations, and local
-  memory artifacts. The first OpenClaw-derived promotion behavior is remotely compiled
-  and accepted.
-- Implemented locally, pending remote verification: Elpis memory artifacts default to
-  `~/.elpis/memories`, its memory database defaults to `~/.elpis/state`, Codex data is
-  preserved on reset, and exact memory search applies age decay and diversity ranking.
-- Semantic memory fallback reuses the existing Elpis RAG tool for discovery and requires
-  an exact memory-file read before use or citation.
-- Local commit `b1157c9` gives `MEMORY.md` a 30,000-character hard limit and the
-  always-loaded summary a 10,000-character hard limit. The consolidation prompt must
-  prune before crossing them, and validation rejects oversized output.
-- Memory is reviewable as ordinary files under `~/.elpis/memories`; granular file edits
-  remove stale entries. The existing confirmed reset-all action clears Elpis memory and
-  preserves Codex data.
-- Elpis now mirrors user- or agent-created goals into workspace `GOAL.md` and writes a
-  compact `ES.md` after each completed turn. Both live under
-  `~/.elpis/context/workspaces/<workspace-key>/` and remain pending remote verification.
-- First-release provider scope is OpenAI subscription plus OpenRouter. Additional
-  providers are important later; `/auto` is a nice-to-have.
+- Canonical work is on `main`; the old prototype remains only under
+  `archive/pre-cleanup-20260716`.
+- Repository cleanup and the one-tool internal RAG path are accepted complete.
+- Durable memory is Elpis-owned under `~/.elpis`, bounded, age-aware, diversity-ranked,
+  recall-tracked, reviewable, and protected from one-off promotion.
+- Elpis writes portable workspace `GOAL.md` and compact per-turn `ES.md` checkpoints.
+  Fresh threads admit them automatically; exact resume keeps the native thread.
+- Compaction stops if the portable continuity files cannot be safely synced first.
+- `/status` reports admitted rules, goal, checkpoint, and memory summary with source,
+  size, lifetime, and reason.
+- OpenAI subscription remains the default authentication path. OpenRouter is a built-in,
+  separately keyed provider selected with `--provider openrouter`.
+- The binary is versioned `0.1.0`. Tagged builds publish a checksummed Linux x86_64
+  release, and `scripts/install-elpis.sh` verifies and installs it atomically.
+- The public README now reflects the current product instead of the obsolete prototype.
 
 ## Verification
 
-- `.venv/bin/python -m compileall -q src`: passed.
-- `PYTHONPATH=src .venv/bin/python` import of `rag.qdrant_backend`: passed.
-- `.venv/bin/python -m pytest -q tests/test_rag_mcp_host.py`: passed.
-- MCP initialize and `tools/list`: passed with exactly one read-only RAG tool.
-- Direct backend explicit-path RAG query: passed in 8.6 seconds with correct sourced
-  context/session results.
-- Direct backend workspace RAG query: passed in 8.5 seconds with sourced project results.
-- `git diff --check`: passed.
+- Local static checks passed: direct pinned Rust formatting, `git diff --check`, shell
+  syntax, and workflow YAML parsing.
 - No local Cargo or Rust compilation was run.
-- Recall tracking, promotion metadata, focused TUI/RAG tests, and the Elpis build passed
-  in GitHub Actions run `29517070995`.
-- Run `29519879166` exposed and confirmed a memory-root clone type error; `5abe0e0`
-  fixes it. Run `29520736607` then failed only formatting; `6f8a92e` applies the pinned
-  formatter and adds `ES.md`. Replacement run `29520985653` is in progress.
-
-## Recent Changes
-
-- `5b92ae1` replaces `FEATURES.json` with `TASKS.md` and truthful release tiers.
-- `6d60288` advertises RAG as read-only; `54623f6` records backend acceptance.
-- `fa94cd1` adds distinct recall tracking and the durable promotion gate.
-- `c4d1634` moves memory artifacts/state under Elpis and adds ranked retrieval.
-- `472d5c1` applies the remote formatter's exact layout and is pushed.
-- `b1157c9` adds hard memory artifact limits.
-- `5abe0e0` fixes memory-root compilation and adds portable workspace `GOAL.md`.
-- `6f8a92e` adds compact per-turn `ES.md` checkpoints.
+- GitHub Actions run `29523016397` is the authoritative remote build and focused test run
+  for commit `ff86755`; record its final result before claiming acceptance.
 
 ## Next Action
 
-After run `29520985653` passes, record verification and admit `GOAL.md` plus `ES.md` into
-fresh/lean turns. Then expose admitted sources and sizes through the existing status UI.
+When run `29523016397` passes, download and install its binary artifact. Verify locally:
 
-Do not add dream narratives, cron scheduling, or an MCP memory adapter. Decay and MMR
-belong in the retrieval layer, not in the consolidation scheduler.
+1. `elpis --version` reports `0.1.0` and the amber Elpis interface launches.
+2. `/status` shows the admitted context files and reasons.
+3. Exact resume retains a task; a fresh thread continues leanly from `GOAL.md`/`ES.md`.
+4. A related new session recalls a taught fact with provenance; an unrelated session does
+   not receive it; review and reset remain available.
+5. OpenRouter starts with its own key and does not request ChatGPT login.
+
+After those checks, update `TASKS.md`, tag `v0.1.0`, and let the verified release workflow
+publish the first binary. Do not add `/auto`, dreaming, extra providers, dictation, or
+Codex pruning before this acceptance boundary.
 
 ## Boundaries
 
-- Preserve Codex/ChatGPT login as authentication only; do not delegate the Elpis runtime
-  to Codex.
-- Do not claim planned features are implemented.
+- Codex/ChatGPT login is authentication-only; Elpis owns context, memory, policy, and
+  provider choice.
 - Do not run Cargo locally.
-- Do not start subagents unless Masih sanctions a specific task.
+- Do not start subagents without Masih approving a specific bounded task.
