@@ -41,15 +41,12 @@ is the current-state record.
 
 ## The working model
 
-```text
-exact workspace evidence
-          |
-          v
-compact admitted context -----> terminal agent
-          |                           |
-          v                           v
-bounded local memory <--------- verified work
-```
+Elpis projects a small, reasoned working set from exact on-disk evidence, then writes verified
+outcomes back to durable state.
+
+<p align="center">
+  <img src="docs/assets/elpis-context-loop.svg" alt="Elpis selects exact evidence into a compact working set, verifies work, writes results back, and recalls bounded memory only when relevant." width="100%">
+</p>
 
 Elpis separates four things that are usually mixed together:
 
