@@ -7,7 +7,7 @@ provider-neutral context/session continuity, and durable memory.
 
 ## Current State
 
-- `main` is five commits ahead of `origin/main` at `fceb981`; nothing has been pushed.
+- `main` is nine commits ahead of `origin/main` at `fa94cd1`; nothing has been pushed.
 - The Gemini cleanup was useful: it restored the required RAG proxy helper and removed
   obsolete `VectorIndex` code, unused notebook splitting functions, `/test-approval`,
   and `/exit`. The Python import and compile checks pass.
@@ -25,7 +25,8 @@ provider-neutral context/session continuity, and durable memory.
   before new short-term evidence may enter durable `MEMORY.md`.
 - Important correction: `codex-rs/memories/` already provides an enabled-by-default
   Rust pipeline for rollout extraction, consolidation, retrieval, citations, and local
-  memory artifacts. Elpis-specific OpenClaw behavior has not been integrated or tested.
+  memory artifacts. The first OpenClaw-derived promotion behavior is integrated locally
+  but not remotely compiled or accepted.
 - First-release provider scope is OpenAI subscription plus OpenRouter. Additional
   providers are important later; `/auto` is a nice-to-have.
 
@@ -43,12 +44,12 @@ provider-neutral context/session continuity, and durable memory.
 - Rust memory changes have only static review and `git diff --check`; remote compilation
   and focused tests remain required.
 
-## Current Changes
+## Recent Changes
 
-- Replaced `FEATURES.json` with `TASKS.md`.
-- Updated agent routing and requirement documents to use the truthful release tiers.
-- These documentation changes are not yet committed.
-- The memory implementation is not committed or pushed.
+- `5b92ae1` replaces `FEATURES.json` with `TASKS.md` and truthful release tiers.
+- `6d60288` advertises RAG as read-only; `54623f6` records backend acceptance.
+- `fa94cd1` adds distinct recall tracking and the durable promotion gate.
+- The worktree is clean; none of these local commits have been pushed.
 
 ## Next Action
 
