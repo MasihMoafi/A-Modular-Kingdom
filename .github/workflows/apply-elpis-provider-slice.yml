@@ -1,24 +1,27 @@
 name: Apply Elpis provider slice
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/elpis-provider-entrypoints
-    paths:
-      - .github/workflows/apply-elpis-provider-slice.yml
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'agent/elpis-provider-entrypoints' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - name: Checkout branch
+      - name: Checkout proposed branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
+          ref: agent/elpis-provider-entrypoints
           fetch-depth: 0
 
       - name: Install Linux build dependencies
