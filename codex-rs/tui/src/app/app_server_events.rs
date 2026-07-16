@@ -65,7 +65,7 @@ impl App {
         app_server_client: &AppServerSession,
         notification: ServerNotification,
     ) {
-        self.mirror_elpis_goal_notification(&notification).await;
+        self.mirror_elpis_context_notification(&notification).await;
         match &notification {
             ServerNotification::ServerRequestResolved(notification) => {
                 if let Some(request) = self
@@ -192,14 +192,40 @@ impl App {
             .handle_server_notification(notification, /*replay_kind*/ None);
     }
 
-    async fn mirror_elpis_goal_notification(&mut self, notification: &ServerNotification) {
+    async fn mirror_elpis_context_notification(&mut self, notification: &ServerNotification) {
+        if let ServerNotification::TurnCompleted(notification) = notification {
+            let cwd = match ThreadId::from_string(&notification.thread_id) {
+                Ok(thread_id) => self
+                    .thread_cwd(thread_id)
+                    .await
+                    .unwrap_or_else(|| self.config.cwd.clone()),
+                Err(_) => self.config.cwd.clone(),
+            };
+            let result = crate::elpis_context::write_session_checkpoint(
+                self.config
+                    .memories
+                    .root
+                    .as_ref()
+                    .map(|root| root.as_path()),
+                cwd.as_path(),
+                &notification.thread_id,
+                &notification.turn,
+            )
+            .await;
+            if let Err(err) = result {
+                tracing::warn!(error = %err, "failed to save Elpis session checkpoint");
+                self.chat_widget.add_error_message(format!(
+                    "Turn completed, but Elpis could not save ES.md: {err}"
+                ));
+            }
+            return;
+        }
+
         let (thread_id, goal) = match notification {
             ServerNotification::ThreadGoalUpdated(notification) => {
                 (&notification.thread_id, Some(&notification.goal))
             }
-            ServerNotification::ThreadGoalCleared(notification) => {
-                (&notification.thread_id, None)
-            }
+            ServerNotification::ThreadGoalCleared(notification) => (&notification.thread_id, None),
             _ => return,
         };
         let cwd = match ThreadId::from_string(thread_id) {
