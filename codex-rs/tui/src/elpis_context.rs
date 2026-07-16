@@ -152,17 +152,19 @@ pub(crate) async fn write_session_checkpoint(
             .unwrap_or("No final agent result was recorded."),
     );
     content.push_str("\n\n## Changed Files\n\n");
-    content.push_str(if changed_files.is_empty() {
-        "- None recorded"
+    let changed_files = if changed_files.is_empty() {
+        "- None recorded".to_string()
     } else {
-        &changed_files.join("\n")
-    });
+        changed_files.join("\n")
+    };
+    content.push_str(&changed_files);
     content.push_str("\n\n## Commands\n\n");
-    content.push_str(if commands.is_empty() {
-        "- None recorded"
+    let commands = if commands.is_empty() {
+        "- None recorded".to_string()
     } else {
-        &commands.join("\n")
-    });
+        commands.join("\n")
+    };
+    content.push_str(&commands);
     content.push_str("\n\n## Exact Evidence\n\n- Full turn remains in the provider transcript.\n");
 
     let checkpoint_path = workspace_dir.join(SESSION_CHECKPOINT_FILE);
@@ -186,7 +188,7 @@ fn goal_path(memories_root: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
 }
 
 fn workspace_dir(memories_root: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
-    codex_core::elpis_context::workspace_context_dir(memories_root, cwd)
+    crate::legacy_core::elpis_context::workspace_context_dir(memories_root, cwd)
 }
 
 fn truncate_chars(value: &str, max_chars: usize) -> String {

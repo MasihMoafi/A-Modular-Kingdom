@@ -112,7 +112,7 @@ struct StatusHistoryCell {
     directory: PathBuf,
     permissions: String,
     agents_summary: Arc<RwLock<String>>,
-    continuity_sources: Vec<codex_core::elpis_context::ContinuitySource>,
+    continuity_sources: Vec<crate::legacy_core::elpis_context::ContinuitySource>,
     collaboration_mode: Option<String>,
     model_provider: Option<String>,
     remote_connection: Option<RemoteConnectionStatus>,
@@ -354,7 +354,7 @@ impl StatusHistoryCell {
             refreshing_rate_limits,
         }));
         let agents_summary = Arc::new(RwLock::new(agents_summary));
-        let mut continuity_sources = codex_core::elpis_context::continuity_sources(
+        let mut continuity_sources = crate::legacy_core::elpis_context::continuity_sources(
             config.memories.root.as_ref().map(|root| root.as_path()),
             config.cwd.as_path(),
         );
