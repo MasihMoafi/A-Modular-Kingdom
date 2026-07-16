@@ -51,12 +51,14 @@ pub async fn reset_memory_workspace_baseline(root: &Path) -> anyhow::Result<()> 
 /// Verifies that a completed consolidation run left the required memory artifacts in place.
 pub async fn validate_consolidation_artifacts(root: &Path) -> anyhow::Result<()> {
     let memory_path = root.join("MEMORY.md");
-    let memory = tokio::fs::read_to_string(&memory_path).await.with_context(|| {
-        format!(
-            "read consolidated memory artifact {}",
-            memory_path.display()
-        )
-    })?;
+    let memory = tokio::fs::read_to_string(&memory_path)
+        .await
+        .with_context(|| {
+            format!(
+                "read consolidated memory artifact {}",
+                memory_path.display()
+            )
+        })?;
     anyhow::ensure!(
         memory.chars().count() <= MAX_DURABLE_MEMORY_CHARS,
         "consolidated memory artifact exceeds {MAX_DURABLE_MEMORY_CHARS} characters: {}",
