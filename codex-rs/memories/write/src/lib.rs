@@ -113,8 +113,13 @@ mod workspace_diff {
     pub(super) const MAX_BYTES: usize = 4 * 1024 * 1024;
 }
 
-pub fn memory_root(codex_home: &AbsolutePathBuf) -> AbsolutePathBuf {
-    codex_home.join("memories")
+pub fn memory_root(
+    memory_root: Option<&AbsolutePathBuf>,
+    codex_home: &AbsolutePathBuf,
+) -> AbsolutePathBuf {
+    memory_root
+        .clone()
+        .unwrap_or_else(|| codex_home.join("memories"))
 }
 
 pub fn rollout_summaries_dir(root: &Path) -> PathBuf {

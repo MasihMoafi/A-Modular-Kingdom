@@ -1,14 +1,7 @@
 use std::path::Path;
 
-pub async fn clear_memory_roots_contents(codex_home: &Path) -> std::io::Result<()> {
-    for memory_root in [
-        codex_home.join("memories"),
-        codex_home.join("memories_extensions"),
-    ] {
-        clear_memory_root_contents(memory_root.as_path()).await?;
-    }
-
-    Ok(())
+pub async fn clear_memory_roots_contents(memory_root: &Path) -> std::io::Result<()> {
+    clear_memory_root_contents(memory_root).await
 }
 
 pub(crate) async fn clear_memory_root_contents(memory_root: &Path) -> std::io::Result<()> {

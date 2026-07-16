@@ -1543,6 +1543,14 @@
           "format": "int64",
           "type": "integer"
         },
+        "root": {
+          "description": "Directory containing durable memory artifacts. When omitted, memory remains under `CODEX_HOME`.",
+          "type": "string"
+        },
+        "state_root": {
+          "description": "Directory containing the durable memory SQLite database. When omitted, the database remains under `CODEX_SQLITE_HOME`.",
+          "type": "string"
+        },
         "use_memories": {
           "description": "When `false`, skip injecting memory usage instructions into developer prompts.",
           "type": "boolean"

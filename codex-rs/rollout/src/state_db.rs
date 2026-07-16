@@ -41,10 +41,12 @@ const STARTUP_BACKFILL_WAIT_TIMEOUT: Duration = Duration::from_secs(2);
 /// runtime, applies rollout metadata backfills as needed, and returns the
 /// initialized handle.
 pub async fn init(config: &impl RolloutConfigView) -> Option<StateDbHandle> {
+    let memories_state_root = config.memories_state_root().to_path_buf();
     let config = RolloutConfig::from_view(config);
     match try_init_with_roots(
         config.codex_home,
         config.sqlite_home,
+        memories_state_root,
         config.model_provider_id,
     )
     .await
@@ -62,10 +64,12 @@ pub async fn init(config: &impl RolloutConfigView) -> Option<StateDbHandle> {
 /// Prefer [`init`] unless the caller needs to surface the exact failure after
 /// tracing or UI setup has completed.
 pub async fn try_init(config: &impl RolloutConfigView) -> anyhow::Result<StateDbHandle> {
+    let memories_state_root = config.memories_state_root().to_path_buf();
     let config = RolloutConfig::from_view(config);
     try_init_with_roots(
         config.codex_home,
         config.sqlite_home,
+        memories_state_root,
         config.model_provider_id,
     )
     .await
@@ -74,11 +78,13 @@ pub async fn try_init(config: &impl RolloutConfigView) -> anyhow::Result<StateDb
 async fn try_init_with_roots(
     codex_home: PathBuf,
     sqlite_home: PathBuf,
+    memories_state_root: PathBuf,
     default_model_provider_id: String,
 ) -> anyhow::Result<StateDbHandle> {
     try_init_with_roots_inner(
         codex_home,
         sqlite_home,
+        memories_state_root,
         default_model_provider_id,
         /*backfill_lease_seconds*/ None,
     )
@@ -89,12 +95,14 @@ async fn try_init_with_roots(
 async fn try_init_with_roots_and_backfill_lease(
     codex_home: PathBuf,
     sqlite_home: PathBuf,
+    memories_state_root: PathBuf,
     default_model_provider_id: String,
     backfill_lease_seconds: i64,
 ) -> anyhow::Result<StateDbHandle> {
     try_init_with_roots_inner(
         codex_home,
         sqlite_home,
+        memories_state_root,
         default_model_provider_id,
         Some(backfill_lease_seconds),
     )
@@ -104,18 +112,22 @@ async fn try_init_with_roots_and_backfill_lease(
 async fn try_init_with_roots_inner(
     codex_home: PathBuf,
     sqlite_home: PathBuf,
+    memories_state_root: PathBuf,
     default_model_provider_id: String,
     backfill_lease_seconds: Option<i64>,
 ) -> anyhow::Result<StateDbHandle> {
-    let runtime =
-        codex_state::StateRuntime::init(sqlite_home.clone(), default_model_provider_id.clone())
-            .await
-            .with_context(|| {
-                format!(
-                    "failed to initialize state runtime at {}",
-                    sqlite_home.display()
-                )
-            })?;
+    let runtime = codex_state::StateRuntime::init_with_memories_state_root(
+        sqlite_home.clone(),
+        memories_state_root,
+        default_model_provider_id.clone(),
+    )
+    .await
+    .with_context(|| {
+        format!(
+            "failed to initialize state runtime at {}",
+            sqlite_home.display()
+        )
+    })?;
     let backfill_gate_started = Instant::now();
     let backfill_gate_result = wait_for_backfill_gate(
         runtime.as_ref(),
@@ -224,8 +236,9 @@ pub async fn get_state_db(config: &impl RolloutConfigView) -> Option<StateDbHand
         );
         return None;
     }
-    let runtime = match codex_state::StateRuntime::init(
+    let runtime = match codex_state::StateRuntime::init_with_memories_state_root(
         config.sqlite_home().to_path_buf(),
+        config.memories_state_root().to_path_buf(),
         config.model_provider_id().to_string(),
     )
     .await

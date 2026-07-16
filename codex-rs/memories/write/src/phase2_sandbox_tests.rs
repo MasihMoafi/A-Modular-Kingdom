@@ -23,7 +23,7 @@ async fn consolidation_uses_canonical_parent_enforcement() -> anyhow::Result<()>
         Some(test.thread_manager.auth_manager()),
     );
 
-    let root = crate::memory_root(&test.config.codex_home);
+    let root = crate::memory_root(test.config.memories.root.as_ref(), &test.config.codex_home);
     let managed_worker_policy = SandboxPolicy::WorkspaceWrite {
         writable_roots: vec![root.clone()],
         network_access: false,

@@ -34,7 +34,7 @@ impl MemoriesExtension {
 pub(crate) struct MemoriesExtensionConfig {
     pub(crate) enabled: bool,
     pub(crate) dedicated_tools: bool,
-    pub(crate) codex_home: AbsolutePathBuf,
+    pub(crate) memory_root: AbsolutePathBuf,
 }
 
 impl MemoriesExtensionConfig {
@@ -42,7 +42,11 @@ impl MemoriesExtensionConfig {
         Self {
             enabled: config.features.enabled(Feature::MemoryTool) && config.memories.use_memories,
             dedicated_tools: config.memories.dedicated_tools,
-            codex_home: config.codex_home.clone(),
+            memory_root: config
+                .memories
+                .root
+                .clone()
+                .unwrap_or_else(|| config.codex_home.join("memories")),
         }
     }
 }
@@ -61,7 +65,7 @@ impl ContextContributor for MemoriesExtension {
                 return Vec::new();
             }
 
-            build_memory_tool_developer_instructions(&config.codex_home)
+            build_memory_tool_developer_instructions(&config.memory_root)
                 .await
                 .map(PromptFragment::developer_policy)
                 .into_iter()
@@ -109,7 +113,7 @@ impl ToolContributor for MemoriesExtension {
         }
 
         tools::memory_tools(
-            LocalMemoriesBackend::from_codex_home(&config.codex_home),
+            LocalMemoriesBackend::from_memory_root(config.memory_root.to_path_buf()),
             self.metrics_client.clone(),
         )
     }

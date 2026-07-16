@@ -183,7 +183,24 @@ impl StateRuntime {
     /// lock contention with the rest of the state store.
     pub async fn init(codex_home: PathBuf, default_provider: String) -> anyhow::Result<Arc<Self>> {
         Self::init_inner(
+            codex_home.clone(),
             codex_home,
+            default_provider,
+            /*telemetry_override*/ None,
+        )
+        .await
+    }
+
+    /// Initialize the runtime with durable memory state stored separately from
+    /// Codex-owned SQLite state.
+    pub async fn init_with_memories_state_root(
+        sqlite_home: PathBuf,
+        memories_state_root: PathBuf,
+        default_provider: String,
+    ) -> anyhow::Result<Arc<Self>> {
+        Self::init_inner(
+            sqlite_home,
+            memories_state_root,
             default_provider,
             /*telemetry_override*/ None,
         )
@@ -196,23 +213,31 @@ impl StateRuntime {
         default_provider: String,
         telemetry_override: &dyn DbTelemetry,
     ) -> anyhow::Result<Arc<Self>> {
-        Self::init_inner(codex_home, default_provider, Some(telemetry_override)).await
+        Self::init_inner(
+            codex_home.clone(),
+            codex_home,
+            default_provider,
+            Some(telemetry_override),
+        )
+        .await
     }
 
     async fn init_inner(
-        codex_home: PathBuf,
+        sqlite_home: PathBuf,
+        memories_state_root: PathBuf,
         default_provider: String,
         telemetry_override: Option<&dyn DbTelemetry>,
     ) -> anyhow::Result<Arc<Self>> {
-        tokio::fs::create_dir_all(&codex_home).await?;
+        tokio::fs::create_dir_all(&sqlite_home).await?;
+        tokio::fs::create_dir_all(&memories_state_root).await?;
         let state_migrator = runtime_state_migrator();
         let logs_migrator = runtime_logs_migrator();
         let goals_migrator = runtime_goals_migrator();
         let memories_migrator = runtime_memories_migrator();
-        let state_path = STATE_DB.path(codex_home.as_path());
-        let logs_path = LOGS_DB.path(codex_home.as_path());
-        let goals_path = GOALS_DB.path(codex_home.as_path());
-        let memories_path = MEMORIES_DB.path(codex_home.as_path());
+        let state_path = STATE_DB.path(sqlite_home.as_path());
+        let logs_path = LOGS_DB.path(sqlite_home.as_path());
+        let goals_path = GOALS_DB.path(sqlite_home.as_path());
+        let memories_path = MEMORIES_DB.path(memories_state_root.as_path());
         let pool = match open_state_sqlite(&state_path, &state_migrator, telemetry_override).await {
             Ok(db) => Arc::new(db),
             Err(err) => {
@@ -310,7 +335,7 @@ impl StateRuntime {
             memories: MemoryStore::new(Arc::clone(&memories_pool), Arc::clone(&pool)),
             pool,
             logs_pool,
-            codex_home,
+            codex_home: sqlite_home,
             default_provider,
             thread_updated_at_millis: Arc::new(AtomicI64::new(thread_updated_at_millis)),
             thread_recency_at_millis: Arc::new(AtomicI64::new(thread_recency_at_millis)),
@@ -345,8 +370,8 @@ impl StateRuntime {
         self.pool.close().await;
     }
 
-    pub async fn clear_memory_data_in_sqlite_home(sqlite_home: &Path) -> anyhow::Result<bool> {
-        let memories_path = MEMORIES_DB.path(sqlite_home);
+    pub async fn clear_memory_data_in_state_root(state_root: &Path) -> anyhow::Result<bool> {
+        let memories_path = MEMORIES_DB.path(state_root);
         if !tokio::fs::try_exists(&memories_path).await? {
             return Ok(false);
         }
@@ -570,10 +595,15 @@ pub async fn sqlite_integrity_check(path: &Path) -> anyhow::Result<Vec<String>> 
 #[cfg(test)]
 mod tests {
     use super::StateRuntime;
+    use super::goals_db_path;
+    use super::logs_db_path;
+    use super::memories_db_path;
+    use super::open_thread_history_db;
     use super::open_state_sqlite;
     use super::runtime_state_migrator;
     use super::sqlite_integrity_check;
     use super::state_db_path;
+    use super::thread_history_db_path;
     use super::test_support::unique_temp_dir;
     use crate::DB_INIT_METRIC;
     use crate::DbTelemetry;
@@ -767,5 +797,36 @@ mod tests {
 
         runtime.close().await;
         let _ = tokio::fs::remove_dir_all(codex_home).await;
+    }
+
+    #[tokio::test]
+    async fn init_with_memories_state_root_separates_only_memories_db() {
+        let sqlite_home = unique_temp_dir();
+        let memories_state_root = unique_temp_dir();
+
+        let runtime = StateRuntime::init_with_memories_state_root(
+            sqlite_home.clone(),
+            memories_state_root.clone(),
+            "test-provider".to_string(),
+        )
+        .await
+        .expect("state runtime should initialize");
+
+        assert!(state_db_path(&sqlite_home).exists());
+        assert!(logs_db_path(&sqlite_home).exists());
+        assert!(goals_db_path(&sqlite_home).exists());
+        assert!(memories_db_path(&memories_state_root).exists());
+        assert!(!memories_db_path(&sqlite_home).exists());
+
+        let thread_history = open_thread_history_db(&sqlite_home)
+            .await
+            .expect("thread history db should initialize");
+        assert!(thread_history_db_path(&sqlite_home).exists());
+        assert!(!thread_history_db_path(&memories_state_root).exists());
+        thread_history.close().await;
+
+        runtime.close().await;
+        let _ = tokio::fs::remove_dir_all(sqlite_home).await;
+        let _ = tokio::fs::remove_dir_all(memories_state_root).await;
     }
 }

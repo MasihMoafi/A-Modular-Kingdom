@@ -61,6 +61,24 @@ fn memories_config_clamps_count_limits_to_nonzero_values() {
 }
 
 #[test]
+fn memories_config_preserves_configured_root() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let root = AbsolutePathBuf::from_absolute_path(root.path()).expect("absolute root");
+    let state_root = tempfile::tempdir().expect("tempdir");
+    let state_root =
+        AbsolutePathBuf::from_absolute_path(state_root.path()).expect("absolute state root");
+
+    let config = MemoriesConfig::from(MemoriesToml {
+        root: Some(root.clone()),
+        state_root: Some(state_root.clone()),
+        ..Default::default()
+    });
+
+    assert_eq!(config.root, Some(root));
+    assert_eq!(config.state_root, Some(state_root));
+}
+
+#[test]
 fn memories_config_clamps_rate_limit_remaining_threshold() {
     let config = MemoriesConfig::from(MemoriesToml {
         min_rate_limit_remaining_percent: Some(101),

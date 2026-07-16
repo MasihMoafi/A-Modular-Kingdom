@@ -1630,12 +1630,18 @@ impl ThreadRequestProcessor {
                 internal_error(format!("failed to clear memory rows in memories db: {err}"))
             })?;
 
-        clear_memory_roots_contents(&self.config.codex_home)
+        let memories_root = self
+            .config
+            .memories
+            .root
+            .clone()
+            .unwrap_or_else(|| self.config.codex_home.join("memories"));
+        clear_memory_roots_contents(&memories_root)
             .await
             .map_err(|err| {
                 internal_error(format!(
-                    "failed to clear memory directories under {}: {err}",
-                    self.config.codex_home.display()
+                    "failed to clear memory directory {}: {err}",
+                    memories_root.display()
                 ))
             })?;
 

@@ -10,6 +10,7 @@ use codex_protocol::protocol::SessionSource;
 use codex_state::Stage1JobClaimOutcome;
 use codex_state::StateRuntime;
 use codex_state::ThreadMetadataBuilder;
+use codex_state::memories_db_path;
 use pretty_assertions::assert_eq;
 use std::path::Path;
 use std::sync::Arc;
@@ -22,10 +23,12 @@ const DEFAULT_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 #[tokio::test]
 async fn memory_reset_clears_memory_files_and_rows_preserves_threads() -> Result<()> {
     let codex_home = TempDir::new()?;
-    create_config_toml(codex_home.path())?;
-    let state_db = init_state_db(codex_home.path()).await?;
+    let elpis_home = TempDir::new()?;
+    let memory_root = elpis_home.path().join("memories");
+    let memory_state_root = elpis_home.path().join("state");
+    create_config_toml(codex_home.path(), &memory_root, &memory_state_root)?;
+    let state_db = init_state_db(codex_home.path(), &memory_state_root).await?;
 
-    let memory_root = codex_home.path().join("memories");
     tokio::fs::create_dir_all(memory_root.join("rollout_summaries")).await?;
     tokio::fs::write(memory_root.join("MEMORY.md"), "stale memory\n").await?;
     tokio::fs::write(
@@ -33,6 +36,9 @@ async fn memory_reset_clears_memory_files_and_rows_preserves_threads() -> Result
         "stale rollout summary\n",
     )
     .await?;
+    let codex_memory = codex_home.path().join("memories/MEMORY.md");
+    tokio::fs::create_dir_all(codex_memory.parent().expect("memory parent")).await?;
+    tokio::fs::write(&codex_memory, "preserve Codex memory\n").await?;
 
     let thread_id = seed_stage1_output(&state_db, codex_home.path()).await?;
 
@@ -68,6 +74,8 @@ async fn memory_reset_clears_memory_files_and_rows_preserves_threads() -> Result
         remaining_entries.next_entry().await?.is_none(),
         "memory root should be empty after reset"
     );
+    assert!(tokio::fs::try_exists(&codex_memory).await?);
+    assert!(!tokio::fs::try_exists(memories_db_path(codex_home.path())).await?);
 
     Ok(())
 }
@@ -122,19 +130,32 @@ async fn seed_stage1_output(state_db: &Arc<StateRuntime>, codex_home: &Path) -> 
     Ok(thread_id)
 }
 
-async fn init_state_db(codex_home: &Path) -> Result<Arc<StateRuntime>> {
-    let state_db = StateRuntime::init(codex_home.to_path_buf(), "mock_provider".into()).await?;
+async fn init_state_db(
+    codex_home: &Path,
+    memory_state_root: &Path,
+) -> Result<Arc<StateRuntime>> {
+    let state_db = StateRuntime::init_with_memories_state_root(
+        codex_home.to_path_buf(),
+        memory_state_root.to_path_buf(),
+        "mock_provider".into(),
+    )
+    .await?;
     state_db
         .mark_backfill_complete(/*last_watermark*/ None)
         .await?;
     Ok(state_db)
 }
 
-fn create_config_toml(codex_home: &Path) -> std::io::Result<()> {
+fn create_config_toml(
+    codex_home: &Path,
+    memory_root: &Path,
+    memory_state_root: &Path,
+) -> std::io::Result<()> {
     let config_toml = codex_home.join("config.toml");
     std::fs::write(
         config_toml,
-        r#"
+        format!(
+            r#"
 model = "mock-model"
 approval_policy = "never"
 sandbox_mode = "read-only"
@@ -144,6 +165,10 @@ suppress_unstable_features_warning = true
 [features]
 sqlite = true
 
+[memories]
+root = {memory_root:?}
+state_root = {memory_state_root:?}
+
 [model_providers.mock_provider]
 name = "Mock provider for test"
 base_url = "http://127.0.0.1:9/v1"
@@ -151,5 +176,8 @@ wire_api = "responses"
 request_max_retries = 0
 stream_max_retries = 0
 "#,
+            memory_root = memory_root.display().to_string(),
+            memory_state_root = memory_state_root.display().to_string(),
+        ),
     )
 }

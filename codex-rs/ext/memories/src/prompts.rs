@@ -25,10 +25,9 @@ fn parse_embedded_template(source: &'static str, template_name: &str) -> Templat
 /// Large `memory_summary.md` files are truncated at
 /// [MEMORY_TOOL_DEVELOPER_INSTRUCTIONS_SUMMARY_TOKEN_LIMIT].
 pub(crate) async fn build_memory_tool_developer_instructions(
-    codex_home: &AbsolutePathBuf,
+    memory_root: &AbsolutePathBuf,
 ) -> Option<String> {
-    let base_path = codex_home.join("memories");
-    let memory_summary_path = base_path.join("memory_summary.md");
+    let memory_summary_path = memory_root.join("memory_summary.md");
     let memory_summary = fs::read_to_string(&memory_summary_path)
         .await
         .ok()?
@@ -41,7 +40,7 @@ pub(crate) async fn build_memory_tool_developer_instructions(
     if memory_summary.is_empty() {
         return None;
     }
-    let base_path = base_path.display().to_string();
+    let base_path = memory_root.display().to_string();
     MEMORY_TOOL_DEVELOPER_INSTRUCTIONS_TEMPLATE
         .render([
             ("base_path", base_path.as_str()),

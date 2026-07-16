@@ -56,7 +56,7 @@ pub async fn run(
         // This should not happen.
         return;
     };
-    let root = memory_root(&config.codex_home);
+    let root = memory_root(config.memories.root.as_ref(), &config.codex_home);
     let max_raw_memories = config.memories.max_raw_memories_for_consolidation;
     let max_unused_days = config.memories.max_unused_days;
 
@@ -313,7 +313,7 @@ mod agent {
         parent_permission_profile: PermissionProfile,
         provider: &dyn ModelProvider,
     ) -> Option<Config> {
-        let root = memory_root(&config.codex_home);
+        let root = memory_root(config.memories.root.as_ref(), &config.codex_home);
         let mut agent_config = config.clone();
 
         agent_config.cwd = root.clone();

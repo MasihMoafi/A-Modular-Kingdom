@@ -98,15 +98,15 @@ Elpis's primary visual identity uses amber, between orange and yellow, not purpl
    - Verify direct workspace and path queries and autonomous use for broad discovery.
    - Mark retrieval read-only so Codex may schedule it beside exact reads or searches.
    - Require exact current-file evidence before code edits.
-3. **Implement the context and session engine**
-   - Full transcript on disk; small model-visible working set.
-   - Expiring tool output, compact records, a visible context list, checkpoints,
-     compaction, exact/lean continuation, fork, and rollback.
-4. **Implement the memory foundation**
+3. **Implement the memory foundation**
    - Reconcile the inherited Codex Rust memory pipeline with the selected OpenClaw
      behaviors before writing new machinery.
    - Provide curated long-term memory, dated notes, selective retrieval,
      pre-compaction flush, provenance, review, and deletion.
+4. **Implement the context and session engine**
+   - Full transcript on disk; small model-visible working set.
+   - Expiring tool output, compact records, a visible context list, checkpoints,
+     compaction, exact/lean continuation, fork, and rollback.
 5. **Verify the first-release provider boundary**
    - Support OpenAI subscription and OpenRouter for the first release.
    - Elpis owns context, memory, session policy, and provider choice.
@@ -127,19 +127,21 @@ Elpis's primary visual identity uses amber, between orange and yellow, not purpl
 | Context list and compact records | Specified in docs; not implemented. |
 | Compaction/checkpoints/lean continuation | Specified in docs; not implemented. |
 | Inherited Codex memory | A substantial Rust extraction, consolidation, retrieval, citation, and artifact pipeline is present and enabled by default; Elpis acceptance has not been run. |
-| OpenClaw-style memory | Not integrated. OpenClaw adds pruning, guarded compaction, dated append-only flushes, hybrid retrieval, and scored promotion that must be reconciled with the inherited Rust pipeline. |
+| OpenClaw-style memory | In progress. Recall counting and promotion are remotely verified. Elpis-owned storage, age-aware diverse retrieval, and semantic fallback are implemented locally pending remote verification; bounded storage, review, deletion, and acceptance remain. |
 | `/auto` model routing | Nice-to-have and not implemented. Product documents may describe the intended behavior but must not claim availability. |
 | Gemini/other runtimes | Experimental Gemini ACP work is preserved as a named historical tip inside `archive/pre-cleanup-20260716`; it is not merged into `main`. |
 
-## Proposed State Layout
+## Target State Layout
 
-This is a proposal, not yet approved:
+Memory uses the Elpis-owned roots below. Session and context paths remain target behavior
+until the context engine is implemented:
 
 - `REQUIREMENTS.md`: project requirements and unresolved product choices.
 - `~/.elpis/.../sessions/`: complete append-only event history.
 - `~/.elpis/.../checkpoints/`: goal, decisions, changes, verification, blocker, next action.
 - `~/.elpis/.../GOAL.md`: current persistent goal and acceptance criteria.
-- `~/.elpis/.../MEMORY.md`: compact, curated long-term memory.
+- `~/.elpis/memories/MEMORY.md`: compact, curated long-term memory.
+- `~/.elpis/state/memories_1.sqlite`: recall, promotion, and consolidation state.
 - `~/.elpis/.../memory/YYYY-MM-DD.md`: detailed working notes and session summaries,
   searched when relevant rather than always injected.
 - `~/.elpis/.../DREAMS.md`: optional later review surface for suggested promotions.
@@ -160,9 +162,9 @@ conversation or only after explicit user confirmation.
 
 ### D3. Automatic memory writes
 
-Recommended: automatically write detailed session notes and pre-compaction notes, but
-require stronger evidence or user review before promoting them into compact long-term
-memory. Decide how much automatic promotion is acceptable.
+Resolved: automatically write detailed session notes and pre-compaction notes. New
+material may enter compact long-term memory after at least three recalls across two
+distinct contexts. Memory remains reviewable and deletable by the user.
 
 ### D4. Default continuation
 

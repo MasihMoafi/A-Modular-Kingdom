@@ -7,7 +7,8 @@ provider-neutral context/session continuity, and durable memory.
 
 ## Current State
 
-- `main` is ten commits ahead of `origin/main` at `108793c`; nothing has been pushed.
+- `main` and `origin/main` are synchronized at `5a8b819`; the current memory ownership
+  and retrieval slice is uncommitted and awaiting remote verification.
 - The Gemini cleanup was useful: it restored the required RAG proxy helper and removed
   obsolete `VectorIndex` code, unused notebook splitting functions, `/test-approval`,
   and `/exit`. The Python import and compile checks pass.
@@ -25,8 +26,13 @@ provider-neutral context/session continuity, and durable memory.
   before new short-term evidence may enter durable `MEMORY.md`.
 - Important correction: `codex-rs/memories/` already provides an enabled-by-default
   Rust pipeline for rollout extraction, consolidation, retrieval, citations, and local
-  memory artifacts. The first OpenClaw-derived promotion behavior is integrated locally
-  but not remotely compiled or accepted.
+  memory artifacts. The first OpenClaw-derived promotion behavior is remotely compiled
+  and accepted.
+- Implemented locally, pending remote verification: Elpis memory artifacts default to
+  `~/.elpis/memories`, its memory database defaults to `~/.elpis/state`, Codex data is
+  preserved on reset, and exact memory search applies age decay and diversity ranking.
+- Semantic memory fallback reuses the existing Elpis RAG tool for discovery and requires
+  an exact memory-file read before use or citation.
 - First-release provider scope is OpenAI subscription plus OpenRouter. Additional
   providers are important later; `/auto` is a nice-to-have.
 
@@ -41,25 +47,23 @@ provider-neutral context/session continuity, and durable memory.
 - Direct backend workspace RAG query: passed in 8.5 seconds with sourced project results.
 - `git diff --check`: passed.
 - No local Cargo or Rust compilation was run.
-- Rust memory changes have only static review and `git diff --check`; remote compilation
-  and focused tests remain required.
+- Recall tracking, promotion metadata, focused TUI/RAG tests, and the Elpis build passed
+  in GitHub Actions run `29517070995`.
 
 ## Recent Changes
 
 - `5b92ae1` replaces `FEATURES.json` with `TASKS.md` and truthful release tiers.
 - `6d60288` advertises RAG as read-only; `54623f6` records backend acceptance.
 - `fa94cd1` adds distinct recall tracking and the durable promotion gate.
-- The worktree is clean; none of these local commits have been pushed.
+- Commits through `5a8b819` are pushed to `origin/main`; newer memory work is uncommitted.
 
 ## Next Action
 
-Remotely compile and run focused state/memory tests for the recall-promotion slice, then
-complete bounded storage, age-based fading, diverse retrieval, provenance, and memory
-review/deletion.
+Remotely verify Elpis-owned storage and ranked retrieval. Then add the selected size
+budget and memory review/deletion.
 
-Do not add dream narratives, cron scheduling, an MCP memory adapter, temporal decay, or
-MMR until the recall-promotion slice passes. Decay and MMR belong in the later retrieval
-layer, not in the consolidation scheduler.
+Do not add dream narratives, cron scheduling, or an MCP memory adapter. Decay and MMR
+belong in the retrieval layer, not in the consolidation scheduler.
 
 ## Boundaries
 

@@ -54,7 +54,7 @@ fn tools_are_not_contributed_when_disabled() {
     thread_store.insert(MemoriesExtensionConfig {
         enabled: false,
         dedicated_tools: true,
-        codex_home: test_path_buf("/tmp/codex-home").abs(),
+        memory_root: test_path_buf("/tmp/codex-home/memories").abs(),
     });
 
     assert!(
@@ -71,7 +71,7 @@ fn tools_are_not_contributed_when_dedicated_tools_disabled() {
     thread_store.insert(MemoriesExtensionConfig {
         enabled: true,
         dedicated_tools: false,
-        codex_home: test_path_buf("/tmp/codex-home").abs(),
+        memory_root: test_path_buf("/tmp/codex-home/memories").abs(),
     });
 
     assert!(
@@ -88,7 +88,7 @@ fn tools_are_contributed_when_enabled_with_dedicated_tools() {
     thread_store.insert(MemoriesExtensionConfig {
         enabled: true,
         dedicated_tools: true,
-        codex_home: test_path_buf("/tmp/codex-home").abs(),
+        memory_root: test_path_buf("/tmp/codex-home/memories").abs(),
     });
 
     let tool_names = extension
@@ -117,7 +117,7 @@ fn install_registers_dedicated_tool_contributor() {
     thread_store.insert(MemoriesExtensionConfig {
         enabled: true,
         dedicated_tools: true,
-        codex_home: test_path_buf("/tmp/codex-home").abs(),
+        memory_root: test_path_buf("/tmp/codex-home/memories").abs(),
     });
 
     let tool_names = registry
@@ -177,7 +177,7 @@ async fn prompt_contribution_uses_memory_summary_when_enabled() {
     thread_store.insert(MemoriesExtensionConfig {
         enabled: true,
         dedicated_tools: false,
-        codex_home: tempdir.path().abs(),
+        memory_root: memories_dir.abs(),
     });
 
     let fragments = extension
@@ -373,6 +373,13 @@ async fn search_tool_accepts_multiple_queries() {
             "matches": [
                 {
                     "path": "MEMORY.md",
+                    "match_line_number": 3,
+                    "content_start_line_number": 3,
+                    "content": "alpha needle",
+                    "matched_queries": ["alpha", "needle"]
+                },
+                {
+                    "path": "MEMORY.md",
                     "match_line_number": 1,
                     "content_start_line_number": 1,
                     "content": "alpha only",
@@ -384,13 +391,6 @@ async fn search_tool_accepts_multiple_queries() {
                     "content_start_line_number": 2,
                     "content": "needle only",
                     "matched_queries": ["needle"]
-                },
-                {
-                    "path": "MEMORY.md",
-                    "match_line_number": 3,
-                    "content_start_line_number": 3,
-                    "content": "alpha needle",
-                    "matched_queries": ["alpha", "needle"]
                 }
             ],
             "next_cursor": null,

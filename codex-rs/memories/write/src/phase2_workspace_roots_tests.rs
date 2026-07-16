@@ -25,7 +25,7 @@ async fn consolidation_rebinds_workspace_roots_to_memory_root() -> anyhow::Resul
     let agent_config =
         agent::get_config(&test.config, parent_permission_profile, provider.as_ref())
             .expect("agent config should be created");
-    let root = memory_root(&test.config.codex_home);
+    let root = memory_root(test.config.memories.root.as_ref(), &test.config.codex_home);
 
     assert_eq!(agent_config.cwd, root);
     assert_eq!(agent_config.workspace_roots, vec![root]);

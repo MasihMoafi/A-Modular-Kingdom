@@ -35,12 +35,13 @@ product, but must not claim unfinished behavior is available.
   pipeline for extraction, consolidation, retrieval, citations, and local artifacts.
 - Elpis has not yet adopted the selected OpenClaw behaviors or established an
   Elpis-owned provider-neutral memory contract.
-- Implemented locally, pending remote Rust verification: distinct recall-context
-  tracking and a promotion gate requiring three recalls across two contexts. Weak
-  one-off memories remain searchable as short-term evidence instead of entering
-  `MEMORY.md`.
-- Next: verify this slice remotely, then implement bounded long-term storage, age-based
-  fading, diverse retrieval, provenance, and a review/delete path.
+- Implemented and remotely verified: distinct recall-context tracking and a promotion
+  gate requiring three recalls across two contexts. Weak one-off memories remain
+  searchable as short-term evidence instead of entering `MEMORY.md`.
+- Implemented locally, pending remote verification: Elpis-owned artifact/database roots,
+  age-based fading, diverse exact retrieval, and semantic RAG fallback with exact-read
+  provenance.
+- Next: bounded long-term storage and a review/delete path.
 - Proof: teach a project fact, recall it in a related new session with provenance, omit
   it from an unrelated session, and allow review/deletion.
 
@@ -73,6 +74,5 @@ product, but must not claim unfinished behavior is available.
 
 ## Current Action
 
-Remotely verify F4's recall-promotion slice, then complete durable memory before starting
-context work. Do not add dream narratives, scheduling, or an MCP memory adapter to the
-first release.
+Complete durable memory before starting context work. Do not add dream narratives,
+scheduling, or an MCP memory adapter to the first release.

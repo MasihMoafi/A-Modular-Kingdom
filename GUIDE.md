@@ -259,6 +259,13 @@ modules are deleted; Codex owns those general agent capabilities. Future Elpis m
 and dictation work must be designed at the Elpis product layer, not restored inside the
 RAG MCP.
 
+### Memory ownership
+
+Elpis memory artifacts default to `~/.elpis/memories` and memory database state defaults
+to `~/.elpis/state`. Codex configuration, authentication, threads, logs, and goals remain
+separate. Resetting Elpis memory must not delete Codex memory or state. Unconfigured
+non-TUI consumers retain the inherited Codex-home fallback for compatibility.
+
 ### Product scope already decided
 
 - The active terminal interface is Codex's contained Rust TUI and already uses Ratatui.

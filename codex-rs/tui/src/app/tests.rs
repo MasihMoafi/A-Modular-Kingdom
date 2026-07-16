@@ -1776,14 +1776,16 @@ fn update_memory_settings_updates_current_thread_memory_mode() -> Result<()> {
 }
 
 #[tokio::test]
-async fn reset_memories_clears_local_memory_directories() -> Result<()> {
+async fn reset_memories_clears_configured_memory_directory() -> Result<()> {
     Box::pin(async {
         let (mut app, _app_event_rx, _op_rx) = Box::pin(make_test_app_with_channels()).await;
         let codex_home = tempdir()?;
         app.config.codex_home = codex_home.path().to_path_buf().abs();
         app.config.sqlite_home = codex_home.path().to_path_buf();
 
-        let memory_root = codex_home.path().join("memories");
+        let elpis_home = tempdir()?;
+        let memory_root = elpis_home.path().join("memories");
+        app.config.memories.root = Some(memory_root.clone().abs());
         let extensions_root = memory_root.join("extensions");
         std::fs::create_dir_all(memory_root.join("rollout_summaries"))?;
         std::fs::create_dir_all(&extensions_root)?;
@@ -1793,6 +1795,9 @@ async fn reset_memories_clears_local_memory_directories() -> Result<()> {
             "stale summary\n",
         )?;
         std::fs::write(extensions_root.join("stale.txt"), "stale extension\n")?;
+        let codex_memory = codex_home.path().join("memories/MEMORY.md");
+        std::fs::create_dir_all(codex_memory.parent().expect("memory parent"))?;
+        std::fs::write(&codex_memory, "preserve Codex memory\n")?;
 
         let mut app_server =
             Box::pin(crate::start_embedded_app_server_for_picker(&app.config)).await?;
@@ -1800,6 +1805,7 @@ async fn reset_memories_clears_local_memory_directories() -> Result<()> {
         Box::pin(app.reset_memories_with_app_server(&mut app_server)).await;
 
         assert_eq!(std::fs::read_dir(&memory_root)?.count(), 0);
+        assert!(codex_memory.exists(), "reset must not clear CODEX_HOME memories");
 
         app_server.shutdown().await?;
         Ok(())

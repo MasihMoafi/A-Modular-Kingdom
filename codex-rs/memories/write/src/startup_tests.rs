@@ -550,7 +550,7 @@ async fn run_memory_phase_two_model_request_test(
     .await;
 
     let (context, config) = memory_startup_context_with_provider(&test, provider).await;
-    let root = memory_root(&config.codex_home);
+    let root = memory_root(config.memories.root.as_ref(), &config.codex_home);
     tokio::fs::create_dir_all(&root).await?;
     seed_extension_instructions(&root).await?;
     seed_required_memory_artifacts(&root).await?;

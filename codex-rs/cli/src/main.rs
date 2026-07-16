@@ -2026,11 +2026,21 @@ async fn run_debug_clear_memories_command(
         .build()
         .await?;
 
-    let memories_path = memories_db_path(config.sqlite_home.as_path());
+    let memories_state_root = config
+        .memories
+        .state_root
+        .as_deref()
+        .unwrap_or(config.sqlite_home.as_path());
+    let memories_path = memories_db_path(memories_state_root);
     let cleared_memories_db =
-        StateRuntime::clear_memory_data_in_sqlite_home(config.sqlite_home.as_path()).await?;
+        StateRuntime::clear_memory_data_in_state_root(memories_state_root).await?;
 
-    clear_memory_roots_contents(&config.codex_home).await?;
+    let memories_root = config
+        .memories
+        .root
+        .clone()
+        .unwrap_or_else(|| config.codex_home.join("memories"));
+    clear_memory_roots_contents(&memories_root).await?;
 
     let mut message = if cleared_memories_db {
         format!("Cleared memory state from {}.", memories_path.display())
@@ -2039,7 +2049,7 @@ async fn run_debug_clear_memories_command(
     };
     message.push_str(&format!(
         " Cleared memory directories under {}.",
-        config.codex_home.display()
+        memories_root.display()
     ));
 
     println!("{message}");

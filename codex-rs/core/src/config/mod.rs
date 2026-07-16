@@ -3314,7 +3314,7 @@ impl Config {
             None => WindowsSandboxLevel::Disabled,
         };
         let memories_config: MemoriesConfig = cfg.memories.clone().unwrap_or_default().into();
-        let memories_root = memory_root(&codex_home);
+        let memories_root = memory_root(memories_config.root.as_ref(), &codex_home);
 
         let profiles_are_active = effective_permission_selection.profiles_are_active(
             default_permissions_override.as_deref(),

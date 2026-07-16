@@ -283,6 +283,12 @@ pub struct ToolSuggestConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 pub struct MemoriesToml {
+    /// Directory containing durable memory artifacts.
+    /// When omitted, memory remains under `CODEX_HOME`.
+    pub root: Option<AbsolutePathBuf>,
+    /// Directory containing the durable memory SQLite database.
+    /// When omitted, the database remains under `CODEX_SQLITE_HOME`.
+    pub state_root: Option<AbsolutePathBuf>,
     /// When `true`, external context sources mark the thread `memory_mode` as `"polluted"`.
     #[serde(alias = "no_memories_if_mcp_or_web_search")]
     pub disable_on_external_context: Option<bool>,
@@ -316,6 +322,8 @@ pub struct MemoriesToml {
 /// Effective memories settings after defaults are applied.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MemoriesConfig {
+    pub root: Option<AbsolutePathBuf>,
+    pub state_root: Option<AbsolutePathBuf>,
     pub disable_on_external_context: bool,
     pub generate_memories: bool,
     pub use_memories: bool,
@@ -333,6 +341,8 @@ pub struct MemoriesConfig {
 impl Default for MemoriesConfig {
     fn default() -> Self {
         Self {
+            root: None,
+            state_root: None,
             disable_on_external_context: false,
             generate_memories: true,
             use_memories: true,
@@ -353,6 +363,8 @@ impl From<MemoriesToml> for MemoriesConfig {
     fn from(toml: MemoriesToml) -> Self {
         let defaults = Self::default();
         Self {
+            root: toml.root,
+            state_root: toml.state_root,
             disable_on_external_context: toml
                 .disable_on_external_context
                 .unwrap_or(defaults.disable_on_external_context),
