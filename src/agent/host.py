@@ -56,6 +56,13 @@ _TOOL = {
         "required": ["query"],
         "additionalProperties": False,
     },
+    "annotations": {
+        "title": "Search Elpis knowledge base",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
 }
 
 
