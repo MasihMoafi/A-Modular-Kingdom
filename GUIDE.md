@@ -212,11 +212,11 @@ Verified foundation:
   are preserved as named tips inside `archive/pre-cleanup-20260716`; they are not part
   of canonical `main`.
 
-Current stabilization has two separate lanes: complete the approved feature subtraction
-in small remotely verified commits, and give the inherited Ratatui interface an
-appearance-only Elpis identity without changing its information or behavior. The visual
-identity pass is the immediate user-visible task. Context design, memory design, `/auto`
-routing, and other feature additions remain later work.
+Current foundation work is memory followed by context continuity. Elpis-owned memory
+storage, promotion, bounded retrieval, and portable `GOAL.md`/`ES.md` context files are
+being remotely verified. Lean continuation and a visible admitted-context list are next.
+Visual identity, provider expansion, pruning, and `/auto` routing follow the foundational
+memory/context acceptance checks.
 
 The currently installed build includes the command-surface changes from `b135e7a` and
 the startup-tip/test-command changes from `419384d`. Most unwanted commands were made

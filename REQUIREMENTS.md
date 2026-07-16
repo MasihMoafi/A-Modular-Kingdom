@@ -124,8 +124,8 @@ Elpis's primary visual identity uses amber, between orange and yellow, not purpl
 | Permission modes and sandboxing | Inherited from Codex; no Elpis reimplementation is required. A focused all-mode acceptance matrix remains useful before release. |
 | Mouse selection/copy | Inherited from the Codex TUI; Masih confirmed the old prototype limitation does not apply to this foundation. |
 | Native sessions and compaction | Inherited for Codex-owned threads. Elpis-wide provider-neutral continuity is not implemented. |
-| Context list and compact records | Specified in docs; not implemented. |
-| Compaction/checkpoints/lean continuation | Specified in docs; not implemented. |
+| Context list and compact records | In progress. A compact per-turn `ES.md` checkpoint is implemented pending remote verification; the visible admitted-context list remains. |
+| Compaction/checkpoints/lean continuation | In progress. Portable workspace `GOAL.md` and `ES.md` files are implemented pending remote verification; automatic admission and lean continuation remain. |
 | Inherited Codex memory | A substantial Rust extraction, consolidation, retrieval, citation, and artifact pipeline is present and enabled by default; Elpis acceptance has not been run. |
 | OpenClaw-style memory | In progress. Recall counting and promotion are remotely verified. Elpis-owned storage, age-aware diverse retrieval, semantic fallback, and hard artifact-size limits are implemented pending remote verification. Ordinary memory files plus the confirmed reset-all action provide review/deletion; end-to-end acceptance remains. |
 | `/auto` model routing | Nice-to-have and not implemented. Product documents may describe the intended behavior but must not claim availability. |
@@ -140,6 +140,8 @@ until the context engine is implemented:
 - `~/.elpis/.../sessions/`: complete append-only event history.
 - `~/.elpis/.../checkpoints/`: goal, decisions, changes, verification, blocker, next action.
 - `~/.elpis/.../GOAL.md`: current persistent goal and acceptance criteria.
+- `~/.elpis/context/workspaces/<workspace>/ES.md`: compact latest session checkpoint;
+  exact turn evidence remains in the provider transcript.
 - `~/.elpis/memories/MEMORY.md`: compact, curated long-term memory.
 - `~/.elpis/state/memories_1.sqlite`: recall, promotion, and consolidation state.
 - `~/.elpis/.../memory/YYYY-MM-DD.md`: detailed working notes and session summaries,

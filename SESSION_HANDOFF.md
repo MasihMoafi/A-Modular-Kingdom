@@ -7,8 +7,8 @@ provider-neutral context/session continuity, and durable memory.
 
 ## Current State
 
-- `origin/main` is at `472d5c1`; local `main` is one commit ahead at `b1157c9`.
-  GitHub Actions run `29519418965` is verifying the ownership/retrieval slice.
+- `main` and `origin/main` are synchronized at `6f8a92e`. GitHub Actions run
+  `29520985653` is verifying memory plus the first context slice.
 - The Gemini cleanup was useful: it restored the required RAG proxy helper and removed
   obsolete `VectorIndex` code, unused notebook splitting functions, `/test-approval`,
   and `/exit`. The Python import and compile checks pass.
@@ -39,6 +39,9 @@ provider-neutral context/session continuity, and durable memory.
 - Memory is reviewable as ordinary files under `~/.elpis/memories`; granular file edits
   remove stale entries. The existing confirmed reset-all action clears Elpis memory and
   preserves Codex data.
+- Elpis now mirrors user- or agent-created goals into workspace `GOAL.md` and writes a
+  compact `ES.md` after each completed turn. Both live under
+  `~/.elpis/context/workspaces/<workspace-key>/` and remain pending remote verification.
 - First-release provider scope is OpenAI subscription plus OpenRouter. Additional
   providers are important later; `/auto` is a nice-to-have.
 
@@ -55,8 +58,9 @@ provider-neutral context/session continuity, and durable memory.
 - No local Cargo or Rust compilation was run.
 - Recall tracking, promotion metadata, focused TUI/RAG tests, and the Elpis build passed
   in GitHub Actions run `29517070995`.
-- Run `29519257543` failed only the formatting check. The exact formatting changes were
-  committed as `472d5c1`; replacement run `29519418965` is in progress.
+- Run `29519879166` exposed and confirmed a memory-root clone type error; `5abe0e0`
+  fixes it. Run `29520736607` then failed only formatting; `6f8a92e` applies the pinned
+  formatter and adds `ES.md`. Replacement run `29520985653` is in progress.
 
 ## Recent Changes
 
@@ -65,12 +69,14 @@ provider-neutral context/session continuity, and durable memory.
 - `fa94cd1` adds distinct recall tracking and the durable promotion gate.
 - `c4d1634` moves memory artifacts/state under Elpis and adds ranked retrieval.
 - `472d5c1` applies the remote formatter's exact layout and is pushed.
-- `b1157c9` adds hard memory artifact limits and is committed locally, not yet pushed.
+- `b1157c9` adds hard memory artifact limits.
+- `5abe0e0` fixes memory-root compilation and adds portable workspace `GOAL.md`.
+- `6f8a92e` adds compact per-turn `ES.md` checkpoints.
 
 ## Next Action
 
-After run `29519418965` passes, push `b1157c9` plus this handoff update, remotely verify
-the size limits, then run the end-to-end memory acceptance check.
+After run `29520985653` passes, record verification and admit `GOAL.md` plus `ES.md` into
+fresh/lean turns. Then expose admitted sources and sizes through the existing status UI.
 
 Do not add dream narratives, cron scheduling, or an MCP memory adapter. Decay and MMR
 belong in the retrieval layer, not in the consolidation scheduler.

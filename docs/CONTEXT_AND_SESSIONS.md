@@ -52,6 +52,16 @@ automatic compaction, or when context pressure crosses the configured threshold.
 checkpoint never embeds full logs or file bodies; it points to them and records the
 smallest useful conclusion.
 
+Elpis stores the current portable workspace goal and checkpoint under
+`~/.elpis/context/workspaces/<readable-workspace-key>/`:
+
+- `GOAL.md` mirrors goal changes from either the user or agent;
+- `ES.md` is replaced after each completed turn with the latest result, changed paths,
+  command outcomes, and the provider-thread pointer.
+
+The provider transcript remains the exact evidence source. These Markdown files are the
+small, editable continuation surface and must not become a second transcript.
+
 ## Resume Contract
 
 A fresh agent reads `AGENTS.md`, `GUIDE.md`, and `SESSION_HANDOFF.md`, then verifies the
