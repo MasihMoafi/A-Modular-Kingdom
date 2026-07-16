@@ -1,1 +1,1 @@
-Draft PR trigger marker. This file is removed by the verification workflow before the provider slice is finalized.
+Trigger PR #28 provider-slice finalization after the trusted default-branch workflow was installed.
