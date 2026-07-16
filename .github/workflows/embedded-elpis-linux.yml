@@ -90,7 +90,28 @@ jobs:
             elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-
 
       - name: Verify Elpis launcher and provider entrypoints
-        run: cargo test -p codex-tui --bin elpis --locked
+        id: launcher_tests
+        run: |
+          set +e
+          cargo test -p codex-tui --bin elpis --locked --message-format=short \
+            > "$RUNNER_TEMP/elpis-launcher-test.log" 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "Elpis launcher/provider verification failed. Diagnostic tail:"
+            tail -n 240 "$RUNNER_TEMP/elpis-launcher-test.log"
+          else
+            cat "$RUNNER_TEMP/elpis-launcher-test.log"
+          fi
+          exit "$status"
+
+      - name: Upload launcher failure log
+        if: ${{ failure() && steps.launcher_tests.outcome == 'failure' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: elpis-launcher-test-failure
+          path: ${{ runner.temp }}/elpis-launcher-test.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Verify memory promotion, archive, bounds, and retrieval
         run: |
