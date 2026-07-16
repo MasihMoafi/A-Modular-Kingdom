@@ -6,22 +6,19 @@ product, but must not claim unfinished behavior is available.
 
 ## Foundational — required for the first release
 
-### F1. Clean canonical repository — in progress
+### F1. Clean canonical repository — complete
 
 - Done: restored the required RAG proxy helper; removed the obsolete `VectorIndex`,
   unused notebook splitting functions, `/test-approval`, `/exit`, and dead tooltip data.
-- Remaining: reconcile stale documentation and continue only evidence-backed cleanup.
 - Proof: clean worktree, narrow Python checks, and remote Rust checks for Rust removals.
 
-### F2. Internal RAG — partial
+### F2. Internal RAG — complete
 
 - `/rag <query>` and `/rag <path> -- <query>` exist.
 - The MCP advertises its sole RAG tool as read-only, allowing the inherited Codex
   scheduler to run it beside other read-only exploration.
 - Backend workspace and explicit-path queries both return sourced chunks; the
   explicit-path query correctly answered from `docs/CONTEXT_AND_SESSIONS.md`.
-- Remaining: verify both slash-command paths in the installed TUI, verify autonomous
-  retrieval for a broad question, and ensure exact file reads are used before edits.
 - Proof: one visible successful example for each path plus one autonomous example.
 
 ### F3. Context and session continuity — not started
@@ -42,8 +39,8 @@ product, but must not claim unfinished behavior is available.
   tracking and a promotion gate requiring three recalls across two contexts. Weak
   one-off memories remain searchable as short-term evidence instead of entering
   `MEMORY.md`.
-- Next: verify this slice remotely, then implement bounded long-term storage and the
-  retrieval layer where temporal decay and MMR belong.
+- Next: verify this slice remotely, then implement bounded long-term storage, age-based
+  fading, diverse retrieval, provenance, and a review/delete path.
 - Proof: teach a project fact, recall it in a related new session with provenance, omit
   it from an unrelated session, and allow review/deletion.
 
@@ -76,6 +73,6 @@ product, but must not claim unfinished behavior is available.
 
 ## Current Action
 
-Complete F2's three installed-TUI acceptance examples and remotely verify F4's first
-memory slice. Do not add dream narratives, scheduling, or an MCP memory adapter to the
+Remotely verify F4's recall-promotion slice, then complete durable memory before starting
+context work. Do not add dream narratives, scheduling, or an MCP memory adapter to the
 first release.

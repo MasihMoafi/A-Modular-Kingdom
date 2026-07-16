@@ -7,7 +7,7 @@ provider-neutral context/session continuity, and durable memory.
 
 ## Current State
 
-- `main` is nine commits ahead of `origin/main` at `fa94cd1`; nothing has been pushed.
+- `main` is ten commits ahead of `origin/main` at `108793c`; nothing has been pushed.
 - The Gemini cleanup was useful: it restored the required RAG proxy helper and removed
   obsolete `VectorIndex` code, unused notebook splitting functions, `/test-approval`,
   and `/exit`. The Python import and compile checks pass.
@@ -17,9 +17,9 @@ provider-neutral context/session continuity, and durable memory.
   important, and nice-to-have.
 - The Codex-derived TUI, permissions, tool rendering, sessions, compaction, mouse
   selection, and ChatGPT authentication remain the execution foundation.
-- The Python MCP exposes only `query_knowledge_base` and now advertises it as read-only;
-  `/rag` routing exists but its live workspace/path/autonomous acceptance checks are
-  incomplete.
+- Repository cleanup and internal RAG are accepted as complete by Masih.
+- The Python MCP exposes only the read-only `query_knowledge_base` tool; `/rag` routing
+  and autonomous retrieval are retained behavior.
 - The interrupted external memory task made no local project change. The current local
   implementation adds distinct recall-context tracking and a 3-recall/2-context gate
   before new short-term evidence may enter durable `MEMORY.md`.
@@ -54,7 +54,8 @@ provider-neutral context/session continuity, and durable memory.
 ## Next Action
 
 Remotely compile and run focused state/memory tests for the recall-promotion slice, then
-complete foundational task F2's installed-TUI acceptance checks.
+complete bounded storage, age-based fading, diverse retrieval, provenance, and memory
+review/deletion.
 
 Do not add dream narratives, cron scheduling, an MCP memory adapter, temporal decay, or
 MMR until the recall-promotion slice passes. Decay and MMR belong in the later retrieval

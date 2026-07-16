@@ -60,6 +60,12 @@ jobs:
             codex-rs/target
           key: embedded-elpis-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock', 'codex-rs/rust-toolchain.toml') }}
 
+      - name: Verify memory recall tracking
+        run: cargo test -p codex-state --locked record_stage1_output_usage_updates_usage_metadata
+
+      - name: Verify memory promotion metadata
+        run: cargo test -p codex-memories-write --locked sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
+
       - name: Compile focused TUI tests
         run: cargo test -p codex-tui --lib --locked --no-run
 
