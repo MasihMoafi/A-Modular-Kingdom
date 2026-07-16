@@ -66,6 +66,9 @@ jobs:
       - name: Verify Elpis branding
         run: cargo test -p codex-tui --lib --locked onboarding::welcome::tests::welcome_renders_animation_on_first_draw -- --exact
 
+      - name: Verify Elpis RAG command
+        run: cargo test -p codex-tui --lib --locked chatwidget::tests::slash_commands::rag_command_routes_
+
       - name: Build Elpis binary
         run: cargo build -p codex-tui --bin elpis --locked
 
