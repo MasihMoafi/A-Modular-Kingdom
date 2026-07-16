@@ -1,23 +1,37 @@
-name: Embedded Elpis Linux binary
+name: Elpis Linux verification
 
 on:
   workflow_dispatch:
+    inputs:
+      full_regression:
+        description: Run the exhaustive inherited-regression checks
+        required: false
+        default: true
+        type: boolean
+  pull_request:
+    paths:
+      - .github/workflows/embedded-elpis-linux.yml
+      - codex-rs/**
+      - scripts/install-elpis-binary.sh
+      - scripts/install-elpis.sh
   push:
     branches:
       - main
-      - agent/elpis-embedded-launcher
     tags:
       - "v*"
     paths:
       - .github/workflows/embedded-elpis-linux.yml
       - codex-rs/**
       - scripts/install-elpis-binary.sh
+      - scripts/install-elpis.sh
+  schedule:
+    - cron: "17 3 * * *"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: embedded-elpis-${{ github.ref }}
+  group: elpis-linux-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -29,10 +43,13 @@ jobs:
       run:
         working-directory: codex-rs
     env:
-      CARGO_INCREMENTAL: "0"
+      CARGO_INCREMENTAL: "1"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
       CARGO_TERM_COLOR: always
+
     steps:
-      - name: Checkout branch
+      - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Install Linux build dependencies
@@ -49,71 +66,57 @@ jobs:
           rustup set profile minimal
           rustup toolchain install 1.95.0 --component rustfmt --no-self-update
 
-      - name: Format Rust
-        run: cargo fmt --all
-
-      - name: Verify Rust formatting
+      - name: Check Rust formatting
         run: cargo fmt --all --check
 
-      - name: Restore Cargo cache
+      - name: Restore Cargo downloads
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
         with:
           path: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-            codex-rs/target
-          key: embedded-elpis-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock', 'codex-rs/rust-toolchain.toml') }}
+          key: elpis-cargo-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock') }}
           restore-keys: |
-            embedded-elpis-${{ runner.os }}-
+            elpis-cargo-${{ runner.os }}-
 
-      - name: Verify memory recall tracking
-        run: cargo test -p codex-state --locked record_stage1_output_usage_updates_usage_metadata
+      - name: Restore incremental build outputs
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: codex-rs/target
+          key: elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-${{ hashFiles('codex-rs/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-${{ hashFiles('codex-rs/Cargo.lock') }}-
+            elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-
 
-      - name: Verify memory promotion metadata
-        run: cargo test -p codex-memories-write --locked sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
-
-      - name: Verify bounded memory artifacts
-        run: cargo test -p codex-memories-write --locked validate_consolidation_artifacts_
-
-      - name: Verify Elpis memory configuration
-        run: cargo test -p codex-config --locked memories_config_preserves_configured_root
-
-      - name: Verify Elpis memory database ownership
-        run: cargo test -p codex-state --locked init_with_memories_state_root_separates_only_memories_db
-
-      - name: Verify ranked memory retrieval
-        run: cargo test -p codex-memories-extension --locked local::search::tests
-
-      - name: Verify Elpis memory path defaults
-        run: cargo test -p codex-tui --bin elpis --locked elpis_memories_defaults_precede_user_config
-
-      - name: Verify provider entrypoints
+      - name: Verify Elpis launcher and provider entrypoints
         run: cargo test -p codex-tui --bin elpis --locked
 
-      - name: Verify Elpis memory reset boundary
-        run: cargo test -p codex-app-server --test all --locked memory_reset_clears_memory_files_and_rows_preserves_threads
-
-      - name: Verify portable Elpis goal
-        run: cargo test -p codex-tui --lib --locked elpis_context::tests
-
-      - name: Verify lean continuity prompt
-        run: cargo test -p codex-core --lib --locked elpis_context::tests
+      - name: Verify memory promotion, archive, bounds, and retrieval
+        run: |
+          cargo test -p codex-state --locked record_stage1_output_usage_updates_usage_metadata
+          cargo test -p codex-memories-write --locked sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
+          cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_archives_deleted_lines
+          cargo test -p codex-memories-write --locked validate_consolidation_artifacts_
+          cargo test -p codex-config --locked memories_config_preserves_configured_root
+          cargo test -p codex-state --locked init_with_memories_state_root_separates_only_memories_db
+          cargo test -p codex-memories-extension --locked local::search::tests
 
       - name: Verify OpenRouter authentication boundary
         run: cargo test -p codex-model-provider-info --locked openrouter
 
-      - name: Compile focused TUI tests
-        run: cargo test -p codex-tui --lib --locked --no-run
+      - name: Run exhaustive continuity regression
+        if: ${{ github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.full_regression) }}
+        run: |
+          cargo test -p codex-app-server --test all --locked memory_reset_clears_memory_files_and_rows_preserves_threads
+          cargo test -p codex-tui --lib --locked elpis_context::tests
+          cargo test -p codex-core --lib --locked elpis_context::tests
+          cargo test -p codex-tui --lib --locked --no-run
+          cargo test -p codex-tui --lib --locked onboarding::welcome::tests::welcome_renders_animation_on_first_draw -- --exact
+          cargo test -p codex-tui --lib --locked chatwidget::tests::slash_commands::rag_command_routes_
 
-      - name: Verify Elpis branding
-        run: cargo test -p codex-tui --lib --locked onboarding::welcome::tests::welcome_renders_animation_on_first_draw -- --exact
-
-      - name: Verify Elpis RAG command
-        run: cargo test -p codex-tui --lib --locked chatwidget::tests::slash_commands::rag_command_routes_
-
-      - name: Build Elpis binary
-        run: cargo build -p codex-tui --bin elpis --locked
+      - name: Build Elpis binary and Cargo timing report
+        run: cargo build -p codex-tui --bin elpis --locked --timings
 
       - name: Verify executable identity
         run: |
@@ -124,6 +127,7 @@ jobs:
         run: strip target/debug/elpis
 
       - name: Upload Elpis binary
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: elpis-linux-x86_64
@@ -131,33 +135,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Record main build result and formatting
-        if: always() && github.ref == 'refs/heads/main'
-        working-directory: .
-        env:
-          BUILD_STATUS: ${{ job.status }}
-        run: |
-          mkdir -p .github/builds
-          cat > .github/builds/latest-main.json <<EOF
-          {
-            "run_id": "${GITHUB_RUN_ID}",
-            "run_attempt": "${GITHUB_RUN_ATTEMPT}",
-            "status": "${BUILD_STATUS}",
-            "commit": "${GITHUB_SHA}",
-            "workflow": "${GITHUB_WORKFLOW}",
-            "artifact": "elpis-linux-x86_64"
-          }
-          EOF
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ "${BUILD_STATUS}" = "success" ]; then
-            git add codex-rs
-          fi
-          git add .github/builds/latest-main.json
-          if ! git diff --cached --quiet; then
-            git commit -m "ci: record main build ${GITHUB_RUN_ID} [skip ci]"
-            git push
-          fi
+      - name: Upload Cargo timing report
+        if: ${{ always() && github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: elpis-cargo-timings
+          path: codex-rs/target/cargo-timings/cargo-timing.html
+          if-no-files-found: warn
+          retention-days: 7
 
   release:
     name: Publish tagged Linux binary
