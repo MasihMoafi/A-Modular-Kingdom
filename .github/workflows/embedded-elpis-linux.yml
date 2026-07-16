@@ -85,8 +85,8 @@ jobs:
       - name: Verify Elpis memory path defaults
         run: cargo test -p codex-tui --bin elpis --locked elpis_memories_defaults_precede_user_config
 
-      - name: Verify provider selection flag
-        run: cargo test -p codex-tui --bin elpis --locked provider_flag_is_limited_and_becomes_a_config_override
+      - name: Verify provider entrypoints
+        run: cargo test -p codex-tui --bin elpis --locked
 
       - name: Verify Elpis memory reset boundary
         run: cargo test -p codex-app-server --test all --locked memory_reset_clears_memory_files_and_rows_preserves_threads
