@@ -45,6 +45,30 @@ pub async fn write_workspace_diff(root: &Path, diff: &GitBaselineDiff) -> anyhow
 /// not retained in the prompt artifact or in unreachable git objects.
 pub async fn reset_memory_workspace_baseline(root: &Path) -> anyhow::Result<()> {
     remove_workspace_diff(root).await?;
+
+    if let Ok(diff) = diff_since_latest_init(root).await {
+        let mut deleted_lines = Vec::new();
+        for line in diff.unified_diff.lines() {
+            if line.starts_with('-') && !line.starts_with("---") {
+                deleted_lines.push(line[1..].to_string());
+            }
+        }
+        if !deleted_lines.is_empty() {
+            let archive_path = root.join("archive.md");
+            let mut archive_content = if archive_path.exists() {
+                tokio::fs::read_to_string(&archive_path).await.unwrap_or_default()
+            } else {
+                "# Elpis Memory Archive\n\n".to_string()
+            };
+            archive_content.push_str(&format!("\n## Archived at {}\n\n", chrono::Utc::now()));
+            for line in deleted_lines {
+                archive_content.push_str(&line);
+                archive_content.push('\n');
+            }
+            let _ = tokio::fs::write(&archive_path, archive_content).await;
+        }
+    }
+
     reset_git_repository(root).await
 }
 
