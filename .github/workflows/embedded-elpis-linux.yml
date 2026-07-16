@@ -52,6 +52,90 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      - name: Materialize surgical cleanup for review
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/remove-inert-memory-debug-commands'
+        working-directory: .
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path("codex-rs/tui/src/chatwidget/slash_dispatch.rs"): [
+                  '''            SlashCommand::MemoryDrop => {
+                      self.add_app_server_stub_message("Memory maintenance");
+                  }
+                  SlashCommand::MemoryUpdate => {
+                      self.add_app_server_stub_message("Memory maintenance");
+                  }
+          ''',
+              ],
+              Path("codex-rs/tui/src/chatwidget/tests/slash_commands.rs"): [
+                  '''#[tokio::test]
+          async fn slash_memory_drop_reports_stubbed_feature() {
+              let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+
+              chat.dispatch_command(SlashCommand::MemoryDrop);
+
+              let event = rx.try_recv().expect("expected unsupported-feature error");
+              match event {
+                  AppEvent::InsertHistoryCell(cell) => {
+                      let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
+                      assert!(rendered.contains("Memory maintenance: Not available in TUI yet."));
+                  }
+                  other => panic!("expected InsertHistoryCell error, got {other:?}"),
+              }
+              assert!(
+                  op_rx.try_recv().is_err(),
+                  "expected no memory op to be sent"
+              );
+          }
+
+          ''',
+                  '''#[tokio::test]
+          async fn slash_memory_update_reports_stubbed_feature() {
+              let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+
+              chat.dispatch_command(SlashCommand::MemoryUpdate);
+
+              let event = rx.try_recv().expect("expected unsupported-feature error");
+              match event {
+                  AppEvent::InsertHistoryCell(cell) => {
+                      let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
+                      assert!(rendered.contains("Memory maintenance: Not available in TUI yet."));
+                  }
+                  other => panic!("expected InsertHistoryCell error, got {other:?}"),
+              }
+              assert!(
+                  op_rx.try_recv().is_err(),
+                  "expected no memory op to be sent"
+              );
+          }
+
+          ''',
+              ],
+          }
+
+          for path, blocks in replacements.items():
+              text = path.read_text()
+              for block in blocks:
+                  count = text.count(block)
+                  if count != 1:
+                      raise SystemExit(f"expected one exact block in {path}, found {count}")
+                  text = text.replace(block, "")
+              path.write_text(text)
+          PY
+
+      - name: Upload materialized cleanup source
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/remove-inert-memory-debug-commands'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: elpis-inert-command-cleanup
+          path: |
+            codex-rs/tui/src/chatwidget/slash_dispatch.rs
+            codex-rs/tui/src/chatwidget/tests/slash_commands.rs
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Install Linux build dependencies
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get update
