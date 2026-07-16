@@ -28,7 +28,7 @@ on:
     - cron: "17 3 * * *"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: elpis-linux-${{ github.ref }}
@@ -51,61 +51,6 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
-
-      - name: Materialize surgical cleanup for review
-        if: github.event_name == 'pull_request' && github.head_ref == 'agent/remove-inert-memory-debug-commands'
-        working-directory: .
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          dispatch_path = Path("codex-rs/tui/src/chatwidget/slash_dispatch.rs")
-          dispatch = dispatch_path.read_text()
-          dispatch_pattern = re.compile(
-              r"\n\s*SlashCommand::MemoryDrop => \{\n"
-              r"\s*self\.add_app_server_stub_message\(\"Memory maintenance\"\);\n"
-              r"\s*\}\n"
-              r"\s*SlashCommand::MemoryUpdate => \{\n"
-              r"\s*self\.add_app_server_stub_message\(\"Memory maintenance\"\);\n"
-              r"\s*\}\n"
-          )
-          dispatch, count = dispatch_pattern.subn("\n", dispatch)
-          if count != 1:
-              raise SystemExit(f"expected one dispatch pair, found {count}")
-          dispatch_path.write_text(dispatch)
-
-          tests_path = Path("codex-rs/tui/src/chatwidget/tests/slash_commands.rs")
-          tests = tests_path.read_text()
-          for name in (
-              "slash_memory_drop_reports_stubbed_feature",
-              "slash_memory_update_reports_stubbed_feature",
-          ):
-              pattern = re.compile(
-                  rf"#\[tokio::test\]\nasync fn {name}\(\) \{{.*?^\}}\n\n",
-                  re.MULTILINE | re.DOTALL,
-              )
-              tests, count = pattern.subn("", tests)
-              if count != 1:
-                  raise SystemExit(f"expected one {name} test, found {count}")
-          tests_path.write_text(tests)
-          PY
-
-      - name: Commit cleanup and restore permanent workflow
-        if: github.event_name == 'pull_request' && github.head_ref == 'agent/remove-inert-memory-debug-commands'
-        working-directory: .
-        run: |
-          git fetch origin main --depth=1
-          git show origin/main:.github/workflows/embedded-elpis-linux.yml > .github/workflows/embedded-elpis-linux.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add codex-rs/tui/src/chatwidget/slash_dispatch.rs \
-            codex-rs/tui/src/chatwidget/tests/slash_commands.rs \
-            .github/workflows/embedded-elpis-linux.yml
-          git commit -m "chore(tui): remove inert memory debug dispatch"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
 
       - name: Install Linux build dependencies
         run: |

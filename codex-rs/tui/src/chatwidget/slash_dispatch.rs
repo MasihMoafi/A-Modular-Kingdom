@@ -476,12 +476,6 @@ impl ChatWidget {
             SlashCommand::Stop => {
                 self.clean_background_terminals();
             }
-            SlashCommand::MemoryDrop => {
-                self.add_app_server_stub_message("Memory maintenance");
-            }
-            SlashCommand::MemoryUpdate => {
-                self.add_app_server_stub_message("Memory maintenance");
-            }
             SlashCommand::Mcp => {
                 self.add_mcp_output(McpServerStatusDetail::ToolsAndAuthOnly);
             }
