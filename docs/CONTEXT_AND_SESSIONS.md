@@ -92,6 +92,18 @@ To keep `ES.md` and the active model context lean, Elpis defines a dual-layer **
 * **Agreement with Current Code:** This directly fulfills the lifecycle contract (durable vs. task vs. turn) in `CONTEXT_AND_SESSIONS.md`. While the current `ES.md` logic in `elpis_context.rs` truncates raw text, it does not actively summarize/evict older steps.
 * **Mitigation of Checkpoint Bloat:** Introducing the background compaction agent directly prevents `ES.md` from expanding over time, keeping it focused on a single-page workspace status.
 
+## Multi-Tier Memory Curation (The Archive Tier)
+
+To safeguard against permanent knowledge loss while staying within context token limits, Elpis implements a two-tiered memory architecture:
+
+### 1. Active Memory Tier
+* **High-Signal & Bounded:** Active memories are kept under strict size budgets (e.g., 30,000 characters for `MEMORY.md` and 10,000 characters for `memory_summary.md`).
+* **Direct Context Injection:** Only active, highly recalled facts are injected directly into the LLM context.
+
+### 2. Archive Memory Tier (`archive.md`)
+* **Append-Only Knowledge Base:** Any memories that are manually deleted, faded due to age-based decay, or fail to pass the promotion gate (weak one-off memories) are written to a single, persistent, append-only file at `~/.elpis/memories/archive.md`.
+* **Searchable Fallback via RAG:** When the active context misses critical historical facts, Elpis runs `/rag` over the archive file to selectively retrieve faded knowledge with its original provenance intact.
+
 ## Resume Contract
 
 A fresh agent reads `AGENTS.md`, `GUIDE.md`, and `SESSION_HANDOFF.md`, then verifies the
