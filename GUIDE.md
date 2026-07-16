@@ -252,6 +252,13 @@ index or scans and indexes the requested folder when no usable index exists. If 
 is later moved to a background job, it must not block or visually take over the TUI; the
 previous usable index should remain available until replacement is complete.
 
+The Python service is RAG-only. Its retained source packages are `src/agent` for the
+one-tool MCP host, `src/rag` for retrieval, and `src/utils` for RAG's proxy handling.
+The superseded Python memory, shell, web, speech, document, parser, and tool-execution
+modules are deleted; Codex owns those general agent capabilities. Future Elpis memory
+and dictation work must be designed at the Elpis product layer, not restored inside the
+RAG MCP.
+
 ### Product scope already decided
 
 - UI work is appearance-only for now: colors and styling may change, but Codex-quality

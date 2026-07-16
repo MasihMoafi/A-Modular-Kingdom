@@ -33,6 +33,10 @@ remove only Masih's approved unwanted features without losing retained Codex beh
   launcher line. The regression was missed during migration; it was not Codex overhead.
 - RAG indexing occurs only after an explicit query when no persisted index exists. It
   loads Torch/models and scans up to 100 files then; it is not Elpis startup work.
+- Done in the current subtraction: deleted the unreferenced `src/memory`, `src/tools`,
+  old query parser, and old tool-execution helper. `pyproject.toml` now packages only
+  the RAG host, RAG implementation, and its proxy helper and declares only RAG runtime
+  dependencies. Codex owns the removed general agent capabilities.
 - Gemini/runtime-boundary work remains parked on `agent/runtime-boundary` and is the
   least important current work.
 
@@ -75,7 +79,10 @@ not unrelated foundations.
 - Do not compile Rust locally; it disrupts Masih's workstation. Use the remote workflow.
 - No subagents are active. Use one worktree per genuinely parallel task, but keep the
   immediate blocker with the main agent.
-- Changed files: `src/agent/host.py`, `GUIDE.md`, `FEATURES.json`, and this handoff.
+- Startup fix is committed as `3e06042`.
+- Current deletion changes: `pyproject.toml`, `src/agent/query_parser.py`,
+  `src/agent/tool_execution.py`, `src/memory/`, `src/tools/`, `GUIDE.md`,
+  `FEATURES.json`, and this handoff.
 - Verification: MCP initialize and tools/list pass with exactly one tool and the narrow
   schema; `.venv/bin/python -m compileall -q src`, `jq -e . FEATURES.json`, and
   `git diff --check` pass. No Rust build is required for this Python service change.
@@ -83,9 +90,9 @@ not unrelated foundations.
 
 ## Next Action
 
-Checkpoint the accepted startup/RAG-boundary fix. Then choose whether the next bounded
-task is the approved appearance-only UI pass or continued complete feature subtraction;
-do not mix those two changes in one commit.
+Commit the proven-unused Python tool and memory deletion as its own checkpoint. Then
+choose whether the next bounded task is the appearance-only UI pass or continued Codex
+feature subtraction; do not mix those changes in one commit.
 
 ## After Startup Is Understood
 

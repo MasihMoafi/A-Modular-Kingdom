@@ -1,33 +1,13 @@
 [project]
-name = "a-modular-kingdom"
+name = "elpis-rag"
 version = "0.1.0"
-description = "A modular agentic kingdom with memory, RAG, and web search"
+description = "Elpis local RAG MCP service"
 dependencies = [
-    "mcp",
-    "fastmcp",
     "ollama",
-    "nest-asyncio",
     "pymupdf>=1.26.3",
     "torch==2.5.1",
-    "torchvision==0.20.1",
-    "torchaudio==2.5.1",
     "sentence-transformers>=5.0.0",
-    "langchain>=0.3.27",
     "langchain-community>=0.3.27",
-    "beautifulsoup4>=4.13.4",
-    "httpx>=0.28.1",
-    "rank-bm25",
-    "prompt-toolkit",
-    "langchain-huggingface",
-    "instructor>=1.0.0",
-    # TTS/STT dependencies
-    "pyttsx3>=2.90",
-    "gtts>=2.2.0",
-    "openai-whisper>=20231117",
-    "speechrecognition>=3.10.0",
-    "pygame>=2.0.0",
-    # PyTorch locked at 2.5.1 to prevent breaking upgrades. After install, upgrade to CUDA variant:
-    # uv pip install torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 --index-url https://download.pytorch.org/whl/cu118 --force-reinstall
     "qdrant-client>=1.7.0",
 ]
 
@@ -38,9 +18,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = [
     "src/agent",
-    "src/memory",
     "src/rag",
-    "src/tools",
     "src/utils",
 ]
 
