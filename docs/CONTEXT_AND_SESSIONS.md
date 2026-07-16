@@ -59,6 +59,24 @@ Elpis stores the current portable workspace goal and checkpoint under
 The provider transcript remains the exact evidence source. These Markdown files are the
 small, editable continuation surface and must not become a second transcript.
 
+## Genius Context Management Design (LCM & Decoupling)
+
+These core design specs represent the reference architecture for context and session management, drawn from OpenClaw's lossless mechanics:
+
+1. **Lossless Context Management (LCM) Pipeline:**
+   * **Context Reconstruction Engine:** Evaluates the remaining token budget after each turn (via an `afterTurn` handler) and queries a SQLite database (`lcm.db`) where historical turns and tool executions are stored.
+   * **Lazy-Loading Context:** Workspace context files and memories are dynamically indexed and vector-embedded, then lazily injected into the prompt based on active topics, rather than dumping large files blindly.
+
+2. **Pre-Compaction Memory Flush (The Silent Turn):**
+   * **Active Threshold Trigger:** When active tokens approach the `reserveTokens` floor, a user-invisible "Pre-compaction memory flush" prompt triggers.
+   * **Filesystem Write & Truncation:** Important decisions and state updates are synced to the filesystem before the older conversational transcript is truncated or summarized.
+
+3. **Compaction Model Decoupling (`compaction.model`):**
+   * **Decoupled Roles:** Primary reasoning is routed to a premium model (e.g., Claude 3.5 Opus / Gemini Pro), while background history compaction and summarization are routed to a cheaper, faster model (e.g., Sonnet or local) via `compaction.model`, preserving context space and token budgets.
+
+4. **Vector-Based Cross-Session Indexing:**
+   * **Global Context Index:** A dedicated SQLite database (`memory-vectors.db`) tracks embeddings of session transcripts and files across separate workspace threads, allowing semantic queries to span disconnected sessions.
+
 ## Resume Contract
 
 A fresh agent reads `AGENTS.md`, `GUIDE.md`, and `SESSION_HANDOFF.md`, then verifies the
