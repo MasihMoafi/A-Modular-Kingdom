@@ -46,8 +46,8 @@ not claim unfinished behavior is available.
 - Weak one-off memories remain searchable evidence instead of entering `MEMORY.md`.
 - Review/delete remains file-based; reset-all clears Elpis memory without deleting Codex
   threads or state.
-- Build-cycle branch: deleted/faded lines are archived before baseline reset, archive write
-  failures stop the reset, and a focused archive regression is included.
+- Current `main` archives deleted/faded lines before baseline reset, propagates archive
+  failures instead of silently losing data, and includes a focused archive regression.
 - Remaining acceptance: teach a fact, recall it with provenance in a related new session,
   omit it from an unrelated session, review/delete it, and verify reset behavior locally.
 
@@ -70,11 +70,11 @@ not claim unfinished behavior is available.
   installs it.
 - The pre-optimization verified run took about 21 minutes and produced a 102,988,260-byte
   artifact.
-- Build-cycle branch removes CI source mutation and status-file commits, enables incremental
+- Current `main` removes CI source mutation and status-file commits, enables incremental
   cross-commit cache reuse, keeps focused checks on ordinary changes, moves exhaustive
   inherited regression to nightly/manual/tag runs, and uploads Cargo timing evidence.
-- Remaining acceptance: compare the optimized runtime to the baseline, install the verified
-  artifact from a clean environment, authenticate, launch, and complete a first task.
+- Remaining acceptance: compare an optimized green runtime to the baseline, install the
+  verified artifact from a clean environment, authenticate, launch, and complete a first task.
 
 ### F7. Distinctive Elpis UI/UX — design complete; implementation partial
 
@@ -90,10 +90,10 @@ not claim unfinished behavior is available.
 
 ## Reduction campaign
 
-- Completed process subtraction: remove broad inherited regression from every ordinary push,
-  remove CI auto-formatting, and remove the self-mutating build-status commit.
-- Bounded code subtraction selected next: issue #32 removes the inert `debug-m-drop` and
-  `debug-m-update` placeholders.
+- Completed process subtraction: broad inherited regression no longer runs on every ordinary
+  push; CI no longer auto-formats or commits a build-status file.
+- In verification: issue #32 deletes the inert `debug-m-drop` and `debug-m-update` enum,
+  dispatch, and stub-test code; the removed names are asserted unparseable.
 - Measured candidates are recorded in `docs/BUILD_AND_REDUCTION_AUDIT.md`.
 - Do not delete arbitrary workspace crates: first prove they are reachable from the Elpis
   binary and optional under the product requirements.
@@ -114,10 +114,10 @@ not claim unfinished behavior is available.
 
 ## Current Action
 
-1. Make the build-cycle and archive branch green and compare its ordinary-change duration
-   with the 21-minute baseline.
-2. Inspect the uploaded Cargo timing report and select the highest-cost optional dependency
-   surface for one bounded deletion.
-3. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
-4. Implement the persistent identity line and amber UI foundation before claiming unique
+1. Make issue #32's surgical deletion branch green and merge it.
+2. Compare the optimized ordinary-change runtime with the 21-minute baseline and inspect the
+   Cargo timing report.
+3. Select the highest-cost optional dependency surface for one bounded deletion.
+4. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
+5. Implement the persistent identity line and amber UI foundation before claiming unique
    UI/UX is complete.
