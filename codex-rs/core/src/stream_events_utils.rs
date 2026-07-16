@@ -148,11 +148,16 @@ pub(crate) async fn record_completed_response_item_with_finalized_facts(
         record_stage1_output_usage_for_memory_citation(
             sess.services.state_db.as_ref(),
             memory_citation,
+            Some(turn_context.sub_id.as_str()),
         )
         .await
     } else {
-        record_stage1_output_usage_and_detect_memory_citation(sess.services.state_db.as_ref(), item)
-            .await
+        record_stage1_output_usage_and_detect_memory_citation(
+            sess.services.state_db.as_ref(),
+            item,
+            Some(turn_context.sub_id.as_str()),
+        )
+        .await
     };
     if has_memory_citation {
         sess.record_memory_citation_for_turn(&turn_context.sub_id)
@@ -190,6 +195,7 @@ pub(crate) async fn mark_thread_memory_mode_polluted_if_external_context(
 async fn record_stage1_output_usage_and_detect_memory_citation(
     state_db_ctx: Option<&state_db::StateDbHandle>,
     item: &ResponseItem,
+    query_key: Option<&str>,
 ) -> bool {
     let Some(raw_text) = raw_assistant_output_text_from_item(item) else {
         return false;
@@ -199,12 +205,13 @@ async fn record_stage1_output_usage_and_detect_memory_citation(
     let Some(memory_citation) = parse_memory_citation(citations) else {
         return false;
     };
-    record_stage1_output_usage_for_memory_citation(state_db_ctx, &memory_citation).await
+    record_stage1_output_usage_for_memory_citation(state_db_ctx, &memory_citation, query_key).await
 }
 
 async fn record_stage1_output_usage_for_memory_citation(
     state_db_ctx: Option<&state_db::StateDbHandle>,
     memory_citation: &MemoryCitation,
+    query_key: Option<&str>,
 ) -> bool {
     let thread_ids = thread_ids_from_memory_citation(memory_citation);
     if thread_ids.is_empty() {
@@ -212,7 +219,10 @@ async fn record_stage1_output_usage_for_memory_citation(
     }
 
     if let Some(db) = state_db_ctx {
-        let _ = db.memories().record_stage1_output_usage(&thread_ids).await;
+        let _ = db
+            .memories()
+            .record_stage1_output_usage(&thread_ids, query_key)
+            .await;
     }
     true
 }

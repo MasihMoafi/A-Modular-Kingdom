@@ -9,6 +9,9 @@ use crate::ensure_layout;
 use crate::raw_memories_file;
 use crate::rollout_summaries_dir;
 
+const PROMOTION_MIN_RECALL_COUNT: u32 = 3;
+const PROMOTION_MIN_UNIQUE_QUERIES: u32 = 2;
+
 /// Rebuild `raw_memories.md` from DB-backed stage-1 outputs.
 pub async fn rebuild_raw_memories_file_from_memories(
     root: &Path,
@@ -69,12 +72,27 @@ async fn rebuild_raw_memories_file(
         let rollout_summary_file = format!("{}.md", rollout_summary_file_stem(memory));
         writeln!(body, "rollout_summary_file: {rollout_summary_file}")
             .map_err(raw_memories_format_error)?;
+        writeln!(body, "recall_count: {}", memory.recall_count)
+            .map_err(raw_memories_format_error)?;
+        writeln!(body, "unique_query_count: {}", memory.unique_query_count)
+            .map_err(raw_memories_format_error)?;
+        if let Some(last_recalled_at) = memory.last_recalled_at.as_ref() {
+            writeln!(body, "last_recalled_at: {}", last_recalled_at.to_rfc3339())
+                .map_err(raw_memories_format_error)?;
+        }
+        writeln!(body, "promotion_eligible: {}", promotion_eligible(memory))
+            .map_err(raw_memories_format_error)?;
         writeln!(body).map_err(raw_memories_format_error)?;
         body.push_str(memory.raw_memory.trim());
         body.push_str("\n\n");
     }
 
     tokio::fs::write(raw_memories_file(root), body).await
+}
+
+fn promotion_eligible(memory: &Stage1Output) -> bool {
+    memory.recall_count >= PROMOTION_MIN_RECALL_COUNT
+        && memory.unique_query_count >= PROMOTION_MIN_UNIQUE_QUERIES
 }
 
 async fn prune_rollout_summaries(root: &Path, keep: &HashSet<String>) -> std::io::Result<()> {

@@ -20,8 +20,9 @@ provider-neutral context/session continuity, and durable memory.
 - The Python MCP exposes only `query_knowledge_base` and now advertises it as read-only;
   `/rag` routing exists but its live workspace/path/autonomous acceptance checks are
   incomplete.
-- No new memory implementation was found in the working tree, commits, branches, or
-  recent reflog. The interrupted memory task made no local project change.
+- The interrupted external memory task made no local project change. The current local
+  implementation adds distinct recall-context tracking and a 3-recall/2-context gate
+  before new short-term evidence may enter durable `MEMORY.md`.
 - Important correction: `codex-rs/memories/` already provides an enabled-by-default
   Rust pipeline for rollout extraction, consolidation, retrieval, citations, and local
   memory artifacts. Elpis-specific OpenClaw behavior has not been integrated or tested.
@@ -39,21 +40,24 @@ provider-neutral context/session continuity, and durable memory.
 - Direct backend workspace RAG query: passed in 8.5 seconds with sourced project results.
 - `git diff --check`: passed.
 - No local Cargo or Rust compilation was run.
+- Rust memory changes have only static review and `git diff --check`; remote compilation
+  and focused tests remain required.
 
 ## Current Changes
 
 - Replaced `FEATURES.json` with `TASKS.md`.
 - Updated agent routing and requirement documents to use the truthful release tiers.
 - These documentation changes are not yet committed.
+- The memory implementation is not committed or pushed.
 
 ## Next Action
 
-Complete foundational task F2 in the installed TUI with three live acceptance checks:
-direct workspace query, explicit-path query, and autonomous retrieval for a broad
-question. Backend-level workspace and path checks already pass.
+Remotely compile and run focused state/memory tests for the recall-promotion slice, then
+complete foundational task F2's installed-TUI acceptance checks.
 
-Do not continue memory implementation until the existing Codex Rust pipeline and the
-current OpenClaw pipeline have been compared and Masih approves the behavioral contract.
+Do not add dream narratives, cron scheduling, an MCP memory adapter, temporal decay, or
+MMR until the recall-promotion slice passes. Decay and MMR belong in the later retrieval
+layer, not in the consolidation scheduler.
 
 ## Boundaries
 

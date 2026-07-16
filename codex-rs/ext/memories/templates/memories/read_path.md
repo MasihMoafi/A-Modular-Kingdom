@@ -20,6 +20,8 @@ Memory layout (general -> specific):
 
 - {{ base_path }}/memory_summary.md (already provided below; do NOT open again)
 - {{ base_path }}/MEMORY.md (searchable registry; primary file to query)
+- {{ base_path }}/raw_memories.md (recent short-term evidence; search on demand, never
+  inject wholesale)
 - {{ base_path }}/skills/<skill-name>/ (skill folder)
   - SKILL.md (entrypoint instructions)
   - scripts/ (optional helper scripts)
@@ -34,11 +36,14 @@ Quick memory pass (when applicable):
 
 1. Skim the MEMORY_SUMMARY below and extract task-relevant keywords.
 2. Search {{ base_path }}/MEMORY.md using those keywords.
-3. Only if MEMORY.md directly points to rollout summaries/skills, open the 1-2
-   most relevant files under {{ base_path }}/rollout_summaries/ or
+3. If MEMORY.md has no relevant hit, search `raw_memories.md` for recent short-term
+   evidence. Do not read the whole file; use targeted terms from the request.
+4. Only when MEMORY.md or raw_memories.md points to rollout summaries/skills, open the
+   1-2 most relevant files under {{ base_path }}/rollout_summaries/ or
    {{ base_path }}/skills/.
-4. If above are not clear and you need exact commands, error text, or precise evidence, search over `rollout_path` for more evidence.
-5. If there are no relevant hits, stop memory lookup and continue normally.
+5. If the above are not clear and you need exact commands, error text, or precise
+   evidence, search over `rollout_path` for more evidence.
+6. If there are no relevant hits, stop memory lookup and continue normally.
 
 Quick-pass budget:
 

@@ -17,6 +17,9 @@ pub struct Stage1Output {
     pub cwd: PathBuf,
     pub git_branch: Option<String>,
     pub generated_at: DateTime<Utc>,
+    pub recall_count: u32,
+    pub unique_query_count: u32,
+    pub last_recalled_at: Option<DateTime<Utc>>,
 }
 
 /// Result of trying to claim a stage-1 memory extraction job.

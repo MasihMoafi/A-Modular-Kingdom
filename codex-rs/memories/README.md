@@ -76,6 +76,18 @@ Job outcomes:
 
 Phase 1 is the stage that turns individual rollouts into DB-backed memory records.
 
+### Recall evidence and durable promotion
+
+Reading a memory with a citation records both its total recall count and the distinct
+turn context that recalled it. `raw_memories.md` exposes those counts as short-term
+evidence. New material becomes eligible for durable `MEMORY.md` promotion only after at
+least three recalls across at least two distinct turn contexts. Until then it remains
+searchable in `raw_memories.md` and its rollout summary.
+
+This gate is intentionally evidence-based: a memorable-sounding one-off session does
+not become long-term memory merely because it is recent. Query text is not stored; the
+database stores only the opaque turn key needed to count distinct recall contexts.
+
 ## Phase 2: Global Consolidation
 
 Phase 2 consolidates the latest stage-1 outputs into the filesystem memory artifacts and then runs a dedicated consolidation agent.

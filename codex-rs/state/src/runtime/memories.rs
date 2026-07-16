@@ -55,6 +55,7 @@ impl MemoryStore {
     pub async fn record_stage1_output_usage(
         &self,
         thread_ids: &[ThreadId],
+        query_key: Option<&str>,
     ) -> anyhow::Result<usize> {
         if thread_ids.is_empty() {
             return Ok(0);
@@ -65,6 +66,7 @@ impl MemoryStore {
         let mut updated_rows = 0;
 
         for thread_id in thread_ids {
+            let thread_id = thread_id.to_string();
             updated_rows += sqlx::query(
                 r#"
 UPDATE stage1_outputs
@@ -75,10 +77,26 @@ WHERE thread_id = ?
                 "#,
             )
             .bind(now)
-            .bind(thread_id.to_string())
+            .bind(thread_id.as_str())
             .execute(&mut *tx)
             .await?
             .rows_affected() as usize;
+
+            if let Some(query_key) = query_key.filter(|value| !value.is_empty()) {
+                sqlx::query(
+                    r#"
+INSERT OR IGNORE INTO stage1_recall_queries (thread_id, query_key, recalled_at)
+SELECT ?, ?, ?
+WHERE EXISTS (SELECT 1 FROM stage1_outputs WHERE thread_id = ?)
+                    "#,
+                )
+                .bind(thread_id.as_str())
+                .bind(query_key)
+                .bind(now)
+                .bind(thread_id.as_str())
+                .execute(&mut *tx)
+                .await?;
+            }
         }
 
         tx.commit().await?;
@@ -347,7 +365,14 @@ SELECT
     so.raw_memory,
     so.rollout_summary,
     so.rollout_slug,
-    so.generated_at
+    so.generated_at,
+    COALESCE(so.usage_count, 0) AS recall_count,
+    so.last_usage,
+    (
+        SELECT COUNT(*)
+        FROM stage1_recall_queries AS rq
+        WHERE rq.thread_id = so.thread_id
+    ) AS unique_query_count
 FROM stage1_outputs AS so
 WHERE length(trim(so.raw_memory)) > 0 OR length(trim(so.rollout_summary)) > 0
 ORDER BY so.source_updated_at DESC, so.thread_id DESC
@@ -502,7 +527,14 @@ SELECT
     so.raw_memory,
     so.rollout_summary,
     so.rollout_slug,
-    so.generated_at
+    so.generated_at,
+    COALESCE(so.usage_count, 0) AS recall_count,
+    so.last_usage,
+    (
+        SELECT COUNT(*)
+        FROM stage1_recall_queries AS rq
+        WHERE rq.thread_id = so.thread_id
+    ) AS unique_query_count
 FROM stage1_outputs AS so
 WHERE so.thread_id = ? AND so.source_updated_at = ?
             "#,
@@ -1386,6 +1418,10 @@ WHERE kind = ? AND job_key = ?
 pub(super) async fn clear_memory_data_in_pool(pool: &SqlitePool) -> anyhow::Result<()> {
     let mut tx = pool.begin().await?;
 
+    sqlx::query("DELETE FROM stage1_recall_queries")
+        .execute(&mut *tx)
+        .await?;
+
     sqlx::query(
         r#"
 DELETE FROM stage1_outputs
@@ -1417,6 +1453,12 @@ fn stage1_output_from_row_and_thread(
     let generated_at: i64 = row.try_get("generated_at")?;
     let source_updated_at = datetime_from_epoch_seconds(source_updated_at)?;
     let generated_at = datetime_from_epoch_seconds(generated_at)?;
+    let recall_count = u32::try_from(row.try_get::<i64, _>("recall_count")?.max(0))?;
+    let unique_query_count = u32::try_from(row.try_get::<i64, _>("unique_query_count")?.max(0))?;
+    let last_recalled_at = row
+        .try_get::<Option<i64>, _>("last_usage")?
+        .map(datetime_from_epoch_seconds)
+        .transpose()?;
     Ok(Stage1Output {
         thread_id: thread.id,
         rollout_path: thread.rollout_path,
@@ -1427,6 +1469,9 @@ fn stage1_output_from_row_and_thread(
         cwd: thread.cwd,
         git_branch: thread.git_branch,
         generated_at,
+        recall_count,
+        unique_query_count,
+        last_recalled_at,
     })
 }
 
@@ -1492,8 +1537,14 @@ impl StateRuntime {
         self.memories.clear_memory_data().await
     }
 
-    async fn record_stage1_output_usage(&self, thread_ids: &[ThreadId]) -> anyhow::Result<usize> {
-        self.memories.record_stage1_output_usage(thread_ids).await
+    async fn record_stage1_output_usage(
+        &self,
+        thread_ids: &[ThreadId],
+        query_key: Option<&str>,
+    ) -> anyhow::Result<usize> {
+        self.memories
+            .record_stage1_output_usage(thread_ids, query_key)
+            .await
     }
 
     async fn claim_stage1_jobs_for_startup(
@@ -4370,10 +4421,18 @@ VALUES (?, ?, ?, ?, ?)
         );
 
         let updated_rows = runtime
-            .record_stage1_output_usage(&[thread_a, thread_a, thread_b, missing])
+            .record_stage1_output_usage(&[thread_a, thread_a, thread_b, missing], Some("query-1"))
             .await
             .expect("record stage1 output usage");
         assert_eq!(updated_rows, 3);
+        runtime
+            .record_stage1_output_usage(&[thread_a], Some("query-1"))
+            .await
+            .expect("record repeated query");
+        runtime
+            .record_stage1_output_usage(&[thread_a], Some("query-2"))
+            .await
+            .expect("record distinct query");
 
         let row_a =
             sqlx::query("SELECT usage_count, last_usage FROM stage1_outputs WHERE thread_id = ?")
@@ -4392,7 +4451,7 @@ VALUES (?, ?, ?, ?, ?)
             row_a
                 .try_get::<i64, _>("usage_count")
                 .expect("usage_count a"),
-            2
+            4
         );
         assert_eq!(
             row_b
@@ -4403,8 +4462,25 @@ VALUES (?, ?, ?, ?, ?)
 
         let last_usage_a = row_a.try_get::<i64, _>("last_usage").expect("last_usage a");
         let last_usage_b = row_b.try_get::<i64, _>("last_usage").expect("last_usage b");
-        assert_eq!(last_usage_a, last_usage_b);
+        assert!(last_usage_a >= last_usage_b);
         assert!(last_usage_a > 0);
+
+        let unique_queries_a = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM stage1_recall_queries WHERE thread_id = ?",
+        )
+        .bind(thread_a.to_string())
+        .fetch_one(memory_pool(&runtime))
+        .await
+        .expect("count unique queries a");
+        let unique_queries_b = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM stage1_recall_queries WHERE thread_id = ?",
+        )
+        .bind(thread_b.to_string())
+        .fetch_one(memory_pool(&runtime))
+        .await
+        .expect("count unique queries b");
+        assert_eq!(unique_queries_a, 2);
+        assert_eq!(unique_queries_b, 1);
 
         let _ = tokio::fs::remove_dir_all(codex_home).await;
     }

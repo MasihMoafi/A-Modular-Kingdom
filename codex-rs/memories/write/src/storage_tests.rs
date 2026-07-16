@@ -26,6 +26,9 @@ fn stage1_output_with_slug(thread_id: ThreadId, rollout_slug: Option<&str>) -> S
         cwd: PathBuf::from("/tmp/workspace"),
         git_branch: None,
         generated_at: Utc.timestamp_opt(124, 0).single().expect("timestamp"),
+        recall_count: 0,
+        unique_query_count: 0,
+        last_recalled_at: None,
     }
 }
 
@@ -95,6 +98,9 @@ async fn sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
         cwd: PathBuf::from("/tmp/workspace"),
         git_branch: None,
         generated_at: Utc.timestamp_opt(101, 0).single().expect("timestamp"),
+        recall_count: 3,
+        unique_query_count: 2,
+        last_recalled_at: Some(Utc.timestamp_opt(102, 0).single().expect("timestamp")),
     }];
 
     sync_rollout_summaries_from_memories(
@@ -146,4 +152,7 @@ async fn sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
     assert!(raw_memories.contains(&format!(
         "rollout_summary_file: {canonical_rollout_summary_file}"
     )));
+    assert!(raw_memories.contains("recall_count: 3"));
+    assert!(raw_memories.contains("unique_query_count: 2"));
+    assert!(raw_memories.contains("promotion_eligible: true"));
 }

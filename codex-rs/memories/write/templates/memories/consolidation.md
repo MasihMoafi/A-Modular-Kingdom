@@ -185,6 +185,12 @@ C) `memory_summary.md`
 Rules:
 
 - If there is no meaningful signal to add beyond what already exists, keep outputs minimal.
+- Treat `raw_memories.md` as short-term evidence. A new item may enter durable `MEMORY.md`
+  only when its metadata says `promotion_eligible: true` (at least three recalls across at
+  least two distinct query contexts). Ineligible items remain available through raw memory
+  and rollout summaries; do not promote them merely because they are recent or eloquent.
+- Existing durable memories are reviewed for staleness and evidence as usual; do not delete
+  an existing item solely because older metadata lacks the promotion fields.
 - You should always make sure `MEMORY.md` and `memory_summary.md` exist and are up to date.
 - `memory_summary.md` must start with the exact line `v1`; if it does not, rewrite the entire
   file rather than patching the previous summary in place.

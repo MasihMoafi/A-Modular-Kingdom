@@ -32,15 +32,18 @@ product, but must not claim unfinished behavior is available.
 - Support truthful exact resume and lean continuation across sessions and providers.
 - Proof: resume one task exactly and one task leanly without replaying irrelevant work.
 
-### F4. Durable memory — investigation paused
+### F4. Durable memory — in progress
 
 - The imported Codex foundation already contains an enabled-by-default Rust memory
   pipeline for extraction, consolidation, retrieval, citations, and local artifacts.
 - Elpis has not yet adopted the selected OpenClaw behaviors or established an
   Elpis-owned provider-neutral memory contract.
-- Next: compare the existing Rust pipeline with OpenClaw's pruning, pre-compaction
-  flush, dated notes, retrieval, and promotion; then approve the smallest integration
-  design before implementation.
+- Implemented locally, pending remote Rust verification: distinct recall-context
+  tracking and a promotion gate requiring three recalls across two contexts. Weak
+  one-off memories remain searchable as short-term evidence instead of entering
+  `MEMORY.md`.
+- Next: verify this slice remotely, then implement bounded long-term storage and the
+  retrieval layer where temporal decay and MMR belong.
 - Proof: teach a project fact, recall it in a related new session with provenance, omit
   it from an unrelated session, and allow review/deletion.
 
@@ -73,6 +76,6 @@ product, but must not claim unfinished behavior is available.
 
 ## Current Action
 
-Complete F2's three installed-TUI acceptance examples. Do not begin memory implementation until
-the existing Codex and OpenClaw memory pipelines have been compared and Masih approves
-the resulting behavioral contract.
+Complete F2's three installed-TUI acceptance examples and remotely verify F4's first
+memory slice. Do not add dream narratives, scheduling, or an MCP memory adapter to the
+first release.
