@@ -598,13 +598,13 @@ mod tests {
     use super::goals_db_path;
     use super::logs_db_path;
     use super::memories_db_path;
-    use super::open_thread_history_db;
     use super::open_state_sqlite;
+    use super::open_thread_history_db;
     use super::runtime_state_migrator;
     use super::sqlite_integrity_check;
     use super::state_db_path;
-    use super::thread_history_db_path;
     use super::test_support::unique_temp_dir;
+    use super::thread_history_db_path;
     use crate::DB_INIT_METRIC;
     use crate::DbTelemetry;
     use crate::migrations::STATE_MIGRATOR;

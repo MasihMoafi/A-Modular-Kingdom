@@ -130,10 +130,7 @@ async fn seed_stage1_output(state_db: &Arc<StateRuntime>, codex_home: &Path) -> 
     Ok(thread_id)
 }
 
-async fn init_state_db(
-    codex_home: &Path,
-    memory_state_root: &Path,
-) -> Result<Arc<StateRuntime>> {
+async fn init_state_db(codex_home: &Path, memory_state_root: &Path) -> Result<Arc<StateRuntime>> {
     let state_db = StateRuntime::init_with_memories_state_root(
         codex_home.to_path_buf(),
         memory_state_root.to_path_buf(),

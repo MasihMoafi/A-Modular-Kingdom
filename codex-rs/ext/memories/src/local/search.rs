@@ -72,12 +72,7 @@ pub(super) async fn search(
         ));
     }
     let end_index = start_index.saturating_add(max_results).min(matches.len());
-    rank_matches(
-        &mut matches,
-        today_days(),
-        matcher.queries.len(),
-        end_index,
-    );
+    rank_matches(&mut matches, today_days(), matcher.queries.len(), end_index);
     let next_cursor = (end_index < matches.len()).then(|| end_index.to_string());
     let truncated = next_cursor.is_some();
     Ok(SearchMemoriesResponse {
@@ -388,9 +383,12 @@ fn dated_memory_date(path: &Path, lines: &[&str], match_index: usize) -> Option<
 fn parse_metadata_date(line: &str) -> Option<i64> {
     let (key, value) = line.split_once(':')?;
     let key = key.trim().to_ascii_lowercase();
-    matches!(key.as_str(), "date" | "created" | "created_at" | "updated" | "updated_at")
-        .then(|| value.trim())
-        .and_then(parse_date)
+    matches!(
+        key.as_str(),
+        "date" | "created" | "created_at" | "updated" | "updated_at"
+    )
+    .then(|| value.trim())
+    .and_then(parse_date)
 }
 
 fn parse_date(value: &str) -> Option<i64> {
@@ -559,7 +557,10 @@ mod tests {
             dated_memory_date(Path::new("MEMORY.md"), &["date: 2026-07-02"], 1),
             Some(days_from_civil(2026, 7, 2))
         );
-        assert_eq!(dated_memory_date(Path::new("MEMORY.md"), &["alpha"], 1), None);
+        assert_eq!(
+            dated_memory_date(Path::new("MEMORY.md"), &["alpha"], 1),
+            None
+        );
     }
 
     #[test]

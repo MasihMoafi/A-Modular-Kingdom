@@ -1805,7 +1805,10 @@ async fn reset_memories_clears_configured_memory_directory() -> Result<()> {
         Box::pin(app.reset_memories_with_app_server(&mut app_server)).await;
 
         assert_eq!(std::fs::read_dir(&memory_root)?.count(), 0);
-        assert!(codex_memory.exists(), "reset must not clear CODEX_HOME memories");
+        assert!(
+            codex_memory.exists(),
+            "reset must not clear CODEX_HOME memories"
+        );
 
         app_server.shutdown().await?;
         Ok(())
