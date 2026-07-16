@@ -36,7 +36,9 @@ _TOOL = {
     "name": "query_knowledge_base",
     "description": (
         "Run local RAG over the launch workspace or supplied files or directory. "
-        "Use broad retrieval only when exact file reads are insufficient."
+        "Use this autonomously when broad semantic discovery would avoid loading many files "
+        "into context. For code changes, follow retrieved source paths with exact search or "
+        "file reads to obtain current line positions."
     ),
     "inputSchema": {
         "type": "object",

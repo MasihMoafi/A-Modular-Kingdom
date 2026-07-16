@@ -110,6 +110,54 @@ fn next_add_to_history_event(rx: &mut tokio::sync::mpsc::UnboundedReceiver<AppEv
 }
 
 #[tokio::test]
+async fn rag_command_routes_query_to_elpis_rag_tool() {
+    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.thread_id = Some(ThreadId::new());
+
+    chat.dispatch_command_with_args(
+        SlashCommand::Rag,
+        "how is context managed?".to_string(),
+        Vec::new(),
+    );
+
+    match next_submit_op(&mut op_rx) {
+        Op::UserTurn { items, .. } => {
+            let [UserInput::Text { text, .. }] = items.as_slice() else {
+                panic!("expected one text input, got {items:?}");
+            };
+            assert!(text.contains("`elpis-rag`"));
+            assert!(text.contains("`query_knowledge_base`"));
+            assert!(text.contains("how is context managed?"));
+            assert!(text.contains("current workspace"));
+        }
+        other => panic!("expected RAG user turn, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn rag_command_routes_explicit_path_to_elpis_rag_tool() {
+    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.thread_id = Some(ThreadId::new());
+
+    chat.dispatch_command_with_args(
+        SlashCommand::Rag,
+        "docs -- what is Elpis?".to_string(),
+        Vec::new(),
+    );
+
+    match next_submit_op(&mut op_rx) {
+        Op::UserTurn { items, .. } => {
+            let [UserInput::Text { text, .. }] = items.as_slice() else {
+                panic!("expected one text input, got {items:?}");
+            };
+            assert!(text.contains("doc_path `docs`"));
+            assert!(text.contains("query `what is Elpis?`"));
+        }
+        other => panic!("expected RAG user turn, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn service_tier_commands_lowercase_catalog_names() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.4")).await;
     let mut preset = get_available_model(&chat, "gpt-5.4");

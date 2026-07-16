@@ -28,6 +28,7 @@ pub enum SlashCommand {
     AutoReview,
     Memories,
     Skills,
+    Rag,
     Import,
     Hooks,
     Review,
@@ -103,6 +104,7 @@ impl SlashCommand {
             SlashCommand::Diff => "show git diff (including untracked files)",
             SlashCommand::Mention => "mention a file",
             SlashCommand::Skills => "use skills to improve how Codex performs specific tasks",
+            SlashCommand::Rag => "search Elpis's local knowledge base",
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Status => "show current session configuration and token usage",
@@ -157,6 +159,7 @@ impl SlashCommand {
         matches!(
             self,
             SlashCommand::Review
+                | SlashCommand::Rag
                 | SlashCommand::Rename
                 | SlashCommand::Plan
                 | SlashCommand::Goal
@@ -178,6 +181,7 @@ impl SlashCommand {
         matches!(
             self,
             SlashCommand::Copy
+                | SlashCommand::Rag
                 | SlashCommand::Raw
                 | SlashCommand::Diff
                 | SlashCommand::Mention
@@ -219,6 +223,7 @@ impl SlashCommand {
             | SlashCommand::Rename
             | SlashCommand::Mention
             | SlashCommand::Skills
+            | SlashCommand::Rag
             | SlashCommand::Hooks
             | SlashCommand::Status
             | SlashCommand::Usage
@@ -331,6 +336,7 @@ mod tests {
 
     #[test]
     fn certain_commands_are_available_during_task() {
+        assert!(SlashCommand::Rag.available_during_task());
         assert!(SlashCommand::Goal.available_during_task());
         assert!(SlashCommand::Ide.available_during_task());
         assert!(SlashCommand::Title.available_during_task());

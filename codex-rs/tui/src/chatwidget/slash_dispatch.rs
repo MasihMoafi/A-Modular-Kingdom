@@ -35,6 +35,7 @@ const SIDE_STARTING_CONTEXT_LABEL: &str = "Side starting...";
 const SIDE_SLASH_COMMAND_UNAVAILABLE_HINT: &str =
     "Press Ctrl+C to return to the main thread first.";
 const GOAL_USAGE_HINT: &str = "Example: /goal improve benchmark coverage";
+const RAG_USAGE: &str = "Usage: /rag <query> or /rag <path> -- <query>";
 const RAW_USAGE: &str = "Usage: /raw [on|off]";
 const USAGE_CHATGPT_LOGIN_REQUIRED: &str = "Sign in with ChatGPT to use /usage.";
 
@@ -421,6 +422,9 @@ impl ChatWidget {
             SlashCommand::Skills => {
                 self.open_skills_menu();
             }
+            SlashCommand::Rag => {
+                self.add_error_message(RAG_USAGE.to_string());
+            }
             SlashCommand::Import => {
                 self.app_event_tx
                     .send(AppEvent::OpenExternalAgentConfigMigration);
@@ -698,6 +702,27 @@ impl ChatWidget {
                 }
                 _ => self.add_error_message("Usage: /hotkeys [debug]".to_string()),
             },
+            SlashCommand::Rag => {
+                let request = match trimmed.split_once(" -- ") {
+                    Some((doc_path, query))
+                        if !doc_path.trim().is_empty() && !query.trim().is_empty() =>
+                    {
+                        format!(
+                            "Use the Elpis `elpis-rag` MCP server's `query_knowledge_base` tool with doc_path `{}` and query `{}`. Base the answer on the retrieved chunks and cite their source paths.",
+                            doc_path.trim(),
+                            query.trim(),
+                        )
+                    }
+                    Some(_) => {
+                        self.add_error_message(RAG_USAGE.to_string());
+                        return;
+                    }
+                    None => format!(
+                        "Use the Elpis `elpis-rag` MCP server's `query_knowledge_base` tool to search the current workspace for `{trimmed}`. Base the answer on the retrieved chunks and cite their source paths."
+                    ),
+                };
+                self.submit_user_message(UserMessage::from(request));
+            }
             SlashCommand::Raw => match trimmed.to_ascii_lowercase().as_str() {
                 "on" => {
                     self.set_raw_output_mode_and_notify(/*enabled*/ true);
@@ -1089,6 +1114,7 @@ impl ChatWidget {
             | SlashCommand::Logout
             | SlashCommand::Mention
             | SlashCommand::Skills
+            | SlashCommand::Rag
             | SlashCommand::Import
             | SlashCommand::Hooks
             | SlashCommand::Title

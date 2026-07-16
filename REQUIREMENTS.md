@@ -73,6 +73,15 @@ not merely described in a prompt.
 Documentation must distinguish current behavior from intended behavior. Each required
 feature needs a focused user-visible check before it is marked working.
 
+### R8. Internal RAG is available directly and autonomously
+
+`/rag <query>` searches the current workspace, while `/rag <path> -- <query>` targets
+a selected folder. The active runtime may also call the same RAG tool autonomously when
+broad semantic retrieval would reduce context load. RAG identifies relevant chunks and
+source paths; code edits must still use exact search or file reads for current positions.
+
+Elpis's primary visual identity uses amber, between orange and yellow, not purple.
+
 ## Required Work, In Order
 
 1. **Stabilize and subtract from the imported Codex foundation**

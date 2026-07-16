@@ -10,10 +10,10 @@ use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 
-const LIGHT_BG_PRIMARY_RGB: (u8, u8, u8) = (91, 54, 166);
-const DARK_BG_PRIMARY_RGB: (u8, u8, u8) = (194, 167, 255);
-const LIGHT_BG_SECONDARY_RGB: (u8, u8, u8) = (0, 107, 104);
-const DARK_BG_SECONDARY_RGB: (u8, u8, u8) = (94, 234, 212);
+const LIGHT_BG_PRIMARY_RGB: (u8, u8, u8) = (168, 92, 0);
+const DARK_BG_PRIMARY_RGB: (u8, u8, u8) = (255, 184, 48);
+const LIGHT_BG_SECONDARY_RGB: (u8, u8, u8) = (190, 69, 0);
+const DARK_BG_SECONDARY_RGB: (u8, u8, u8) = (255, 214, 92);
 const LIGHT_BG_STATUS_RGB: (u8, u8, u8) = (145, 95, 0);
 const DARK_BG_STATUS_RGB: (u8, u8, u8) = (255, 209, 102);
 // Decorative table rules should remain visible without competing with cell content.
@@ -153,7 +153,7 @@ mod tests {
     use ratatui::style::Modifier;
 
     #[test]
-    fn accent_style_uses_darker_violet_on_light_backgrounds() {
+    fn accent_style_uses_darker_amber_on_light_backgrounds() {
         let style = accent_style_for(Some((255, 255, 255)));
 
         assert_eq!(style.fg, Some(best_color(LIGHT_BG_PRIMARY_RGB)));
@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn accent_style_uses_violet_on_dark_or_unknown_backgrounds() {
+    fn accent_style_uses_amber_on_dark_or_unknown_backgrounds() {
         let expected = Style::default().fg(best_color(DARK_BG_PRIMARY_RGB)).bold();
 
         assert_eq!(accent_style_for(Some((0, 0, 0))), expected);
