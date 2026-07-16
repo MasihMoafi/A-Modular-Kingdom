@@ -61,6 +61,8 @@ jobs:
             ~/.cargo/git/db
             codex-rs/target
           key: embedded-elpis-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock', 'codex-rs/rust-toolchain.toml') }}
+          restore-keys: |
+            embedded-elpis-${{ runner.os }}-
 
       - name: Verify memory recall tracking
         run: cargo test -p codex-state --locked record_stage1_output_usage_updates_usage_metadata
