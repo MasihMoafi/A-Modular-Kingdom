@@ -73,11 +73,6 @@ pub enum SlashCommand {
     Personality,
     #[strum(serialize = "subagents")]
     MultiAgents,
-    // Debugging commands.
-    #[strum(serialize = "debug-m-drop")]
-    MemoryDrop,
-    #[strum(serialize = "debug-m-update")]
-    MemoryUpdate,
 }
 
 impl SlashCommand {
@@ -114,8 +109,6 @@ impl SlashCommand {
             SlashCommand::Pets => "choose or hide the terminal pet",
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Stop => "kill all background terminals",
-            SlashCommand::MemoryDrop => "DO NOT USE",
-            SlashCommand::MemoryUpdate => "DO NOT USE",
             SlashCommand::Model => "choose a provider-aware model and reasoning effort",
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
@@ -209,9 +202,7 @@ impl SlashCommand {
             | SlashCommand::Review
             | SlashCommand::Plan
             | SlashCommand::Clear
-            | SlashCommand::Logout
-            | SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate => false,
+            | SlashCommand::Logout => false,
             SlashCommand::Diff
             | SlashCommand::Resume
             | SlashCommand::Model
@@ -268,9 +259,7 @@ impl SlashCommand {
             | SlashCommand::Mcp
             | SlashCommand::Quit
             | SlashCommand::Clear => true,
-            SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate
-            | SlashCommand::Keymap
+            SlashCommand::Keymap
             | SlashCommand::Hooks
             | SlashCommand::Rename
             | SlashCommand::Delete
@@ -347,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    fn removed_commands_are_not_visible() {
+    fn removed_commands_are_not_visible_or_parseable() {
         let visible = super::built_in_slash_commands()
             .into_iter()
             .map(|(name, _)| name)
@@ -358,6 +347,8 @@ mod tests {
             "btw",
             "copy",
             "del",
+            "debug-m-drop",
+            "debug-m-update",
             "exit",
             "feedback",
             "fork",
@@ -386,6 +377,8 @@ mod tests {
         }
         assert!(visible.contains(&"memories"));
         assert!(visible.contains(&"add"));
+        assert!(SlashCommand::from_str("debug-m-drop").is_err());
+        assert!(SlashCommand::from_str("debug-m-update").is_err());
     }
 
     #[test]
