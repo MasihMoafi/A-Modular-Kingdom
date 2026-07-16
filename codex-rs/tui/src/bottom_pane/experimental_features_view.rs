@@ -56,9 +56,7 @@ impl ExperimentalFeaturesView {
     ) -> Self {
         let mut header = ColumnRenderable::new();
         header.push(Line::from("Settings".bold()));
-        header.push(Line::from(
-            "Changes are saved to config.toml.".dim(),
-        ));
+        header.push(Line::from("Changes are saved to config.toml.".dim()));
 
         let mut view = Self {
             features,
