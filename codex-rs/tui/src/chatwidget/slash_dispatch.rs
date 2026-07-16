@@ -696,7 +696,7 @@ impl ChatWidget {
                         }
                     }
                 }
-                _ => self.add_error_message("Usage: /keymap [debug]".to_string()),
+                _ => self.add_error_message("Usage: /hotkeys [debug]".to_string()),
             },
             SlashCommand::Raw => match trimmed.to_ascii_lowercase().as_str() {
                 "on" => {

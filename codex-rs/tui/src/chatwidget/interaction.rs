@@ -47,6 +47,15 @@ impl ChatWidget {
             return;
         }
 
+        if key_event.kind == KeyEventKind::Press
+            && key_hint::ctrl(KeyCode::Char('k')).is_press(key_event)
+            && self.bottom_pane.composer_is_empty()
+            && self.bottom_pane.no_modal_or_popup_active()
+        {
+            self.clean_background_terminals();
+            return;
+        }
+
         match key_event {
             KeyEvent {
                 code: KeyCode::Char(c),

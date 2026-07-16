@@ -525,7 +525,7 @@ mod tests {
     }
 
     #[test]
-    fn plan_command_visible_when_collaboration_modes_enabled() {
+    fn plan_command_stays_removed_when_collaboration_modes_enabled() {
         let mut popup = CommandPopup::new(
             CommandPopupFlags {
                 collaboration_modes_enabled: true,
@@ -542,13 +542,7 @@ mod tests {
         );
         popup.on_composer_text_change("/plan".to_string());
 
-        match popup.selected_item() {
-            Some(CommandItem::Builtin(cmd)) => assert_eq!(cmd.command(), "plan"),
-            Some(CommandItem::ServiceTier(command)) => {
-                panic!("expected plan command, got service tier {command:?}")
-            }
-            other => panic!("expected plan to be selected for exact match, got {other:?}"),
-        }
+        assert!(popup.filtered_items().is_empty());
     }
 
     #[test]
@@ -584,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn personality_command_visible_when_enabled() {
+    fn personality_command_stays_removed_when_enabled() {
         let mut popup = CommandPopup::new(
             CommandPopupFlags {
                 collaboration_modes_enabled: true,
@@ -601,13 +595,7 @@ mod tests {
         );
         popup.on_composer_text_change("/personality".to_string());
 
-        match popup.selected_item() {
-            Some(CommandItem::Builtin(cmd)) => assert_eq!(cmd.command(), "personality"),
-            Some(CommandItem::ServiceTier(command)) => {
-                panic!("expected personality command, got service tier {command:?}")
-            }
-            other => panic!("expected personality to be selected for exact match, got {other:?}"),
-        }
+        assert!(popup.filtered_items().is_empty());
     }
 
     #[test]

@@ -15,12 +15,14 @@ pub enum SlashCommand {
     Model,
     Ide,
     Permissions,
+    #[strum(to_string = "hotkeys")]
     Keymap,
     Vim,
     #[strum(serialize = "setup-default-sandbox")]
     ElevateSandbox,
     #[strum(serialize = "sandbox-add-read-dir")]
     SandboxReadRoot,
+    #[strum(to_string = "settings")]
     Experimental,
     #[strum(to_string = "approve")]
     AutoReview,
@@ -32,6 +34,7 @@ pub enum SlashCommand {
     Rename,
     New,
     Archive,
+    #[strum(to_string = "del")]
     Delete,
     Resume,
     Fork,
@@ -64,7 +67,7 @@ pub enum SlashCommand {
     Feedback,
     Rollout,
     Ps,
-    #[strum(to_string = "stop", serialize = "clean")]
+    #[strum(to_string = "kill")]
     Stop,
     Clear,
     Personality,
@@ -90,11 +93,11 @@ impl SlashCommand {
             SlashCommand::Rename => "rename the current thread",
             SlashCommand::Resume => "resume a saved chat",
             SlashCommand::Archive => "archive this session and exit",
-            SlashCommand::Delete => "permanently delete this session and exit",
+            SlashCommand::Delete => "permanently delete this session and quit",
             SlashCommand::Clear => "clear the terminal and start a new chat",
             SlashCommand::Fork => "fork the current chat",
             SlashCommand::App => "continue this session in Codex Desktop",
-            SlashCommand::Quit | SlashCommand::Exit => "exit Codex",
+            SlashCommand::Quit | SlashCommand::Exit => "quit Elpis",
             SlashCommand::Copy => "copy last response as markdown",
             SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
             SlashCommand::Diff => "show git diff (including untracked files)",
@@ -110,7 +113,7 @@ impl SlashCommand {
             SlashCommand::Theme => "choose a syntax highlighting theme",
             SlashCommand::Pets => "choose or hide the terminal pet",
             SlashCommand::Ps => "list background terminals",
-            SlashCommand::Stop => "stop all background terminals",
+            SlashCommand::Stop => "kill all background terminals",
             SlashCommand::MemoryDrop => "DO NOT USE",
             SlashCommand::MemoryUpdate => "DO NOT USE",
             SlashCommand::Model => "choose what model and reasoning effort to use",
@@ -125,13 +128,13 @@ impl SlashCommand {
                 "start a side conversation in an ephemeral fork"
             }
             SlashCommand::Permissions => "choose what Codex is allowed to do",
-            SlashCommand::Keymap => "remap TUI shortcuts",
+            SlashCommand::Keymap => "view or change TUI hotkeys",
             SlashCommand::Vim => "toggle Vim mode for the composer",
             SlashCommand::ElevateSandbox => "set up elevated agent sandbox",
             SlashCommand::SandboxReadRoot => {
                 "let sandbox read a directory: /sandbox-add-read-dir <absolute_path>"
             }
-            SlashCommand::Experimental => "toggle experimental features",
+            SlashCommand::Experimental => "configure Elpis settings",
             SlashCommand::AutoReview => "approve one retry of a recent auto-review denial",
             SlashCommand::Memories => "configure memory use and generation",
             SlashCommand::Mcp => "list configured MCP tools; use /mcp verbose for details",
@@ -245,6 +248,18 @@ impl SlashCommand {
 
     fn is_visible(self) -> bool {
         match self {
+            SlashCommand::Archive
+            | SlashCommand::Exit
+            | SlashCommand::Memories
+            | SlashCommand::MemoryDrop
+            | SlashCommand::MemoryUpdate
+            | SlashCommand::Mention
+            | SlashCommand::Personality
+            | SlashCommand::Plan
+            | SlashCommand::Pets
+            | SlashCommand::Raw
+            | SlashCommand::Usage
+            | SlashCommand::Vim => false,
             SlashCommand::SandboxReadRoot => cfg!(target_os = "windows"),
             SlashCommand::Copy => !cfg!(target_os = "android"),
             SlashCommand::App => cfg!(any(target_os = "macos", target_os = "windows")),
@@ -270,19 +285,46 @@ mod tests {
     use super::SlashCommand;
 
     #[test]
-    fn stop_command_is_canonical_name() {
-        assert_eq!(SlashCommand::Stop.command(), "stop");
+    fn kill_command_is_canonical_name() {
+        assert_eq!(SlashCommand::Stop.command(), "kill");
     }
 
     #[test]
-    fn clean_alias_parses_to_stop_command() {
-        assert_eq!(SlashCommand::from_str("clean"), Ok(SlashCommand::Stop));
+    fn removed_stop_names_do_not_parse() {
+        assert!(SlashCommand::from_str("stop").is_err());
+        assert!(SlashCommand::from_str("clean").is_err());
     }
 
     #[test]
-    fn pet_alias_parses_to_pets_command() {
-        assert_eq!(SlashCommand::Pets.command(), "pets");
-        assert_eq!(SlashCommand::from_str("pet"), Ok(SlashCommand::Pets));
+    fn renamed_commands_use_elpis_names() {
+        assert_eq!(SlashCommand::Keymap.command(), "hotkeys");
+        assert_eq!(SlashCommand::Delete.command(), "del");
+        assert_eq!(SlashCommand::Experimental.command(), "settings");
+        assert!(SlashCommand::from_str("keymap").is_err());
+        assert!(SlashCommand::from_str("delete").is_err());
+        assert!(SlashCommand::from_str("experimental").is_err());
+    }
+
+    #[test]
+    fn removed_commands_are_not_visible() {
+        let visible = super::built_in_slash_commands()
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>();
+        for removed in [
+            "archive",
+            "exit",
+            "memories",
+            "mention",
+            "personality",
+            "plan",
+            "pets",
+            "raw",
+            "usage",
+            "vim",
+        ] {
+            assert!(!visible.contains(&removed), "{removed} should be removed");
+        }
     }
 
     #[test]
@@ -291,9 +333,6 @@ mod tests {
         assert!(SlashCommand::Ide.available_during_task());
         assert!(SlashCommand::Title.available_during_task());
         assert!(SlashCommand::Statusline.available_during_task());
-        assert!(SlashCommand::Raw.available_during_task());
-        assert!(SlashCommand::Raw.available_in_side_conversation());
-        assert!(SlashCommand::Raw.supports_inline_args());
         assert!(SlashCommand::App.available_during_task());
     }
 

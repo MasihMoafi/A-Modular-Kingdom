@@ -1,6 +1,6 @@
 //! Settings-adjacent popup surfaces for `ChatWidget`.
 //!
-//! This keeps theme, personality, and experimental-feature UI out of the main
+//! This keeps theme, personality, and settings UI out of the main
 //! orchestration module without changing their event wiring.
 
 use super::*;
@@ -91,19 +91,12 @@ impl ChatWidget {
     }
 
     pub(crate) fn open_experimental_popup(&mut self) {
-        let features: Vec<ExperimentalFeatureItem> = FEATURES
-            .iter()
-            .filter_map(|spec| {
-                let name = spec.stage.experimental_menu_name()?;
-                let description = spec.stage.experimental_menu_description()?;
-                Some(ExperimentalFeatureItem {
-                    feature: spec.id,
-                    name: name.to_string(),
-                    description: description.to_string(),
-                    enabled: self.config.features.enabled(spec.id),
-                })
-            })
-            .collect();
+        let features = vec![ExperimentalFeatureItem {
+            feature: Feature::PreventIdleSleep,
+            name: "Keep computer awake".to_string(),
+            description: "Prevent sleep while Elpis is working.".to_string(),
+            enabled: self.config.features.enabled(Feature::PreventIdleSleep),
+        }];
 
         let view = ExperimentalFeaturesView::new(
             features,

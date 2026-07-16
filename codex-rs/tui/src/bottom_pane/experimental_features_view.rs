@@ -55,9 +55,9 @@ impl ExperimentalFeaturesView {
         keymap: ListKeymap,
     ) -> Self {
         let mut header = ColumnRenderable::new();
-        header.push(Line::from("Experimental features".bold()));
+        header.push(Line::from("Settings".bold()));
         header.push(Line::from(
-            "Toggle experimental features. Changes are saved to config.toml.".dim(),
+            "Changes are saved to config.toml.".dim(),
         ));
 
         let mut view = Self {

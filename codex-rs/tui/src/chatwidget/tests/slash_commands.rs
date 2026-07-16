@@ -1881,7 +1881,7 @@ async fn slash_keymap_debug_can_inspect_app_shortcuts() {
 async fn slash_keymap_invalid_args_show_usage() {
     let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
 
-    submit_composer_text(&mut chat, "/keymap nope");
+    submit_composer_text(&mut chat, "/hotkeys nope");
 
     let cells = drain_insert_history(&mut rx);
     let rendered = cells
@@ -1890,10 +1890,10 @@ async fn slash_keymap_invalid_args_show_usage() {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(
-        rendered.contains("Usage: /keymap [debug]"),
+        rendered.contains("Usage: /hotkeys [debug]"),
         "expected usage message, got: {rendered:?}"
     );
-    assert_eq!(recall_latest_after_clearing(&mut chat), "/keymap nope");
+    assert_eq!(recall_latest_after_clearing(&mut chat), "/hotkeys nope");
     assert!(op_rx.try_recv().is_err(), "expected no core op to be sent");
 }
 
@@ -2081,7 +2081,7 @@ async fn slash_exit_requests_exit() {
 }
 
 #[tokio::test]
-async fn slash_stop_submits_background_terminal_cleanup() {
+async fn slash_kill_submits_background_terminal_cleanup() {
     let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
 
     chat.dispatch_command(SlashCommand::Stop);
@@ -2091,9 +2091,30 @@ async fn slash_stop_submits_background_terminal_cleanup() {
     assert_eq!(cells.len(), 1, "expected cleanup confirmation message");
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
-        rendered.contains("Stopping all background terminals."),
+        rendered.contains("Killing all background terminals."),
         "expected cleanup confirmation, got {rendered:?}"
     );
+}
+
+#[tokio::test]
+async fn ctrl_k_kills_background_terminals_when_composer_is_empty() {
+    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+
+    chat.handle_key_event(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL));
+
+    assert_matches!(op_rx.try_recv(), Ok(Op::CleanBackgroundTerminals));
+}
+
+#[tokio::test]
+async fn ctrl_k_keeps_editor_behavior_when_composer_has_text() {
+    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.bottom_pane
+        .set_composer_text("draft".to_string(), Vec::new(), Vec::new());
+
+    chat.handle_key_event(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL));
+
+    assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
+    assert_eq!(chat.bottom_pane.composer_text(), "draft");
 }
 
 #[tokio::test]

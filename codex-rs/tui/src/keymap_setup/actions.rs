@@ -1,4 +1,4 @@
-//! Catalog and accessors for keymap actions shown by `/keymap`.
+//! Catalog and accessors for keymap actions shown by `/hotkeys`.
 //!
 //! The descriptor table is the single UI-facing inventory of configurable
 //! actions. Each descriptor ties together the config path segment, user-facing
@@ -30,7 +30,7 @@ pub(super) struct KeymapActionDescriptor {
     pub(super) action: &'static str,
     /// Short user-facing explanation of what the action does.
     pub(super) description: &'static str,
-    /// Feature required before the action appears in `/keymap`.
+    /// Feature required before the action appears in `/hotkeys`.
     required_feature: Option<KeymapActionFeature>,
 }
 

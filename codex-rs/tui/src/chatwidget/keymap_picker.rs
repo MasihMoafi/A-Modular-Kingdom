@@ -1,10 +1,10 @@
-//! `ChatWidget` integration points for the `/keymap` picker flow.
+//! `ChatWidget` integration points for the `/hotkeys` picker flow.
 //!
 //! The picker model, capture view, and edit semantics live in [`crate::keymap_setup`]. This module
 //! keeps only the `ChatWidget`-owned responsibilities: opening those views in the bottom pane,
 //! routing users back to the right picker row after an edit, and synchronizing the committed
 //! keymap config back into the live widget state. Keeping these methods outside `chatwidget.rs`
-//! keeps the main transcript/event surface from also owning the `/keymap` navigation details.
+//! keeps the main transcript/event surface from also owning the `/hotkeys` navigation details.
 //!
 //! The important invariant is that any accepted keymap edit must update three places together:
 //! the stored `Config.tui_keymap`, the cached copy-response binding used by app-level shortcuts,
@@ -21,7 +21,7 @@ use crate::keymap::RuntimeKeymap;
 use crate::keymap_setup;
 
 impl ChatWidget {
-    /// Opens the root `/keymap` picker using the current `tui.keymap` configuration.
+    /// Opens the root `/hotkeys` picker using the current `tui.keymap` configuration.
     ///
     /// This validates the persisted keymap before building picker rows because every subsequent
     /// picker screen needs the effective runtime bindings, including preset defaults and user

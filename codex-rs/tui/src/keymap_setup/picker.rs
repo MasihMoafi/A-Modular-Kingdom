@@ -1,4 +1,4 @@
-//! Shortcut picker construction for `/keymap`.
+//! Shortcut picker construction for `/hotkeys`.
 
 use codex_config::types::TuiKeymap;
 use ratatui::style::Styled;
@@ -439,7 +439,7 @@ fn keymap_row_prefix(row: &KeymapActionRow) -> Vec<Span<'static>> {
 
 fn keymap_header(description: String, summary: String) -> Box<dyn Renderable> {
     let mut header = ColumnRenderable::new();
-    header.push(Line::from("Keymap".bold()));
+    header.push(Line::from("Hotkeys".bold()));
     header.push(Line::from(description.dim()));
     header.push(Line::from(summary.dim()));
     Box::new(header)

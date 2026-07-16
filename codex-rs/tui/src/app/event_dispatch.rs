@@ -2492,7 +2492,7 @@ impl App {
         };
         if self.side_threads.contains_key(&thread_id) {
             self.chat_widget.add_error_message(
-                "'/delete' is unavailable in side conversations. Press Ctrl+C to return to the main thread first."
+                "'/del' is unavailable in side conversations. Press Ctrl+C to return to the main thread first."
                     .to_string(),
             );
             return AppRunControl::Continue;

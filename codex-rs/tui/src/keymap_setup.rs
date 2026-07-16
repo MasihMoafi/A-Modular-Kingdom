@@ -1,4 +1,4 @@
-//! Guided keymap remapping UI for `/keymap`.
+//! Guided keymap remapping UI for `/hotkeys`.
 //!
 //! This module owns the interactive editing flow that starts from a resolved
 //! [`RuntimeKeymap`] and produces a new root-level [`TuiKeymap`] override. The
@@ -463,7 +463,7 @@ pub(crate) fn keymap_with_edit(
         KeymapEditIntent::ReplaceOne { old_key } => {
             if !current_bindings.iter().any(|binding| binding == old_key) {
                 return Err(format!(
-                    "`{context}.{action}` no longer uses `{old_key}`. Reopen /keymap and choose a binding again."
+                    "`{context}.{action}` no longer uses `{old_key}`. Reopen /hotkeys and choose a binding again."
                 ));
             }
             let bindings = current_bindings
@@ -514,7 +514,7 @@ fn keymap_with_bindings(
 ) -> Result<TuiKeymap, String> {
     let mut keymap = keymap.clone();
     let slot = binding_slot(&mut keymap, context, action).ok_or_else(|| {
-        format!("Unknown keymap action `{context}.{action}`. Reopen /keymap and choose an action.")
+        format!("Unknown keymap action `{context}.{action}`. Reopen /hotkeys and choose an action.")
     })?;
     *slot = Some(match keys {
         [key] => KeybindingsSpec::One(KeybindingSpec(key.clone())),
@@ -539,7 +539,7 @@ pub(crate) fn active_binding_specs(
     action: &str,
 ) -> Result<Vec<String>, String> {
     let bindings = bindings_for_action(runtime_keymap, context, action).ok_or_else(|| {
-        format!("Unknown keymap action `{context}.{action}`. Reopen /keymap and choose an action.")
+        format!("Unknown keymap action `{context}.{action}`. Reopen /hotkeys and choose an action.")
     })?;
     bindings
         .iter()
@@ -568,7 +568,7 @@ pub(crate) fn keymap_without_custom_binding(
 ) -> Result<TuiKeymap, String> {
     let mut keymap = keymap.clone();
     let slot = binding_slot(&mut keymap, context, action).ok_or_else(|| {
-        format!("Unknown keymap action `{context}.{action}`. Reopen /keymap and choose an action.")
+        format!("Unknown keymap action `{context}.{action}`. Reopen /hotkeys and choose an action.")
     })?;
     *slot = None;
     Ok(keymap)
@@ -577,12 +577,12 @@ pub(crate) fn keymap_without_custom_binding(
 fn has_custom_binding(keymap: &TuiKeymap, context: &str, action: &str) -> Result<bool, String> {
     let mut keymap = keymap.clone();
     let slot = binding_slot(&mut keymap, context, action).ok_or_else(|| {
-        format!("Unknown keymap action `{context}.{action}`. Reopen /keymap and choose an action.")
+        format!("Unknown keymap action `{context}.{action}`. Reopen /hotkeys and choose an action.")
     })?;
     Ok(slot.is_some())
 }
 
-/// Bottom-pane view that captures a single key event for a pending `/keymap` edit.
+/// Bottom-pane view that captures a single key event for a pending `/hotkeys` edit.
 ///
 /// The view is deliberately transient: it renders instructions, accepts one
 /// keypress, and emits the captured key to the app layer. It does not mutate
@@ -1230,7 +1230,7 @@ mod tests {
         let params = build_keymap_picker_params(&runtime, &TuiKeymap::default());
         let rendered = render_picker(params, /*width*/ 78);
 
-        assert!(rendered.contains("Keymap"));
+        assert!(rendered.contains("Hotkeys"));
         assert!(rendered.contains("Open Transcript"));
         assert!(rendered.contains("ctrl-t"));
         assert!(!rendered.contains("Selected Action"));

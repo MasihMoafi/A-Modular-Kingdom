@@ -953,7 +953,7 @@ fn shortcut_overlay_lines(state: ShortcutsState) -> Vec<Line<'static>> {
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         "customize shortcuts with ".into(),
-        "/keymap".cyan(),
+        "/hotkeys".cyan(),
     ]));
     lines
 }

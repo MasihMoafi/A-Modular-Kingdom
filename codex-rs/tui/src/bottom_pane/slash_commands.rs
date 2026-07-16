@@ -199,19 +199,17 @@ mod tests {
     }
 
     #[test]
-    fn stop_command_resolves_for_dispatch() {
+    fn kill_command_resolves_for_dispatch() {
         assert_eq!(
-            find_builtin_command("stop", all_enabled_flags()),
+            find_builtin_command("kill", all_enabled_flags()),
             Some(SlashCommand::Stop)
         );
     }
 
     #[test]
-    fn clean_command_alias_resolves_for_dispatch() {
-        assert_eq!(
-            find_builtin_command("clean", all_enabled_flags()),
-            Some(SlashCommand::Stop)
-        );
+    fn removed_stop_names_do_not_resolve() {
+        assert_eq!(find_builtin_command("stop", all_enabled_flags()), None);
+        assert_eq!(find_builtin_command("clean", all_enabled_flags()), None);
     }
 
     #[test]
@@ -280,13 +278,10 @@ mod tests {
     }
 
     #[test]
-    fn usage_command_exact_lookup_still_resolves_when_account_token_activity_is_disabled() {
+    fn removed_usage_command_does_not_resolve() {
         let mut flags = all_enabled_flags();
         flags.token_activity_command_enabled = false;
-        assert_eq!(
-            find_builtin_command("usage", flags),
-            Some(SlashCommand::Usage)
-        );
+        assert_eq!(find_builtin_command("usage", flags), None);
     }
 
     #[test]
@@ -304,11 +299,8 @@ mod tests {
             vec![
                 SlashCommand::Ide,
                 SlashCommand::Copy,
-                SlashCommand::Raw,
                 SlashCommand::Diff,
-                SlashCommand::Mention,
                 SlashCommand::Status,
-                SlashCommand::Usage,
             ]
         );
     }
