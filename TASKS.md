@@ -38,10 +38,13 @@ product, but must not claim unfinished behavior is available.
 - Implemented and remotely verified: distinct recall-context tracking and a promotion
   gate requiring three recalls across two contexts. Weak one-off memories remain
   searchable as short-term evidence instead of entering `MEMORY.md`.
-- Implemented locally, pending remote verification: Elpis-owned artifact/database roots,
-  age-based fading, diverse exact retrieval, and semantic RAG fallback with exact-read
-  provenance.
-- Next: bounded long-term storage and a review/delete path.
+- Implemented, pending remote verification: Elpis-owned artifact/database roots,
+  age-based fading, diverse exact retrieval, semantic RAG fallback with exact-read
+  provenance, and hard 30,000/10,000-character limits for durable memory/summary.
+- Review/delete path: memory remains inspectable as ordinary files under
+  `~/.elpis/memories`; granular edits remove stale entries, while the confirmed reset-all
+  action clears Elpis memory without deleting Codex data.
+- Next: remote verification and the end-to-end memory acceptance check.
 - Proof: teach a project fact, recall it in a related new session with provenance, omit
   it from an unrelated session, and allow review/deletion.
 

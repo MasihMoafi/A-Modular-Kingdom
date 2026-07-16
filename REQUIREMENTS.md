@@ -127,7 +127,7 @@ Elpis's primary visual identity uses amber, between orange and yellow, not purpl
 | Context list and compact records | Specified in docs; not implemented. |
 | Compaction/checkpoints/lean continuation | Specified in docs; not implemented. |
 | Inherited Codex memory | A substantial Rust extraction, consolidation, retrieval, citation, and artifact pipeline is present and enabled by default; Elpis acceptance has not been run. |
-| OpenClaw-style memory | In progress. Recall counting and promotion are remotely verified. Elpis-owned storage, age-aware diverse retrieval, and semantic fallback are implemented locally pending remote verification; bounded storage, review, deletion, and acceptance remain. |
+| OpenClaw-style memory | In progress. Recall counting and promotion are remotely verified. Elpis-owned storage, age-aware diverse retrieval, semantic fallback, and hard artifact-size limits are implemented pending remote verification. Ordinary memory files plus the confirmed reset-all action provide review/deletion; end-to-end acceptance remains. |
 | `/auto` model routing | Nice-to-have and not implemented. Product documents may describe the intended behavior but must not claim availability. |
 | Gemini/other runtimes | Experimental Gemini ACP work is preserved as a named historical tip inside `archive/pre-cleanup-20260716`; it is not merged into `main`. |
 

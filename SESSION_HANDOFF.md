@@ -7,8 +7,8 @@ provider-neutral context/session continuity, and durable memory.
 
 ## Current State
 
-- `main` and `origin/main` are synchronized at `5a8b819`; the current memory ownership
-  and retrieval slice is uncommitted and awaiting remote verification.
+- `origin/main` is at `472d5c1`; local `main` is one commit ahead at `b1157c9`.
+  GitHub Actions run `29519418965` is verifying the ownership/retrieval slice.
 - The Gemini cleanup was useful: it restored the required RAG proxy helper and removed
   obsolete `VectorIndex` code, unused notebook splitting functions, `/test-approval`,
   and `/exit`. The Python import and compile checks pass.
@@ -33,6 +33,12 @@ provider-neutral context/session continuity, and durable memory.
   preserved on reset, and exact memory search applies age decay and diversity ranking.
 - Semantic memory fallback reuses the existing Elpis RAG tool for discovery and requires
   an exact memory-file read before use or citation.
+- Local commit `b1157c9` gives `MEMORY.md` a 30,000-character hard limit and the
+  always-loaded summary a 10,000-character hard limit. The consolidation prompt must
+  prune before crossing them, and validation rejects oversized output.
+- Memory is reviewable as ordinary files under `~/.elpis/memories`; granular file edits
+  remove stale entries. The existing confirmed reset-all action clears Elpis memory and
+  preserves Codex data.
 - First-release provider scope is OpenAI subscription plus OpenRouter. Additional
   providers are important later; `/auto` is a nice-to-have.
 
@@ -49,18 +55,22 @@ provider-neutral context/session continuity, and durable memory.
 - No local Cargo or Rust compilation was run.
 - Recall tracking, promotion metadata, focused TUI/RAG tests, and the Elpis build passed
   in GitHub Actions run `29517070995`.
+- Run `29519257543` failed only the formatting check. The exact formatting changes were
+  committed as `472d5c1`; replacement run `29519418965` is in progress.
 
 ## Recent Changes
 
 - `5b92ae1` replaces `FEATURES.json` with `TASKS.md` and truthful release tiers.
 - `6d60288` advertises RAG as read-only; `54623f6` records backend acceptance.
 - `fa94cd1` adds distinct recall tracking and the durable promotion gate.
-- Commits through `5a8b819` are pushed to `origin/main`; newer memory work is uncommitted.
+- `c4d1634` moves memory artifacts/state under Elpis and adds ranked retrieval.
+- `472d5c1` applies the remote formatter's exact layout and is pushed.
+- `b1157c9` adds hard memory artifact limits and is committed locally, not yet pushed.
 
 ## Next Action
 
-Remotely verify Elpis-owned storage and ranked retrieval. Then add the selected size
-budget and memory review/deletion.
+After run `29519418965` passes, push `b1157c9` plus this handoff update, remotely verify
+the size limits, then run the end-to-end memory acceptance check.
 
 Do not add dream narratives, cron scheduling, or an MCP memory adapter. Decay and MMR
 belong in the retrieval layer, not in the consolidation scheduler.
