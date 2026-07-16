@@ -50,6 +50,15 @@ remove only Masih's approved unwanted features without losing retained Codex beh
   `/rag <query>` and `/rag <path> -- <query>` routing to the existing `elpis-rag`
   `query_knowledge_base` tool. The tool now also tells runtimes to use it autonomously for broad
   semantic discovery, then use exact reads before editing code.
+- `FEATURES.json` is the active implementation checklist. The immediate hard task is
+  truthful concurrent tool activity, followed by selective parallel RAG, context
+  receipts/ledger, session continuity, curated memory, `/auto`, behavioral enforcement,
+  additional runtimes, and release readiness.
+- Commit `2d7d792` removes the proven-dead 603-line tooltip/announcement catalog. GitHub
+  Actions run `29504230764` passes formatting, focused TUI compilation, branding, RAG
+  routing, executable identity, and artifact creation.
+- Local `src/utils/__init__.py` and `src/utils/proxy.py` currently appear deleted outside
+  the scoped Elpis work. They were deliberately not staged, restored, or included.
 
 ## Approved Command And Feature Contract
 
@@ -105,14 +114,13 @@ not unrelated foundations.
 
 ## Next Action
 
-Install the artifact from GitHub Actions run `29502821295`, then have Masih verify that
-`/rag` appears and that `/rag what makes Elpis distinct?` visibly calls
-`query_knowledge_base` and returns sourced chunks. Keep the feature `partial` until this
-user-visible check passes; do not claim that prompt routing alone proves a live tool call.
+Implement `multi-tool-activity` from `FEATURES.json`: replace the single-MCP-active-cell
+assumption with call-ID keyed lifecycle state, render concurrent activities separately,
+and prove reverse-order completion and cancellation without duplicate cells. Do not mark
+RAG read-only or inject speculative parallel RAG until this display is truthful.
 
-After RAG acceptance, resume the lowest-risk subtraction: delete the now-unreferenced
-`tooltips` system, `/test-approval` implementation, and proven unused imports in one
-remotely verified task. Keep larger plan/personality/vim/raw removal separate.
+In a separate bounded worktree, the next subtraction is complete removal of
+`/test-approval`. Keep larger plan/personality/vim/raw removal separate.
 
 Then proceed in `FEATURES.json` order: context sovereignty, session continuity,
 cross-session memory, `/auto` routing, behavioral enforcement, dictation, additional
