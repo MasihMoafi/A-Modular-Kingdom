@@ -12,9 +12,16 @@ use codex_core::config::Config;
 use codex_exec_server::EnvironmentManager;
 use codex_extension_api::AgentSpawnFuture;
 use codex_extension_api::AgentSpawner;
+use codex_extension_api::ConfigContributor;
+use codex_extension_api::ContextContributor;
+use codex_extension_api::ExtensionData;
 use codex_extension_api::ExtensionEventSink;
+use codex_extension_api::ExtensionFuture;
 use codex_extension_api::ExtensionRegistry;
 use codex_extension_api::ExtensionRegistryBuilder;
+use codex_extension_api::PromptFragment;
+use codex_extension_api::ThreadLifecycleContributor;
+use codex_extension_api::ThreadStartInput;
 use codex_goal_extension::GoalService;
 use codex_login::AuthManager;
 use codex_protocol::ThreadId;
@@ -72,6 +79,7 @@ where
         );
     }
     codex_guardian::install(&mut builder, guardian_agent_spawner);
+    install_elpis_continuity(&mut builder);
     codex_memories_extension::install(&mut builder, codex_otel::global());
     codex_mcp_extension::install(&mut builder);
     codex_mcp_extension::install_executor_plugins(&mut builder, environment_manager);
@@ -98,6 +106,78 @@ where
         },
     );
     Arc::new(builder.build())
+}
+
+#[derive(Default)]
+struct ElpisContinuityExtension;
+
+#[derive(Clone)]
+struct ElpisContinuityConfig {
+    memories_root: Option<codex_utils_absolute_path::AbsolutePathBuf>,
+    cwd: codex_utils_absolute_path::AbsolutePathBuf,
+}
+
+impl ElpisContinuityConfig {
+    fn from_config(config: &Config) -> Self {
+        Self {
+            memories_root: config.memories.root.clone(),
+            cwd: config.cwd.clone(),
+        }
+    }
+}
+
+impl ContextContributor for ElpisContinuityExtension {
+    fn contribute_thread_context<'a>(
+        &'a self,
+        _session_store: &'a ExtensionData,
+        thread_store: &'a ExtensionData,
+    ) -> ExtensionFuture<'a, Vec<PromptFragment>> {
+        Box::pin(async move {
+            let Some(config) = thread_store.get::<ElpisContinuityConfig>() else {
+                return Vec::new();
+            };
+            codex_core::elpis_context::build_continuity_prompt(
+                config.memories_root.as_ref().map(|root| root.as_path()),
+                config.cwd.as_path(),
+            )
+            .await
+            .map(PromptFragment::separate_developer)
+            .into_iter()
+            .collect()
+        })
+    }
+}
+
+impl ThreadLifecycleContributor<Config> for ElpisContinuityExtension {
+    fn on_thread_start<'a>(
+        &'a self,
+        input: ThreadStartInput<'a, Config>,
+    ) -> ExtensionFuture<'a, ()> {
+        Box::pin(async move {
+            input
+                .thread_store
+                .insert(ElpisContinuityConfig::from_config(input.config));
+        })
+    }
+}
+
+impl ConfigContributor<Config> for ElpisContinuityExtension {
+    fn on_config_changed(
+        &self,
+        _session_store: &ExtensionData,
+        thread_store: &ExtensionData,
+        _previous_config: &Config,
+        new_config: &Config,
+    ) {
+        thread_store.insert(ElpisContinuityConfig::from_config(new_config));
+    }
+}
+
+fn install_elpis_continuity(builder: &mut ExtensionRegistryBuilder<Config>) {
+    let extension = Arc::new(ElpisContinuityExtension);
+    builder.thread_lifecycle_contributor(extension.clone());
+    builder.config_contributor(extension.clone());
+    builder.prompt_contributor(extension);
 }
 
 pub(crate) fn app_server_extension_event_sink(

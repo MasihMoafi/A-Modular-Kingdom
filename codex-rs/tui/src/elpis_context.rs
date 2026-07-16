@@ -5,13 +5,9 @@ use codex_app_server_protocol::PatchApplyStatus;
 use codex_app_server_protocol::ThreadItem;
 use codex_app_server_protocol::Turn;
 use codex_app_server_protocol::TurnStatus;
-use sha2::Digest;
-use sha2::Sha256;
 use std::path::Path;
 use std::path::PathBuf;
 
-const CONTEXT_DIR: &str = "context";
-const WORKSPACES_DIR: &str = "workspaces";
 const GOAL_FILE: &str = "GOAL.md";
 const SESSION_CHECKPOINT_FILE: &str = "ES.md";
 const MAX_RESULT_CHARS: usize = 4_000;
@@ -190,13 +186,7 @@ fn goal_path(memories_root: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
 }
 
 fn workspace_dir(memories_root: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
-    let elpis_home = memories_root?.parent()?;
-    Some(
-        elpis_home
-            .join(CONTEXT_DIR)
-            .join(WORKSPACES_DIR)
-            .join(workspace_key(cwd)),
-    )
+    codex_core::elpis_context::workspace_context_dir(memories_root, cwd)
 }
 
 fn truncate_chars(value: &str, max_chars: usize) -> String {
@@ -236,30 +226,6 @@ fn patch_status(status: &PatchApplyStatus) -> &'static str {
         PatchApplyStatus::Failed => "failed",
         PatchApplyStatus::Declined => "declined",
     }
-}
-
-fn workspace_key(cwd: &Path) -> String {
-    let slug = cwd
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("workspace")
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
-                character
-            } else {
-                '-'
-            }
-        })
-        .take(40)
-        .collect::<String>();
-    let slug = if slug.is_empty() { "workspace" } else { &slug };
-    let digest = Sha256::digest(cwd.to_string_lossy().as_bytes());
-    let suffix = digest[..6]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    format!("{slug}-{suffix}")
 }
 
 #[cfg(test)]
@@ -302,17 +268,6 @@ mod tests {
         );
         assert!(!path.exists());
         Ok(())
-    }
-
-    #[test]
-    fn workspace_key_is_stable_readable_and_path_specific() {
-        let first = workspace_key(Path::new("/tmp/My Project"));
-        assert_eq!(first, workspace_key(Path::new("/tmp/My Project")));
-        assert!(first.starts_with("My-Project-"));
-        assert_ne!(
-            workspace_key(Path::new("/a/project")),
-            workspace_key(Path::new("/b/project"))
-        );
     }
 
     #[tokio::test]

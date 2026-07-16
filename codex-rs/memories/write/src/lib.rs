@@ -118,7 +118,7 @@ pub fn memory_root(
     codex_home: &AbsolutePathBuf,
 ) -> AbsolutePathBuf {
     memory_root
-        .clone()
+        .cloned()
         .unwrap_or_else(|| codex_home.join("memories"))
 }
 

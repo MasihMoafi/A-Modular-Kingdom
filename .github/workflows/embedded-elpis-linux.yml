@@ -87,6 +87,9 @@ jobs:
       - name: Verify portable Elpis goal
         run: cargo test -p codex-tui --lib --locked elpis_context::tests
 
+      - name: Verify lean continuity prompt
+        run: cargo test -p codex-core --lib --locked elpis_context::tests
+
       - name: Compile focused TUI tests
         run: cargo test -p codex-tui --lib --locked --no-run
 
