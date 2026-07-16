@@ -112,6 +112,7 @@ mod cwd_prompt;
 mod debug_config;
 mod diff_model;
 mod diff_render;
+mod elpis_context;
 mod exec_cell;
 mod exec_command;
 mod external_agent_config_migration;

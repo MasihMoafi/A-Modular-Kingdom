@@ -15,6 +15,7 @@ use codex_app_server_protocol::AuthMode;
 use codex_app_server_protocol::RateLimitReachedType;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ServerRequest;
+use codex_protocol::ThreadId;
 
 impl App {
     pub(super) fn refresh_mcp_startup_expected_servers_from_config(&mut self) {
@@ -64,6 +65,7 @@ impl App {
         app_server_client: &AppServerSession,
         notification: ServerNotification,
     ) {
+        self.mirror_elpis_goal_notification(&notification).await;
         match &notification {
             ServerNotification::ServerRequestResolved(notification) => {
                 if let Some(request) = self
@@ -190,6 +192,52 @@ impl App {
             .handle_server_notification(notification, /*replay_kind*/ None);
     }
 
+    async fn mirror_elpis_goal_notification(&mut self, notification: &ServerNotification) {
+        let (thread_id, goal) = match notification {
+            ServerNotification::ThreadGoalUpdated(notification) => {
+                (&notification.thread_id, Some(&notification.goal))
+            }
+            ServerNotification::ThreadGoalCleared(notification) => {
+                (&notification.thread_id, None)
+            }
+            _ => return,
+        };
+        let cwd = match ThreadId::from_string(thread_id) {
+            Ok(thread_id) => self
+                .thread_cwd(thread_id)
+                .await
+                .unwrap_or_else(|| self.config.cwd.clone()),
+            Err(_) => self.config.cwd.clone(),
+        };
+        let memories_root = self
+            .config
+            .memories
+            .root
+            .as_ref()
+            .map(|root| root.as_path());
+        let result = match goal {
+            Some(goal) => crate::elpis_context::write_goal(
+                memories_root,
+                cwd.as_path(),
+                thread_id,
+                &goal.objective,
+                goal_status_label(&goal.status),
+                goal.updated_at,
+            )
+            .await
+            .map(|_| ()),
+            None => crate::elpis_context::clear_goal(memories_root, cwd.as_path(), thread_id)
+                .await
+                .map(|_| ()),
+        };
+        if let Err(err) = result {
+            tracing::warn!(error = %err, "failed to mirror Elpis goal");
+            self.chat_widget.add_error_message(format!(
+                "Goal changed, but Elpis could not save its portable GOAL.md: {err}"
+            ));
+        }
+    }
+
     async fn handle_server_request_event(
         &mut self,
         app_server_client: &AppServerSession,
@@ -233,5 +281,17 @@ impl App {
         if let Err(err) = result {
             tracing::warn!("failed to enqueue app-server request: {err}");
         }
+    }
+}
+
+fn goal_status_label(status: &codex_app_server_protocol::ThreadGoalStatus) -> &'static str {
+    use codex_app_server_protocol::ThreadGoalStatus;
+    match status {
+        ThreadGoalStatus::Active => "active",
+        ThreadGoalStatus::Paused => "paused",
+        ThreadGoalStatus::Blocked => "blocked",
+        ThreadGoalStatus::UsageLimited => "usage-limited",
+        ThreadGoalStatus::BudgetLimited => "budget-limited",
+        ThreadGoalStatus::Complete => "complete",
     }
 }
