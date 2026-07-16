@@ -22,7 +22,8 @@ The committed `codex-rs/` tree from the pinned revision is imported at the repos
 root. Its Apache-2.0 `LICENSE` and `NOTICE` are retained inside that directory, and
 `codex-rs/ELPIS_UPSTREAM.md` records provenance. After the imported foundation passed
 its authenticated milestone, the superseded root `tui/` prototype was archived on
-`archive/legacy-prototype-20260716` and removed from canonical `main`.
+the legacy-prototype tip now held inside `archive/pre-cleanup-20260716` and removed from
+canonical `main`.
 
 No feature subtraction or Elpis-specific renaming is part of this baseline import.
 Crate and module boundaries remain upstream-shaped so the later action-rendering,

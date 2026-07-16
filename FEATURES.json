@@ -151,7 +151,7 @@
       "status": "partial",
       "user_visible_behavior": "A non-Codex runtime enters Elpis while Elpis retains its context, memory, policy, and evidence.",
       "acceptance": ["Complete and resume one visible task through each supported runtime."],
-      "evidence": ["Experimental Gemini ACP seam is parked on agent/runtime-boundary and is not merged; this is intentionally low priority."]
+      "evidence": ["The experimental Gemini ACP seam is preserved as a named historical tip inside archive/pre-cleanup-20260716 and is not merged; this is intentionally low priority."]
     },
     {
       "id": "release-ready",

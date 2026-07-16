@@ -206,10 +206,9 @@ Verified foundation:
   mouse interaction, native sessions, and native compaction are inherited from Codex;
 - a real authenticated turn ran a command and created a file, and launch checks proved
   no donor-clone runtime dependency;
-- the old hand-grown TUI and Python agent state is preserved on
-  `archive/legacy-prototype-20260716`, not the active architecture;
-- Gemini/runtime-boundary experiments are parked on `agent/runtime-boundary` and are
-  not part of canonical `main`.
+- the old hand-grown TUI, Python agent state, and Gemini/runtime-boundary experiments
+  are preserved as named tips inside `archive/pre-cleanup-20260716`; they are not part
+  of canonical `main`.
 
 Current stabilization has two separate lanes: complete the approved feature subtraction
 in small remotely verified commits, and give the inherited Ratatui interface an
@@ -239,11 +238,11 @@ Python's standard library. Its measured handshake is about 0.04 seconds, a profi
 Elpis launch scheduled its first frame in 0.049 seconds, and Masih confirmed that the
 fresh launch is fast. Startup performance is accepted.
 
-The one-tool host was not a new product decision: it already existed on
-`archive/legacy-prototype-20260716`. During the Codex-foundation transition, canonical
-`main` inherited an older unified host from the embedded-launcher line where extra tools
-defaulted on, while the minimal host remained on the archive branch. This was a migration
-regression, not a Codex TUI cost.
+The one-tool host was not a new product decision: it already existed on the historical
+legacy-prototype tip now preserved inside `archive/pre-cleanup-20260716`. During the
+Codex-foundation transition, canonical `main` inherited an older unified host from the
+embedded-launcher line where extra tools defaulted on, while the minimal host remained
+on the prototype line. This was a migration regression, not a Codex TUI cost.
 
 RAG indexing is not startup work. `rag.fetch` is imported only after an explicit query.
 On that first query it loads Torch and embedding models, then loads an existing persisted

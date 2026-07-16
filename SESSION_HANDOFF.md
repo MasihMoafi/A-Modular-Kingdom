@@ -37,8 +37,8 @@ remove only Masih's approved unwanted features without losing retained Codex beh
   old query parser, and old tool-execution helper. `pyproject.toml` now packages only
   the RAG host, RAG implementation, and its proxy helper and declares only RAG runtime
   dependencies. Codex owns the removed general agent capabilities.
-- Gemini/runtime-boundary work remains parked on `agent/runtime-boundary` and is the
-  least important current work.
+- Gemini/runtime-boundary work is preserved as a named historical tip inside
+  `archive/pre-cleanup-20260716` and is the least important current work.
 
 ## Approved Command And Feature Contract
 
