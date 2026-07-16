@@ -10,6 +10,7 @@ use std::time::Instant;
 use crossterm::event::KeyCode;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Styled;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
@@ -27,6 +28,7 @@ use crate::motion::ReducedMotionIndicator;
 use crate::motion::activity_indicator;
 use crate::motion::shimmer_text;
 use crate::render::renderable::Renderable;
+use crate::style::status_symbol_style;
 use crate::text_formatting::capitalize_first;
 use crate::tui::FrameRequester;
 use crate::wrapping::RtOptions;
@@ -257,7 +259,7 @@ impl Renderable for StatusIndicatorWidget {
             motion_mode,
             ReducedMotionIndicator::Hidden,
         ) {
-            spans.push(indicator);
+            spans.push(indicator.patch_style(status_symbol_style()));
             spans.push(" ".into());
         }
         spans.extend(shimmer_text(&self.header, motion_mode));

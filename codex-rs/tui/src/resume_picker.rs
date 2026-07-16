@@ -19,6 +19,7 @@ use crate::legacy_core::config::edit::ConfigEditsBuilder;
 use crate::markdown::append_markdown;
 use crate::pager_overlay::Overlay;
 use crate::session_resume::resolve_session_thread_id;
+use crate::style::accent_style;
 use crate::status::format_directory_display;
 use crate::terminal_palette::best_color;
 use crate::terminal_palette::default_bg;
@@ -2721,11 +2722,7 @@ fn selection_marker(is_selected: bool, is_expanded: bool) -> Span<'static> {
 }
 
 fn selected_session_style() -> Style {
-    if default_bg().is_some_and(is_light) {
-        Style::default().fg(Color::Magenta)
-    } else {
-        Style::default().fg(Color::Yellow)
-    }
+    accent_style()
 }
 
 fn selected_session_title_span(title: String) -> Span<'static> {

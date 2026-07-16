@@ -49,6 +49,7 @@ use crate::key_hint::KeyBinding;
 use crate::key_hint::KeyBindingListExt;
 use crate::motion::MotionMode;
 use crate::motion::shimmer_text;
+use crate::style::popup_border_style;
 use crate::onboarding::keys;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
 use crate::onboarding::onboarding_screen::StepStateProvider;
@@ -656,7 +657,7 @@ impl AuthModeWidget {
                     .title("API key")
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
-                    .border_style(Style::default().fg(Color::Cyan)),
+                    .border_style(popup_border_style()),
             )
             .render(input_area, buf);
 

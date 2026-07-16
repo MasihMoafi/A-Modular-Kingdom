@@ -5,6 +5,7 @@ use crate::history_cell::PlainHistoryCell;
 use crate::history_cell::plain_lines;
 use crate::history_cell::with_border_with_inner_width;
 use crate::legacy_core::config::Config;
+use crate::style::brand_style;
 use crate::token_usage::TokenUsage;
 use crate::token_usage::TokenUsageInfo;
 use crate::version::CODEX_CLI_VERSION;
@@ -711,7 +712,7 @@ impl HistoryCell for StatusHistoryCell {
         let mut lines: Vec<Line<'static>> = Vec::new();
         lines.push(Line::from(vec![
             Span::from(format!("{}>_ ", FieldFormatter::INDENT)).dim(),
-            Span::from(CODEX_RUNTIME_TITLE).bold(),
+            Span::from(CODEX_RUNTIME_TITLE).style(brand_style()),
             Span::from(" ").dim(),
             Span::from(format!("(v{CODEX_CLI_VERSION})")).dim(),
         ]));

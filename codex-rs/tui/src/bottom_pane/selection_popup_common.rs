@@ -6,6 +6,7 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
 use ratatui::widgets::Widget;
 use std::borrow::Cow;
 use unicode_width::UnicodeWidthChar;
@@ -16,6 +17,7 @@ use crate::line_truncation::truncate_line_with_ellipsis_if_overflow;
 use crate::render::Insets;
 use crate::render::RectExt as _;
 use crate::style::accent_style;
+use crate::style::popup_border_style;
 use crate::style::user_message_style;
 
 use super::scroll_state::ScrollState;
@@ -101,6 +103,8 @@ pub(crate) fn render_menu_surface(area: Rect, buf: &mut Buffer) -> Rect {
         return area;
     }
     Block::default()
+        .borders(Borders::ALL)
+        .border_style(popup_border_style())
         .style(user_message_style())
         .render(area, buf);
     menu_surface_inset(area)

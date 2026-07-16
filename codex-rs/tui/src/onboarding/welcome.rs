@@ -17,6 +17,7 @@ use crate::key_hint::KeyBindingListExt;
 use crate::onboarding::keys;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
 use crate::onboarding::onboarding_screen::StepStateProvider;
+use crate::style::brand_style;
 use crate::tui::FrameRequester;
 
 use super::onboarding_screen::StepState;
@@ -95,7 +96,7 @@ impl WidgetRef for &WelcomeWidget {
         lines.push(Line::from(vec![
             "  ".into(),
             "Welcome to ".into(),
-            PRODUCT_NAME.bold(),
+            PRODUCT_NAME.set_style(brand_style()),
             ", with Codex as the active runtime".into(),
         ]));
 

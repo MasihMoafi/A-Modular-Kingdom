@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::branding::CODEX_RUNTIME_TITLE;
+use crate::style::brand_style;
 
 pub(crate) const SESSION_HEADER_MAX_INNER_WIDTH: usize = 56; // Just an eyeballed value
 
@@ -291,7 +292,7 @@ impl HistoryCell for SessionHeaderHistoryCell {
         // Title line rendered inside the box: ">_ Elpis · Codex runtime (vX)"
         let title_spans: Vec<Span<'static>> = vec![
             Span::from(">_ ").dim(),
-            Span::from(CODEX_RUNTIME_TITLE).bold(),
+            Span::from(CODEX_RUNTIME_TITLE).style(brand_style()),
             Span::from(" ").dim(),
             Span::from(format!("(v{})", self.version)).dim(),
         ];

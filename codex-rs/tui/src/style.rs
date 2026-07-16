@@ -10,7 +10,12 @@ use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 
-const LIGHT_BG_ACCENT_RGB: (u8, u8, u8) = (0, 95, 135);
+const LIGHT_BG_PRIMARY_RGB: (u8, u8, u8) = (91, 54, 166);
+const DARK_BG_PRIMARY_RGB: (u8, u8, u8) = (194, 167, 255);
+const LIGHT_BG_SECONDARY_RGB: (u8, u8, u8) = (0, 107, 104);
+const DARK_BG_SECONDARY_RGB: (u8, u8, u8) = (94, 234, 212);
+const LIGHT_BG_STATUS_RGB: (u8, u8, u8) = (145, 95, 0);
+const DARK_BG_STATUS_RGB: (u8, u8, u8) = (255, 209, 102);
 // Decorative table rules should remain visible without competing with cell content.
 const TABLE_SEPARATOR_FG_ALPHA: f32 = 0.20;
 
@@ -32,6 +37,26 @@ pub(crate) fn accent_style() -> Style {
     accent_style_for(default_bg())
 }
 
+/// Returns the shared Elpis style for product titles.
+pub(crate) fn brand_style() -> Style {
+    primary_style_for(default_bg())
+}
+
+/// Returns the border style for the focused composer.
+pub(crate) fn composer_border_style() -> Style {
+    primary_style_for(default_bg())
+}
+
+/// Returns the border style for popup surfaces.
+pub(crate) fn popup_border_style() -> Style {
+    secondary_style_for(default_bg())
+}
+
+/// Returns the Elpis gold used for meaningful status symbols.
+pub(crate) fn status_symbol_style() -> Style {
+    status_style_for(default_bg())
+}
+
 /// Returns the style for a user-authored message using the provided terminal background.
 pub fn user_message_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
     match terminal_bg {
@@ -49,10 +74,44 @@ pub fn proposed_plan_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
 
 /// Returns the shared accent style for the provided terminal background.
 pub(crate) fn accent_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
+    primary_style_for(terminal_bg)
+}
+
+fn primary_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
+    Style::default()
+        .fg(best_color(adaptive_palette_color(
+            terminal_bg,
+            LIGHT_BG_PRIMARY_RGB,
+            DARK_BG_PRIMARY_RGB,
+        )))
+        .bold()
+}
+
+fn secondary_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
+    Style::default().fg(best_color(adaptive_palette_color(
+        terminal_bg,
+        LIGHT_BG_SECONDARY_RGB,
+        DARK_BG_SECONDARY_RGB,
+    )))
+}
+
+fn status_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
+    Style::default().fg(best_color(adaptive_palette_color(
+        terminal_bg,
+        LIGHT_BG_STATUS_RGB,
+        DARK_BG_STATUS_RGB,
+    )))
+}
+
+fn adaptive_palette_color(
+    terminal_bg: Option<(u8, u8, u8)>,
+    light_bg: (u8, u8, u8),
+    dark_bg: (u8, u8, u8),
+) -> (u8, u8, u8) {
     if terminal_bg.is_some_and(is_light) {
-        Style::default().fg(best_color(LIGHT_BG_ACCENT_RGB)).bold()
+        light_bg
     } else {
-        Style::default().fg(Color::Cyan).bold()
+        dark_bg
     }
 }
 
@@ -75,9 +134,9 @@ fn table_separator_style_for(
 #[allow(clippy::disallowed_methods)]
 pub fn user_message_bg(terminal_bg: (u8, u8, u8)) -> Color {
     let (top, alpha) = if is_light(terminal_bg) {
-        ((0, 0, 0), 0.04)
+        (LIGHT_BG_PRIMARY_RGB, 0.06)
     } else {
-        ((255, 255, 255), 0.12)
+        (DARK_BG_PRIMARY_RGB, 0.12)
     };
     best_color(blend(top, terminal_bg, alpha))
 }
@@ -94,16 +153,18 @@ mod tests {
     use ratatui::style::Modifier;
 
     #[test]
-    fn accent_style_uses_darker_cyan_on_light_backgrounds() {
+    fn accent_style_uses_darker_violet_on_light_backgrounds() {
         let style = accent_style_for(Some((255, 255, 255)));
 
-        assert_eq!(style.fg, Some(best_color(LIGHT_BG_ACCENT_RGB)));
+        assert_eq!(style.fg, Some(best_color(LIGHT_BG_PRIMARY_RGB)));
         assert!(style.add_modifier.contains(Modifier::BOLD));
     }
 
     #[test]
-    fn accent_style_uses_cyan_on_dark_or_unknown_backgrounds() {
-        let expected = Style::default().fg(Color::Cyan).bold();
+    fn accent_style_uses_violet_on_dark_or_unknown_backgrounds() {
+        let expected = Style::default()
+            .fg(best_color(DARK_BG_PRIMARY_RGB))
+            .bold();
 
         assert_eq!(accent_style_for(Some((0, 0, 0))), expected);
         assert_eq!(accent_style_for(/*terminal_bg*/ None), expected);
