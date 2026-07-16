@@ -73,11 +73,6 @@ pub enum SlashCommand {
     Personality,
     #[strum(serialize = "subagents")]
     MultiAgents,
-    // Debugging commands.
-    #[strum(serialize = "debug-m-drop")]
-    MemoryDrop,
-    #[strum(serialize = "debug-m-update")]
-    MemoryUpdate,
 }
 
 impl SlashCommand {
@@ -114,8 +109,6 @@ impl SlashCommand {
             SlashCommand::Pets => "choose or hide the terminal pet",
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Stop => "kill all background terminals",
-            SlashCommand::MemoryDrop => "DO NOT USE",
-            SlashCommand::MemoryUpdate => "DO NOT USE",
             SlashCommand::Model => "choose what model and reasoning effort to use",
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
@@ -207,9 +200,7 @@ impl SlashCommand {
             | SlashCommand::Review
             | SlashCommand::Plan
             | SlashCommand::Clear
-            | SlashCommand::Logout
-            | SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate => false,
+            | SlashCommand::Logout => false,
             SlashCommand::Diff
             | SlashCommand::Resume
             | SlashCommand::Model
@@ -250,8 +241,6 @@ impl SlashCommand {
         match self {
             SlashCommand::Archive
             | SlashCommand::Memories
-            | SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate
             | SlashCommand::Mention
             | SlashCommand::Personality
             | SlashCommand::Plan
@@ -305,13 +294,15 @@ mod tests {
     }
 
     #[test]
-    fn removed_commands_are_not_visible() {
+    fn removed_commands_are_not_visible_or_parseable() {
         let visible = super::built_in_slash_commands()
             .into_iter()
             .map(|(name, _)| name)
             .collect::<Vec<_>>();
         for removed in [
             "archive",
+            "debug-m-drop",
+            "debug-m-update",
             "exit",
             "memories",
             "mention",
@@ -324,6 +315,8 @@ mod tests {
         ] {
             assert!(!visible.contains(&removed), "{removed} should be removed");
         }
+        assert!(SlashCommand::from_str("debug-m-drop").is_err());
+        assert!(SlashCommand::from_str("debug-m-update").is_err());
     }
 
     #[test]
