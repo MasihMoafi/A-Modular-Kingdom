@@ -58,71 +58,37 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
-          replacements = {
-              Path("codex-rs/tui/src/chatwidget/slash_dispatch.rs"): [
-                  '''            SlashCommand::MemoryDrop => {
-                      self.add_app_server_stub_message("Memory maintenance");
-                  }
-                  SlashCommand::MemoryUpdate => {
-                      self.add_app_server_stub_message("Memory maintenance");
-                  }
-          ''',
-              ],
-              Path("codex-rs/tui/src/chatwidget/tests/slash_commands.rs"): [
-                  '''#[tokio::test]
-          async fn slash_memory_drop_reports_stubbed_feature() {
-              let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+          dispatch_path = Path("codex-rs/tui/src/chatwidget/slash_dispatch.rs")
+          dispatch = dispatch_path.read_text()
+          dispatch_pattern = re.compile(
+              r"\n\s*SlashCommand::MemoryDrop => \{\n"
+              r"\s*self\.add_app_server_stub_message\(\"Memory maintenance\"\);\n"
+              r"\s*\}\n"
+              r"\s*SlashCommand::MemoryUpdate => \{\n"
+              r"\s*self\.add_app_server_stub_message\(\"Memory maintenance\"\);\n"
+              r"\s*\}\n"
+          )
+          dispatch, count = dispatch_pattern.subn("\n", dispatch)
+          if count != 1:
+              raise SystemExit(f"expected one dispatch pair, found {count}")
+          dispatch_path.write_text(dispatch)
 
-              chat.dispatch_command(SlashCommand::MemoryDrop);
-
-              let event = rx.try_recv().expect("expected unsupported-feature error");
-              match event {
-                  AppEvent::InsertHistoryCell(cell) => {
-                      let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
-                      assert!(rendered.contains("Memory maintenance: Not available in TUI yet."));
-                  }
-                  other => panic!("expected InsertHistoryCell error, got {other:?}"),
-              }
-              assert!(
-                  op_rx.try_recv().is_err(),
-                  "expected no memory op to be sent"
-              );
-          }
-
-          ''',
-                  '''#[tokio::test]
-          async fn slash_memory_update_reports_stubbed_feature() {
-              let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-
-              chat.dispatch_command(SlashCommand::MemoryUpdate);
-
-              let event = rx.try_recv().expect("expected unsupported-feature error");
-              match event {
-                  AppEvent::InsertHistoryCell(cell) => {
-                      let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
-                      assert!(rendered.contains("Memory maintenance: Not available in TUI yet."));
-                  }
-                  other => panic!("expected InsertHistoryCell error, got {other:?}"),
-              }
-              assert!(
-                  op_rx.try_recv().is_err(),
-                  "expected no memory op to be sent"
-              );
-          }
-
-          ''',
-              ],
-          }
-
-          for path, blocks in replacements.items():
-              text = path.read_text()
-              for block in blocks:
-                  count = text.count(block)
-                  if count != 1:
-                      raise SystemExit(f"expected one exact block in {path}, found {count}")
-                  text = text.replace(block, "")
-              path.write_text(text)
+          tests_path = Path("codex-rs/tui/src/chatwidget/tests/slash_commands.rs")
+          tests = tests_path.read_text()
+          for name in (
+              "slash_memory_drop_reports_stubbed_feature",
+              "slash_memory_update_reports_stubbed_feature",
+          ):
+              pattern = re.compile(
+                  rf"#\[tokio::test\]\nasync fn {name}\(\) \{{.*?^\}}\n\n",
+                  re.MULTILINE | re.DOTALL,
+              )
+              tests, count = pattern.subn("", tests)
+              if count != 1:
+                  raise SystemExit(f"expected one {name} test, found {count}")
+          tests_path.write_text(tests)
           PY
 
       - name: Upload materialized cleanup source
