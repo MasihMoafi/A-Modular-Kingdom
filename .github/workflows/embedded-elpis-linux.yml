@@ -52,6 +52,31 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      - name: Upload Elpis source snapshot
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/complete-elpis-product-pillars'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: elpis-product-source
+          path: |
+            TASKS.md
+            readme.md
+            requirements.md
+            docs
+            codex-rs/Cargo.toml
+            codex-rs/Cargo.lock
+            codex-rs/tui/Cargo.toml
+            codex-rs/tui/src
+            codex-rs/core/Cargo.toml
+            codex-rs/core/src
+            codex-rs/model-provider-info/Cargo.toml
+            codex-rs/model-provider-info/src
+            codex-rs/protocol/Cargo.toml
+            codex-rs/protocol/src
+            codex-rs/config
+            codex-rs/memories
+          if-no-files-found: warn
+          retention-days: 1
+
       - name: Install Linux build dependencies
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get update
