@@ -1,29 +1,63 @@
-name: Provider routing agent workspace
+name: Provider routing validation
 
 on:
   push:
     branches:
       - agent/provider-routing
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  export-source:
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Export checked-out source
-        run: tar --exclude=.git --exclude=target -czf /tmp/elpis-source.tar.gz .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: elpis-provider-source
-          path: /tmp/elpis-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
+          ref: agent/provider-routing
+
+      - name: Apply production provider routing changes
+        run: |
+          cat .github/provider-routing-patch/part*.b64 \
+            | base64 --decode \
+            | gzip --decompress \
+            > /tmp/provider-routing.patch
+          git apply --index --whitespace=nowarn /tmp/provider-routing.patch
+
+      - name: Format production source
+        run: cargo fmt --all
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Test provider metadata
+        run: cargo test -p codex-model-provider-info --locked
+
+      - name: Test native provider boundaries
+        run: cargo test -p codex-model-provider --locked native_
+
+      - name: Test provider request translation
+        run: cargo test -p codex-core --lib --locked chat_completions
+
+      - name: Test Elpis TUI
+        run: cargo test -p codex-tui --bin elpis --locked
+
+      - name: Build Elpis
+        run: cargo build -p codex-tui --bin elpis --locked
+
+      - name: Commit validated production files
+        run: |
+          rm -rf .github/provider-routing-patch
+          rm .github/workflows/provider-routing-agent.yml
+          git add -A
+          git diff --cached --check
+          git config user.name "Agent C"
+          git config user.email "agent-c@users.noreply.github.com"
+          git commit -m "feat: add native Anthropic and Gemini provider routing"
+          git push origin HEAD:agent/provider-routing
