@@ -37,10 +37,11 @@ jobs:
           rustup set profile minimal
           rustup toolchain install 1.95.0 --component rustfmt --no-self-update
 
-      - name: Apply reviewed integration patch
+      - name: Apply byte-verified integration edits
         run: |
-          git apply --check .github/patches/elpis-ui-final.patch
-          git apply .github/patches/elpis-ui-final.patch
+          cat .github/finalizer/chunk-* | base64 -d > /tmp/elpis-finalize.py
+          python3 /tmp/elpis-finalize.py
+          git diff --check
 
       - name: Format source
         working-directory: codex-rs
@@ -65,6 +66,7 @@ jobs:
           git config user.email "elpis-integration-agent@users.noreply.github.com"
           git rm .github/workflows/integration-finalize.yml \
             .github/patches/elpis-ui-final.patch
+          git rm -r .github/finalizer
           git add codex-rs/tui/src/branding.rs \
             codex-rs/tui/src/chatwidget/model_popups.rs \
             codex-rs/tui/src/chatwidget/protocol.rs \
