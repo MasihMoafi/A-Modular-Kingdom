@@ -78,6 +78,11 @@ pub mod legacy_core {
         pub use codex_core::elpis_context::*;
     }
 
+    pub mod context_cleaner {
+        pub use codex_core::context_cleaner::eviction_count;
+        pub use codex_core::context_cleaner::latest_eviction_event;
+    }
+
     pub mod config {
         pub use codex_core::config::*;
 
