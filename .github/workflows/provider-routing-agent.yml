@@ -34,24 +34,31 @@ jobs:
           git apply --index --whitespace=nowarn /tmp/provider-routing.patch
 
       - name: Format production source
+        working-directory: codex-rs
         run: cargo fmt --all
 
       - name: Check formatting
+        working-directory: codex-rs
         run: cargo fmt --all --check
 
       - name: Test provider metadata
+        working-directory: codex-rs
         run: cargo test -p codex-model-provider-info --locked
 
       - name: Test native provider boundaries
+        working-directory: codex-rs
         run: cargo test -p codex-model-provider --locked native_
 
       - name: Test provider request translation
+        working-directory: codex-rs
         run: cargo test -p codex-core --lib --locked chat_completions
 
       - name: Test Elpis TUI
+        working-directory: codex-rs
         run: cargo test -p codex-tui --bin elpis --locked
 
       - name: Build Elpis
+        working-directory: codex-rs
         run: cargo build -p codex-tui --bin elpis --locked
 
       - name: Commit validated production files
