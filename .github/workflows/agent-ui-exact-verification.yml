@@ -1,4 +1,4 @@
-name: Apply and verify UI state isolation
+name: Verify UI state isolation
 
 on:
   pull_request:
@@ -6,10 +6,10 @@ on:
       - .github/workflows/agent-ui-exact-verification.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
+  verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -19,11 +19,8 @@ jobs:
       CARGO_TERM_COLOR: always
       RUST_MIN_STACK: "16777216"
     steps:
-      - name: Checkout UI branch
+      - name: Checkout source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          ref: agent/ui-ux
-          fetch-depth: 0
 
       - name: Isolate runtime identity per UI thread
         run: |
@@ -129,28 +126,32 @@ fn mutate_runtime_identity<T>(f: impl FnOnce(&mut RuntimeIdentity) -> T) -> T {
         working-directory: codex-rs
         run: cargo build -p codex-tui --bin elpis --locked
 
-      - name: Commit verified state isolation and snapshots
+      - name: Package verified changes
         run: |
-          rm .github/workflows/agent-ui-exact-verification.yml
           python3 <<'PY'
           from pathlib import Path
           import subprocess
 
-          changed = subprocess.check_output(
-              ['git', 'status', '--short'], text=True
+          paths = subprocess.check_output(
+              ['git', 'diff', '--name-only'], text=True
           ).splitlines()
-          allowed_exact = {
-              '.github/workflows/agent-ui-exact-verification.yml',
-              'codex-rs/tui/src/branding.rs',
-          }
-          for entry in changed:
-              path = entry[3:]
-              if path in allowed_exact or path.endswith('.snap'):
+          if 'codex-rs/tui/src/branding.rs' not in paths:
+              raise SystemExit('branding state-isolation change missing')
+          for path in paths:
+              if path == 'codex-rs/tui/src/branding.rs' or path.endswith('.snap'):
                   continue
               raise SystemExit(f'unexpected generated change: {path}')
+          Path('/tmp/ui-state-files.txt').write_text('\n'.join(paths) + '\n')
+          subprocess.run(
+              ['tar', '-czf', '/tmp/ui-state-update.tar.gz', '-T', '/tmp/ui-state-files.txt'],
+              check=True,
+          )
           PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Isolate Elpis UI state and refresh snapshots"
-          git push origin HEAD:agent/ui-ux
+
+      - name: Upload verified changes
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agent-ui-state-update
+          path: /tmp/ui-state-update.tar.gz
+          if-no-files-found: error
+          retention-days: 1
