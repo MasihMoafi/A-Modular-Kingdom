@@ -47,11 +47,21 @@ jobs:
 
       - name: Test native provider boundaries
         working-directory: codex-rs
-        run: cargo test -p codex-model-provider --locked native_
+        run: |
+          if ! cargo test -p codex-model-provider --locked native_ > /tmp/native-provider.log 2>&1; then
+            tail -n 240 /tmp/native-provider.log
+            exit 1
+          fi
+          tail -n 80 /tmp/native-provider.log
 
       - name: Test provider request translation
         working-directory: codex-rs
-        run: cargo test -p codex-core --lib --locked chat_completions
+        run: |
+          if ! cargo test -p codex-core --lib --locked chat_completions > /tmp/provider-core.log 2>&1; then
+            tail -n 300 /tmp/provider-core.log
+            exit 1
+          fi
+          tail -n 100 /tmp/provider-core.log
 
       - name: Test Elpis TUI
         working-directory: codex-rs
