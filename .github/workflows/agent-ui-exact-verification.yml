@@ -1,0 +1,73 @@
+name: Agent UI exact verification
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/agent-ui-exact-verification.yml
+      - codex-rs/**
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify required UI handoff commands
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: codex-rs
+    env:
+      CARGO_INCREMENTAL: "1"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bubblewrap \
+            libcap-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+
+      - name: Restore Cargo downloads
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: elpis-cargo-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock') }}
+          restore-keys: |
+            elpis-cargo-${{ runner.os }}-
+
+      - name: Restore incremental build outputs
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: codex-rs/target
+          key: elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-${{ hashFiles('codex-rs/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-${{ hashFiles('codex-rs/Cargo.lock') }}-
+            elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Test codex-tui library
+        run: cargo test -p codex-tui --lib --locked
+
+      - name: Test Elpis binary
+        run: cargo test -p codex-tui --bin elpis --locked
+
+      - name: Build Elpis binary
+        run: cargo build -p codex-tui --bin elpis --locked
