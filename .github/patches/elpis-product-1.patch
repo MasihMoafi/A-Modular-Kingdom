@@ -1,0 +1,431 @@
+diff --git a/codex-rs/codex-api/src/endpoint/chat.rs b/codex-rs/codex-api/src/endpoint/chat.rs
+new file mode 100644
+index 0000000..429e14c
+--- /dev/null
++++ b/codex-rs/codex-api/src/endpoint/chat.rs
+@@ -0,0 +1,54 @@
++use crate::auth::SharedAuthProvider;
++use crate::endpoint::session::EndpointSession;
++use crate::error::ApiError;
++use crate::provider::Provider;
++use codex_client::HttpTransport;
++use codex_client::RequestTelemetry;
++use http::HeaderMap;
++use http::Method;
++use serde_json::Value;
++use std::sync::Arc;
++use tracing::instrument;
++
++/// Minimal client for providers that expose the OpenAI-compatible Chat Completions endpoint.
++pub struct ChatCompletionsClient<T: HttpTransport> {
++    session: EndpointSession<T>,
++}
++
++impl<T: HttpTransport> ChatCompletionsClient<T> {
++    pub fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
++        Self {
++            session: EndpointSession::new(transport, provider, auth),
++        }
++    }
++
++    pub fn with_telemetry(self, request: Option<Arc<dyn RequestTelemetry>>) -> Self {
++        Self {
++            session: self.session.with_request_telemetry(request),
++        }
++    }
++
++    #[instrument(
++        name = "chat_completions.complete",
++        level = "info",
++        skip_all,
++        fields(http.method = "POST", api.path = "chat/completions")
++    )]
++    pub async fn complete(
++        &self,
++        request: Value,
++        extra_headers: HeaderMap,
++    ) -> Result<Value, ApiError> {
++        let response = self
++            .session
++            .execute(
++                Method::POST,
++                "chat/completions",
++                extra_headers,
++                Some(request),
++            )
++            .await?;
++        serde_json::from_slice(&response.body)
++            .map_err(|err| ApiError::Stream(format!("invalid chat completions response: {err}")))
++    }
++}
+diff --git a/codex-rs/codex-api/src/endpoint/mod.rs b/codex-rs/codex-api/src/endpoint/mod.rs
+index 106c5d7..fa6f1d5 100644
+--- a/codex-rs/codex-api/src/endpoint/mod.rs
++++ b/codex-rs/codex-api/src/endpoint/mod.rs
+@@ -1,3 +1,4 @@
++pub(crate) mod chat;
+ pub(crate) mod compact;
+ pub(crate) mod images;
+ pub(crate) mod memories;
+@@ -9,6 +10,7 @@ pub(crate) mod responses_websocket;
+ pub(crate) mod search;
+ mod session;
+ 
++pub use chat::ChatCompletionsClient;
+ pub use compact::CompactClient;
+ pub use images::ImagesClient;
+ pub use memories::MemoriesClient;
+diff --git a/codex-rs/codex-api/src/lib.rs b/codex-rs/codex-api/src/lib.rs
+index 1d1a4c8..003370d 100644
+--- a/codex-rs/codex-api/src/lib.rs
++++ b/codex-rs/codex-api/src/lib.rs
+@@ -46,6 +46,7 @@ pub use crate::common::WS_REQUEST_HEADER_TRACEPARENT_CLIENT_METADATA_KEY;
+ pub use crate::common::WS_REQUEST_HEADER_TRACESTATE_CLIENT_METADATA_KEY;
+ pub use crate::common::create_text_param_for_request;
+ pub use crate::common::response_create_client_metadata;
++pub use crate::endpoint::ChatCompletionsClient;
+ pub use crate::endpoint::CompactClient;
+ pub use crate::endpoint::ImagesClient;
+ pub use crate::endpoint::MemoriesClient;
+diff --git a/codex-rs/core/src/chat_completions.rs b/codex-rs/core/src/chat_completions.rs
+new file mode 100644
+index 0000000..d9456d3
+--- /dev/null
++++ b/codex-rs/core/src/chat_completions.rs
+@@ -0,0 +1,336 @@
++use crate::client_common::Prompt;
++use crate::client_common::ResponseEvent;
++use crate::client_common::ResponseStream;
++use codex_protocol::ResponseItemId;
++use codex_protocol::error::CodexErr;
++use codex_protocol::error::Result;
++use codex_protocol::models::AgentMessageInputContent;
++use codex_protocol::models::ContentItem;
++use codex_protocol::models::MessagePhase;
++use codex_protocol::models::ResponseItem;
++use codex_protocol::protocol::TokenUsage;
++use codex_tools::ResponsesApiNamespaceTool;
++use codex_tools::ToolSpec;
++use serde::Deserialize;
++use serde_json::Value;
++use serde_json::json;
++use tokio::sync::mpsc;
++use tokio_util::sync::CancellationToken;
++
++pub(crate) fn build_chat_completions_request(prompt: &Prompt, model: &str) -> Value {
++    let mut messages = Vec::new();
++    let instructions = prompt.base_instructions.text.trim();
++    if !instructions.is_empty() {
++        messages.push(json!({"role": "system", "content": instructions}));
++    }
++    for item in &prompt.input {
++        if let Some(message) = response_item_to_chat_message(item) {
++            messages.push(message);
++        }
++    }
++
++    let tools = chat_tools(&prompt.tools);
++    let mut request = json!({
++        "model": model,
++        "messages": messages,
++        "stream": false,
++        "max_tokens": 16384,
++    });
++    if !tools.is_empty() {
++        request["tools"] = Value::Array(tools);
++        request["tool_choice"] = Value::String("auto".to_string());
++        request["parallel_tool_calls"] = Value::Bool(prompt.parallel_tool_calls);
++    }
++    if let Some(schema) = &prompt.output_schema {
++        request["response_format"] = json!({
++            "type": "json_schema",
++            "json_schema": {
++                "name": "elpis_output",
++                "strict": prompt.output_schema_strict,
++                "schema": schema,
++            }
++        });
++    }
++    request
++}
++
++fn message_text(content: &[ContentItem]) -> String {
++    content
++        .iter()
++        .filter_map(|item| match item {
++            ContentItem::InputText { text } | ContentItem::OutputText { text } => Some(text.as_str()),
++            ContentItem::InputImage { image_url, .. } => Some(image_url.as_str()),
++        })
++        .collect::<Vec<_>>()
++        .join("\n")
++}
++
++fn agent_message_text(content: &[AgentMessageInputContent]) -> String {
++    content
++        .iter()
++        .filter_map(|item| match item {
++            AgentMessageInputContent::InputText { text } => Some(text.as_str()),
++            AgentMessageInputContent::EncryptedContent { .. } => None,
++        })
++        .collect::<Vec<_>>()
++        .join("\n")
++}
++
++fn response_item_to_chat_message(item: &ResponseItem) -> Option<Value> {
++    match item {
++        ResponseItem::Message { role, content, .. } => Some(json!({
++            "role": role,
++            "content": message_text(content),
++        })),
++        ResponseItem::AgentMessage {
++            author,
++            recipient,
++            content,
++            ..
++        } => Some(json!({
++            "role": "user",
++            "content": format!("Agent {author} to {recipient}: {}", agent_message_text(content)),
++        })),
++        ResponseItem::FunctionCall {
++            name,
++            arguments,
++            call_id,
++            ..
++        }
++        | ResponseItem::CustomToolCall {
++            name,
++            input: arguments,
++            call_id,
++            ..
++        } => Some(json!({
++            "role": "assistant",
++            "content": Value::Null,
++            "tool_calls": [{
++                "id": call_id,
++                "type": "function",
++                "function": {"name": name, "arguments": arguments},
++            }],
++        })),
++        ResponseItem::FunctionCallOutput { call_id, output, .. }
++        | ResponseItem::CustomToolCallOutput { call_id, output, .. } => Some(json!({
++            "role": "tool",
++            "tool_call_id": call_id,
++            "content": output.body.to_text().unwrap_or_default(),
++        })),
++        ResponseItem::ToolSearchOutput { execution, .. } => Some(json!({
++            "role": "tool",
++            "content": execution,
++        })),
++        ResponseItem::Reasoning { .. }
++        | ResponseItem::AdditionalTools { .. }
++        | ResponseItem::LocalShellCall { .. }
++        | ResponseItem::ToolSearchCall { .. }
++        | ResponseItem::WebSearchCall { .. }
++        | ResponseItem::ImageGenerationCall { .. }
++        | ResponseItem::Compaction { .. }
++        | ResponseItem::CompactionTrigger { .. }
++        | ResponseItem::ContextCompaction { .. }
++        | ResponseItem::Other => None,
++    }
++}
++
++fn chat_tools(tools: &[ToolSpec]) -> Vec<Value> {
++    let mut result = Vec::new();
++    for tool in tools {
++        match tool {
++            ToolSpec::Function(function) => result.push(json!({
++                "type": "function",
++                "function": {
++                    "name": function.name,
++                    "description": function.description,
++                    "parameters": function.parameters,
++                    "strict": function.strict,
++                }
++            })),
++            ToolSpec::Namespace(namespace) => {
++                for tool in &namespace.tools {
++                    let ResponsesApiNamespaceTool::Function(function) = tool;
++                    result.push(json!({
++                        "type": "function",
++                        "function": {
++                            "name": format!("{}__{}", namespace.name, function.name),
++                            "description": function.description,
++                            "parameters": function.parameters,
++                            "strict": function.strict,
++                        }
++                    }));
++                }
++            }
++            ToolSpec::Freeform(tool) => result.push(json!({
++                "type": "function",
++                "function": {
++                    "name": tool.name,
++                    "description": tool.description,
++                    "parameters": {
++                        "type": "object",
++                        "properties": {"input": {"type": "string"}},
++                        "required": ["input"],
++                        "additionalProperties": false,
++                    },
++                }
++            })),
++            ToolSpec::ToolSearch { .. } | ToolSpec::WebSearch { .. } => {}
++        }
++    }
++    result
++}
++
++#[derive(Debug, Deserialize)]
++struct ChatCompletionResponse {
++    id: Option<String>,
++    choices: Vec<ChatChoice>,
++    usage: Option<ChatUsage>,
++}
++
++#[derive(Debug, Deserialize)]
++struct ChatChoice {
++    message: ChatAssistantMessage,
++    finish_reason: Option<String>,
++}
++
++#[derive(Debug, Deserialize)]
++struct ChatAssistantMessage {
++    content: Option<String>,
++    #[serde(default)]
++    tool_calls: Vec<ChatToolCall>,
++}
++
++#[derive(Debug, Deserialize)]
++struct ChatToolCall {
++    id: String,
++    function: ChatFunctionCall,
++}
++
++#[derive(Debug, Deserialize)]
++struct ChatFunctionCall {
++    name: String,
++    arguments: String,
++}
++
++#[derive(Debug, Deserialize)]
++struct ChatUsage {
++    #[serde(default)]
++    prompt_tokens: i64,
++    #[serde(default)]
++    completion_tokens: i64,
++    #[serde(default)]
++    total_tokens: i64,
++}
++
++pub(crate) fn chat_completion_response_stream(value: Value) -> Result<ResponseStream> {
++    let response: ChatCompletionResponse = serde_json::from_value(value)
++        .map_err(|err| CodexErr::Stream(format!("invalid chat completion payload: {err}"), None))?;
++    let choice = response
++        .choices
++        .into_iter()
++        .next()
++        .ok_or_else(|| CodexErr::Stream("chat completion returned no choices".to_string(), None))?;
++
++    let mut events = vec![ResponseEvent::Created];
++    if let Some(content) = choice.message.content.filter(|text| !text.is_empty()) {
++        events.push(ResponseEvent::OutputTextDelta(content.clone()));
++        events.push(ResponseEvent::OutputItemDone(ResponseItem::Message {
++            id: Some(ResponseItemId::new("msg")),
++            role: "assistant".to_string(),
++            content: vec![ContentItem::OutputText { text: content }],
++            phase: Some(MessagePhase::FinalAnswer),
++            internal_chat_message_metadata_passthrough: None,
++        }));
++    }
++    for tool_call in choice.message.tool_calls {
++        events.push(ResponseEvent::OutputItemDone(ResponseItem::FunctionCall {
++            id: Some(ResponseItemId::new("fc")),
++            name: tool_call.function.name,
++            namespace: None,
++            arguments: tool_call.function.arguments,
++            call_id: tool_call.id,
++            internal_chat_message_metadata_passthrough: None,
++        }));
++    }
++    let usage = response.usage.map(|usage| TokenUsage {
++        input_tokens: usage.prompt_tokens,
++        cached_input_tokens: 0,
++        output_tokens: usage.completion_tokens,
++        reasoning_output_tokens: 0,
++        total_tokens: usage.total_tokens,
++    });
++    let end_turn = choice
++        .finish_reason
++        .as_deref()
++        .map(|reason| !matches!(reason, "tool_calls" | "function_call"));
++    events.push(ResponseEvent::Completed {
++        response_id: response.id.unwrap_or_else(|| "chat-completion".to_string()),
++        token_usage: usage,
++        end_turn,
++    });
++
++    let (tx, rx_event) = mpsc::channel(events.len().max(1));
++    for event in events {
++        tx.try_send(Ok(event))
++            .map_err(|err| CodexErr::Stream(format!("failed to queue chat event: {err}"), None))?;
++    }
++    drop(tx);
++    Ok(ResponseStream {
++        rx_event,
++        consumer_dropped: CancellationToken::new(),
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use codex_protocol::models::BaseInstructions;
++    use futures::StreamExt;
++
++    #[test]
++    fn request_maps_messages_and_function_tools() {
++        let prompt = Prompt {
++            input: vec![ResponseItem::Message {
++                id: None,
++                role: "user".to_string(),
++                content: vec![ContentItem::InputText {
++                    text: "hello".to_string(),
++                }],
++                phase: None,
++                internal_chat_message_metadata_passthrough: None,
++            }],
++            base_instructions: BaseInstructions { text: "be useful".to_string() },
++            ..Prompt::default()
++        };
++        let request = build_chat_completions_request(&prompt, "claude-sonnet-4-5");
++        assert_eq!(request["model"], "claude-sonnet-4-5");
++        assert_eq!(request["messages"][0]["role"], "system");
++        assert_eq!(request["messages"][1]["content"], "hello");
++    }
++
++    #[tokio::test]
++    async fn response_maps_text_tools_and_usage() {
++        let value = json!({
++            "id": "chat-1",
++            "choices": [{
++                "message": {
++                    "content": "done",
++                    "tool_calls": [{
++                        "id": "call-1",
++                        "type": "function",
++                        "function": {"name": "shell", "arguments": "{}"}
++                    }]
++                },
++                "finish_reason": "tool_calls"
++            }],
++            "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}
++        });
++        let events = chat_completion_response_stream(value)
++            .expect("stream")
++            .collect::<Vec<_>>()
++            .await;
++        assert!(events.iter().any(|event| matches!(event, Ok(ResponseEvent::OutputTextDelta(text)) if text == "done")));
++        assert!(events.iter().any(|event| matches!(event, Ok(ResponseEvent::OutputItemDone(ResponseItem::FunctionCall { name, .. })) if name == "shell")));
++        assert!(events.iter().any(|event| matches!(event, Ok(ResponseEvent::Completed { end_turn: Some(false), .. }))));
++    }
++}
