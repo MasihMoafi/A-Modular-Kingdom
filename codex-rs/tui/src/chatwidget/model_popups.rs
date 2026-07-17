@@ -4,7 +4,7 @@
 //! into another, especially while Plan mode is active.
 
 use super::*;
-use ratatui::style::Styled;
+use ratatui::text::Span;
 
 const ULTRA_REASONING_CONCURRENCY_WARNING_THRESHOLD: usize = 8;
 
@@ -68,15 +68,18 @@ impl ChatWidget {
         let provider = self.model_provider_display_name();
         let route = self.model_provider_route().long_label();
         let mut header = ColumnRenderable::new();
-        header.push(Line::from(
-            title.to_string().style(crate::style::brand_style()),
-        ));
-        header.push(Line::from(
-            format!("Provider: {provider}").style(crate::style::status_symbol_style()),
-        ));
-        header.push(Line::from(
-            format!("Route: {route}").style(crate::style::status_symbol_style()),
-        ));
+        header.push(Line::from(Span::styled(
+            title.to_string(),
+            crate::style::brand_style(),
+        )));
+        header.push(Line::from(Span::styled(
+            format!("Provider: {provider}"),
+            crate::style::status_symbol_style(),
+        )));
+        header.push(Line::from(Span::styled(
+            format!("Route: {route}"),
+            crate::style::status_symbol_style(),
+        )));
         header.push(Line::from(
             format!("Current model: {}", self.current_model()).bold(),
         ));
@@ -92,9 +95,10 @@ impl ChatWidget {
         let warning = format!(
             "Compatibility route: OpenAI base URL is overridden to {base_url}. Model discovery and selection depend on that endpoint."
         );
-        Some(Line::from(
-            warning.style(crate::style::popup_border_style()),
-        ))
+        Some(Line::from(Span::styled(
+            warning,
+            crate::style::popup_border_style(),
+        )))
     }
 
     fn custom_openai_base_url(&self) -> Option<String> {
@@ -663,9 +667,10 @@ impl ChatWidget {
 
         let mut header = ColumnRenderable::new();
         header.push(Line::from("Advanced Reasoning".bold()));
-        header.push(Line::from(
-            "⚠ Consumes usage limits faster".style(crate::style::status_symbol_style()),
-        ));
+        header.push(Line::from(Span::styled(
+            "⚠ Consumes usage limits faster",
+            crate::style::status_symbol_style(),
+        )));
         self.bottom_pane.show_selection_view(SelectionViewParams {
             header: Box::new(header),
             footer_hint: Some(standard_popup_hint_line()),
