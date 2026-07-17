@@ -64,12 +64,16 @@ jobs:
             docs
             codex-rs/Cargo.toml
             codex-rs/Cargo.lock
+            codex-rs/codex-api
+            codex-rs/http-client
+            codex-rs/model-provider
+            codex-rs/model-provider-info
+            codex-rs/tools
+            codex-rs/login
             codex-rs/tui/Cargo.toml
             codex-rs/tui/src
             codex-rs/core/Cargo.toml
             codex-rs/core/src
-            codex-rs/model-provider-info/Cargo.toml
-            codex-rs/model-provider-info/src
             codex-rs/protocol/Cargo.toml
             codex-rs/protocol/src
             codex-rs/config
