@@ -27,40 +27,20 @@ jobs:
           text = path.read_text()
           text = text.replace('use ratatui::style::Styled;\n', 'use ratatui::text::Span;\n')
           replacements = {
-              '''        header.push(Line::from(
-              title.to_string().style(crate::style::brand_style()),
-          ));''': '''        header.push(Line::from(Span::styled(
-              title.to_string(),
-              crate::style::brand_style(),
-          )));''',
-              '''        header.push(Line::from(
-              format!("Provider: {provider}").style(crate::style::status_symbol_style()),
-          ));''': '''        header.push(Line::from(Span::styled(
-              format!("Provider: {provider}"),
-              crate::style::status_symbol_style(),
-          )));''',
-              '''        header.push(Line::from(
-              format!("Route: {route}").style(crate::style::status_symbol_style()),
-          ));''': '''        header.push(Line::from(Span::styled(
-              format!("Route: {route}"),
-              crate::style::status_symbol_style(),
-          )));''',
-              '''        Some(Line::from(
-              warning.style(crate::style::popup_border_style()),
-          ))''': '''        Some(Line::from(Span::styled(
-              warning,
-              crate::style::popup_border_style(),
-          )))''',
-              '''        header.push(Line::from(
-              "⚠ Consumes usage limits faster".style(crate::style::status_symbol_style()),
-          ));''': '''        header.push(Line::from(Span::styled(
-              "⚠ Consumes usage limits faster",
-              crate::style::status_symbol_style(),
-          )));''',
+              'title.to_string().style(crate::style::brand_style())':
+                  'Span::styled(title.to_string(), crate::style::brand_style())',
+              'format!("Provider: {provider}").style(crate::style::status_symbol_style())':
+                  'Span::styled(format!("Provider: {provider}"), crate::style::status_symbol_style())',
+              'format!("Route: {route}").style(crate::style::status_symbol_style())':
+                  'Span::styled(format!("Route: {route}"), crate::style::status_symbol_style())',
+              'warning.style(crate::style::popup_border_style())':
+                  'Span::styled(warning, crate::style::popup_border_style())',
+              '"⚠ Consumes usage limits faster".style(crate::style::status_symbol_style())':
+                  'Span::styled("⚠ Consumes usage limits faster", crate::style::status_symbol_style())',
           }
           for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f'missing expected block:\n{old}')
+              if text.count(old) != 1:
+                  raise SystemExit(f'expected one occurrence, found {text.count(old)}: {old}')
               text = text.replace(old, new, 1)
           if '.style(crate::style::' in text:
               raise SystemExit('unconverted Elpis style call remains')
