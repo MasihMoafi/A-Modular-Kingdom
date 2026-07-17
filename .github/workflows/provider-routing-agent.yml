@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/provider-routing
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -52,6 +55,7 @@ jobs:
         run: cargo build -p codex-tui --bin elpis --locked
 
       - name: Commit validated production files
+        if: github.event_name == 'push'
         run: |
           rm -rf .github/provider-routing-patch
           rm .github/workflows/provider-routing-agent.yml
