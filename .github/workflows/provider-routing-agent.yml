@@ -35,11 +35,45 @@ jobs:
             cat /tmp/base-apply.log
             exit 1
           fi
+          python3 <<'PY'
+          from pathlib import Path
+
+          cargo = Path("codex-rs/model-provider/Cargo.toml")
+          text = cargo.read_text()
+          dependency = 'serde_json = { workspace = true }\n'
+          dev_marker = '[dev-dependencies]\npretty_assertions = { workspace = true }\n' + dependency
+          if dev_marker in text:
+              text = text.replace(
+                  dev_marker,
+                  '[dev-dependencies]\npretty_assertions = { workspace = true }\n',
+                  1,
+              )
+          if dependency not in text.split('[dev-dependencies]', 1)[0]:
+              marker = 'http = { workspace = true }\n'
+              if marker not in text:
+                  raise RuntimeError('model-provider dependency insertion marker missing')
+              text = text.replace(marker, marker + dependency, 1)
+          cargo.write_text(text)
+
+          provider = Path("codex-rs/model-provider/src/provider.rs")
+          text = provider.read_text()
+          bad = (
+              '    use codex_protocol::openai_models::ModelInfo;\n'
+              '    use codex_protocol::openai_models::ModelInfo;\n'
+              'use codex_protocol::openai_models::ModelsResponse;\n'
+          )
+          good = (
+              '    use codex_protocol::openai_models::ModelInfo;\n'
+              '    use codex_protocol::openai_models::ModelsResponse;\n'
+          )
+          if bad in text:
+              text = text.replace(bad, good, 1)
+          elif text.count('use codex_protocol::openai_models::ModelInfo;') != 2:
+              raise RuntimeError('unexpected ModelInfo import shape after provider patch')
+          provider.write_text(text)
+          PY
+          git add codex-rs/model-provider/Cargo.toml codex-rs/model-provider/src/provider.rs
           git diff --cached > /tmp/provider-staged.diff
-          if ! git apply --index .github/provider-routing-patch/fix.patch > /tmp/fix-apply.log 2>&1; then
-            cat /tmp/fix-apply.log
-            exit 1
-          fi
 
       - name: Format production source
         working-directory: codex-rs
@@ -86,7 +120,6 @@ jobs:
           name: provider-routing-diagnostics
           path: |
             /tmp/base-apply.log
-            /tmp/fix-apply.log
             /tmp/provider-staged.diff
             /tmp/provider-routing.patch
             /tmp/native-provider.log
