@@ -230,12 +230,7 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
     );
 
     let mut spans = Vec::new();
-    push_field(
-        &mut spans,
-        "ELPIS",
-        "runtime",
-        crate::style::brand_style(),
-    );
+    push_field(&mut spans, "ELPIS", "runtime", crate::style::brand_style());
     push_field(
         &mut spans,
         "provider",

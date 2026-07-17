@@ -26,21 +26,20 @@ impl ChatWidget {
         } else {
             self.config.model_provider_id.clone()
         };
-        let custom_openai_base = self
-            .config
-            .model_provider
-            .base_url
-            .as_deref()
-            .is_some_and(|base_url| {
-                let normalized = base_url.trim().trim_end_matches('/');
-                !normalized.is_empty() && normalized != DEFAULT_OPENAI_BASE_URL
-            });
-        let provider_route =
-            if self.config.model_provider.is_openai() && !custom_openai_base {
-                crate::branding::ProviderRoute::Native
-            } else {
-                crate::branding::ProviderRoute::Compatibility
-            };
+        let custom_openai_base =
+            self.config
+                .model_provider
+                .base_url
+                .as_deref()
+                .is_some_and(|base_url| {
+                    let normalized = base_url.trim().trim_end_matches('/');
+                    !normalized.is_empty() && normalized != DEFAULT_OPENAI_BASE_URL
+                });
+        let provider_route = if self.config.model_provider.is_openai() && !custom_openai_base {
+            crate::branding::ProviderRoute::Native
+        } else {
+            crate::branding::ProviderRoute::Compatibility
+        };
         let current_model = self.current_model().to_string();
         if crate::branding::sync_runtime_identity(
             thread_id.as_deref(),
