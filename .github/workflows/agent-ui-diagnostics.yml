@@ -1,9 +1,7 @@
 name: Apply UI span styling fix
 
 on:
-  push:
-    branches:
-      - agent/ui-ux
+  pull_request:
     paths:
       - .github/workflows/agent-ui-diagnostics.yml
 
@@ -12,7 +10,6 @@ permissions:
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout UI branch
