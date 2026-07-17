@@ -70,11 +70,8 @@ impl StatusLineAccent {
     }
 
     fn fallback_style(self) -> Style {
-        match self {
-            Self::Model | Self::State | Self::Metadata | Self::Mode => Style::default().cyan(),
-            Self::Path | Self::Usage | Self::Progress => Style::default().green(),
-            Self::Branch | Self::Limit | Self::Thread => Style::default().magenta(),
-        }
+        let _ = self;
+        Style::default().yellow()
     }
 }
 
@@ -85,9 +82,34 @@ pub(crate) fn status_line_from_segments<I>(
 where
     I: IntoIterator<Item = (StatusLineItem, String)>,
 {
-    status_line_from_segments_with_resolver(segments, use_theme_colors, |accent| {
-        foreground_style_for_scopes(accent.scopes())
-    })
+    let segments = segments.into_iter().collect::<Vec<_>>();
+    let model_hint = segments.iter().find_map(|(item, value)| {
+        matches!(
+            item,
+            StatusLineItem::ModelName | StatusLineItem::ModelWithReasoning
+        )
+        .then(|| value.clone())
+    });
+    let tail = status_line_from_segments_with_resolver(
+        segments.into_iter().filter(|(item, _)| {
+            !matches!(
+                item,
+                StatusLineItem::ModelName
+                    | StatusLineItem::ModelWithReasoning
+                    | StatusLineItem::ContextRemaining
+                    | StatusLineItem::ContextUsed
+                    | StatusLineItem::ContextWindowSize
+                    | StatusLineItem::UsedTokens
+            )
+        }),
+        use_theme_colors,
+        |accent| foreground_style_for_scopes(accent.scopes()),
+    );
+
+    Some(crate::branding::decorate_status_line(
+        tail,
+        model_hint.as_deref(),
+    ))
 }
 
 fn status_line_from_segments_with_resolver<I, F>(
@@ -203,11 +225,11 @@ mod tests {
         .expect("status line");
 
         assert_eq!(line_text(&line), "gpt-5 · /repo · main");
-        assert_eq!(line.spans[0].style.fg, Some(Color::Cyan));
+        assert_eq!(line.spans[0].style.fg, Some(Color::Yellow));
         assert!(!line.spans[0].style.add_modifier.contains(Modifier::DIM));
-        assert_eq!(line.spans[2].style.fg, Some(Color::Green));
+        assert_eq!(line.spans[2].style.fg, Some(Color::Yellow));
         assert!(!line.spans[2].style.add_modifier.contains(Modifier::DIM));
-        assert_eq!(line.spans[4].style.fg, Some(Color::Magenta));
+        assert_eq!(line.spans[4].style.fg, Some(Color::Yellow));
         assert!(!line.spans[4].style.add_modifier.contains(Modifier::DIM));
     }
 
@@ -229,7 +251,7 @@ mod tests {
         assert_eq!(line.spans[0].style.fg, Some(Color::Red));
         assert!(!line.spans[0].style.add_modifier.contains(Modifier::DIM));
         assert!(line.spans[1].style.add_modifier.contains(Modifier::DIM));
-        assert_eq!(line.spans[2].style.fg, Some(Color::Green));
+        assert_eq!(line.spans[2].style.fg, Some(Color::Yellow));
         assert!(!line.spans[2].style.add_modifier.contains(Modifier::DIM));
     }
 
