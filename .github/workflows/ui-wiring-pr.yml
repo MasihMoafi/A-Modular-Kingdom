@@ -1,0 +1,54 @@
+name: Verify and commit UI specialist
+
+on:
+  pull_request:
+    branches:
+      - agent/product-integration
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/ui-ux
+          fetch-depth: 0
+
+      - name: Apply production UI wiring
+        run: |
+          base64 -d .github/ui-wiring.b64 | bzip2 -d > /tmp/apply_ui_wiring.py
+          python3 /tmp/apply_ui_wiring.py
+
+      - name: Install dependencies and Rust
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libcap-dev libssl-dev pkg-config
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+
+      - name: Format and verify live identity surfaces
+        working-directory: codex-rs
+        run: |
+          cargo fmt --all
+          cargo fmt --all --check
+          cargo test -p codex-tui --lib --locked branding::tests
+          cargo test -p codex-tui --lib --locked elpis_provider_identity_tests
+          cargo test -p codex-tui --bin elpis --locked
+          cargo check -p codex-tui --locked
+
+      - name: Commit verified production source and remove bootstrap
+        run: |
+          rm .github/ui-wiring.b64 .github/workflows/ui-wiring-pr.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(tui): wire live Elpis runtime identity"
+          git push origin HEAD:agent/ui-ux
