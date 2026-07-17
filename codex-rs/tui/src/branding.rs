@@ -101,19 +101,27 @@ pub(crate) fn sync_runtime_identity(
     route: ProviderRoute,
     model: &str,
     durable_memory_enabled: bool,
-) {
+) -> bool {
     mutate_runtime_identity(|state| {
+        let provider = normalized_value(provider, "configured");
+        let model = normalized_value(model, "starting");
+        let changed = state.thread_id.as_deref() != thread_id
+            || state.provider != provider
+            || state.route != route
+            || state.model != model
+            || state.durable_memory_enabled != durable_memory_enabled;
         if state.thread_id.as_deref() != thread_id {
             *state = RuntimeIdentity {
                 thread_id: thread_id.map(ToOwned::to_owned),
                 ..RuntimeIdentity::default()
             };
         }
-        state.provider = normalized_value(provider, "configured");
+        state.provider = provider;
         state.route = route;
-        state.model = normalized_value(model, "starting");
+        state.model = model;
         state.durable_memory_enabled = durable_memory_enabled;
-    });
+        changed
+    })
 }
 
 pub(crate) fn record_context_usage(last_total_tokens: i64, context_window: Option<i64>) {
@@ -139,20 +147,6 @@ pub(crate) fn record_compaction(thread_id: &str, turn_id: &str) -> EvictionNotic
             count: state.eviction_count,
             reason: "context compaction".to_string(),
             evidence: format!("thread:{thread_id}/turn:{turn_id}"),
-        };
-        state.latest_eviction = Some(notice.clone());
-        state.latest_continuity = Some("context compacted".to_string());
-        notice
-    })
-}
-
-pub(crate) fn record_compaction_item(item_id: &str) -> EvictionNotice {
-    mutate_runtime_identity(|state| {
-        state.eviction_count = state.eviction_count.saturating_add(1);
-        let notice = EvictionNotice {
-            count: state.eviction_count,
-            reason: "context compaction".to_string(),
-            evidence: format!("item:{item_id}"),
         };
         state.latest_eviction = Some(notice.clone());
         state.latest_continuity = Some("context compacted".to_string());
@@ -214,7 +208,7 @@ pub(crate) fn decorate_status_line(
 
 fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span<'static>> {
     let model = if state.model == "starting" {
-        model_hint.unwrap_or(&state.model)
+        model_hint.unwrap_or(state.model.as_str())
     } else {
         state.model.as_str()
     };
@@ -236,12 +230,7 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
     );
 
     let mut spans = Vec::new();
-    push_field(
-        &mut spans,
-        "ELPIS",
-        "runtime",
-        crate::style::brand_style(),
-    );
+    push_field(&mut spans, "ELPIS", "runtime", crate::style::brand_style());
     push_field(
         &mut spans,
         "provider",
@@ -272,6 +261,14 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
         &eviction,
         crate::style::status_symbol_style(),
     );
+    if let Some(continuity) = state.latest_continuity.as_deref() {
+        push_field(
+            &mut spans,
+            "flow",
+            continuity,
+            crate::style::status_symbol_style(),
+        );
+    }
     spans
 }
 

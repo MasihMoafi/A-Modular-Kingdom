@@ -105,7 +105,7 @@ impl SlashCommand {
             SlashCommand::Rag => "search Elpis's local knowledge base",
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
-            SlashCommand::Status => "show current session configuration and token usage",
+            SlashCommand::Status => "inspect current context, continuity, and token usage",
             SlashCommand::Usage => "view account usage or use a usage limit reset",
             SlashCommand::DebugConfig => "show config layers and requirement sources for debugging",
             SlashCommand::Title => "configure which items appear in the terminal title",
@@ -116,7 +116,7 @@ impl SlashCommand {
             SlashCommand::Stop => "kill all background terminals",
             SlashCommand::MemoryDrop => "DO NOT USE",
             SlashCommand::MemoryUpdate => "DO NOT USE",
-            SlashCommand::Model => "choose what model and reasoning effort to use",
+            SlashCommand::Model => "choose a provider-aware model and reasoning effort",
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
             }
@@ -136,7 +136,7 @@ impl SlashCommand {
             }
             SlashCommand::Experimental => "configure Elpis settings",
             SlashCommand::AutoReview => "approve one retry of a recent auto-review denial",
-            SlashCommand::Memories => "configure memory use and generation",
+            SlashCommand::Memories => "inspect durable memory and generation settings",
             SlashCommand::Mcp => "list configured MCP tools; use /mcp verbose for details",
             SlashCommand::Apps => "manage apps",
             SlashCommand::Plugins => "browse plugins",
@@ -249,7 +249,6 @@ impl SlashCommand {
     fn is_visible(self) -> bool {
         match self {
             SlashCommand::Archive
-            | SlashCommand::Memories
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate
             | SlashCommand::Mention
@@ -313,7 +312,6 @@ mod tests {
         for removed in [
             "archive",
             "exit",
-            "memories",
             "mention",
             "personality",
             "plan",
@@ -324,6 +322,7 @@ mod tests {
         ] {
             assert!(!visible.contains(&removed), "{removed} should be removed");
         }
+        assert!(visible.contains(&"memories"));
     }
 
     #[test]
