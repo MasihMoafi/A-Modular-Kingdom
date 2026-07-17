@@ -1,57 +1,106 @@
 # Elpis Provider Boundary
 
 Elpis owns context admission, durable memory, continuity, permissions, evidence, and the
-terminal interface. A selected provider owns inference; changing provider must not discard
-the Elpis state around it.
+terminal interface. The selected provider owns inference. Provider changes must not discard the
+Elpis state around them, and a native-provider selection must never be redirected through another
+provider.
 
-## Implementation Status
+## Built-in hosted routes
 
-Remotely tested at launcher/configuration level:
+| Provider ID | API base URL | Credential environment variable | Wire protocol | Default model |
+| --- | --- | --- | --- | --- |
+| `openai` | `https://api.openai.com/v1` (or the existing configured OpenAI/Codex base) | `OPENAI_API_KEY` when API-key auth is used | OpenAI Responses | `gpt-5.4` |
+| `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | OpenAI Responses compatibility | `openai/gpt-5.4` |
+| `anthropic` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | Anthropic Messages | `claude-sonnet-4-6` |
+| `google-gemini` | `https://generativelanguage.googleapis.com/v1beta` | `GEMINI_API_KEY` | Gemini GenerateContent | `gemini-3.5-flash` |
 
-- OpenAI, OpenRouter, Amazon Bedrock, Ollama, and LM Studio provider IDs;
-- Claude Sonnet and Gemini Pro/Flash shortcuts through OpenRouter;
-- separate OpenRouter credentials through `OPENROUTER_API_KEY`.
+The OpenAI Responses implementation is unchanged. OpenRouter also continues to use its existing
+Responses-compatible path.
 
-Not yet accepted end to end:
+## Compatibility aliases
 
-- an authenticated OpenAI task and resume;
-- an authenticated OpenRouter task and resume;
-- continuity evidence across a provider change;
-- the provider-aware `Choose a mind` `/model` surface.
+These launcher aliases are intentionally **not native routes**:
 
-Native Anthropic and Google adapters are not implemented. Claude and Gemini shortcuts are
-OpenRouter compatibility routes and must be labelled that way.
+| Alias | Actual provider | Model alias | Label |
+| --- | --- | --- | --- |
+| `--provider claude` | OpenRouter | `~anthropic/claude-sonnet-latest` | Claude via OpenRouter (compatibility) |
+| `--provider gemini` | OpenRouter | `~google/gemini-pro-latest` | Gemini Pro via OpenRouter (compatibility) |
+| `--provider gemini-flash` | OpenRouter | `~google/gemini-flash-latest` | Gemini Flash via OpenRouter (compatibility) |
 
-## Supported Entry Points
+Use `--provider anthropic` or `--provider google-gemini` for direct vendor routing. Those native
+IDs never install an OpenRouter model override.
 
-| Selection | Runtime path | Credential |
-| --- | --- | --- |
-| `--provider openai` | OpenAI/Codex foundation | ChatGPT login or configured OpenAI auth |
-| `--provider openrouter` | OpenRouter Responses API | `OPENROUTER_API_KEY` |
-| `--provider claude` | OpenRouter Claude Sonnet family | `OPENROUTER_API_KEY` |
-| `--provider gemini` | OpenRouter Gemini Pro family | `OPENROUTER_API_KEY` |
-| `--provider gemini-flash` | OpenRouter Gemini Flash family | `OPENROUTER_API_KEY` |
-| `--provider amazon-bedrock` | Bedrock path | configured AWS/Bedrock auth |
-| `--provider ollama` | local Ollama | local service |
-| `--provider lmstudio` | local LM Studio | local service |
+## Native authentication boundaries
 
-An explicit OpenRouter slug may be selected with configuration or `elpis -m <model>`.
+- Anthropic sends `ANTHROPIC_API_KEY` only as `x-api-key` and sends
+  `anthropic-version: 2023-06-01`.
+- Gemini sends `GEMINI_API_KEY` only as `x-goog-api-key`.
+- OpenAI and OpenRouter API keys retain their existing `Authorization: Bearer ...` behavior.
+- Provider credentials are read from the provider's configured environment variable. They are not
+  copied between providers and are never translated into an OpenRouter credential.
 
-## Model Selection
+## Native request and stream translation
 
-Today, provider-family aliases are selected through the launcher. The inherited `/model`
-picker has not yet become the Elpis provider-aware surface.
+The native adapters translate the canonical Elpis turn representation as follows:
 
-The future `Choose a mind` layer should show provider, runtime path, credential source,
-capabilities, and whether the route is native or compatibility-based.
+- system and developer text becomes Anthropic `system` blocks or Gemini `systemInstruction`;
+- user and assistant text becomes vendor-native message/content blocks;
+- function definitions become Anthropic `tools` or Gemini `functionDeclarations`;
+- function calls and text-only function results round-trip through native tool-use/function-call
+  blocks;
+- streamed text, tool calls, vendor errors, token usage, model/version identifiers, and completion
+  state are translated back into the existing `ResponseEvent` stream;
+- dropping the response stream cancels the parser task and drops the upstream response body;
+- provider stream-idle timeouts are surfaced as stream errors.
 
-## Native Adapter Roadmap
+The static native catalogs are supplied to the model manager, so `/model` consumes the native
+provider's default model instead of attempting an OpenAI `/models` request.
 
-Direct Anthropic and Google support requires real protocol adapters covering:
+## Honest protocol limitations
 
-1. request and streaming translation;
-2. tool-call and tool-result mapping;
-3. reasoning/thinking preservation;
-4. authentication and error mapping;
-5. truthful model/capability catalogs;
-6. continuity acceptance across a provider switch.
+The current native boundary intentionally rejects rather than silently approximates unsupported
+history or tool shapes.
+
+- Text and function tools are supported. Image inputs and image-bearing tool results are currently
+  rejected even though both vendors have image-capable APIs.
+- OpenAI Responses-only items (encrypted reasoning state, remote compaction controls, custom/freeform
+  tools, tool-search items, built-in web search, image generation, and namespace tools) are not
+  translated.
+- Vendor-native thinking/reasoning signatures, citations, prompt-cache controls, structured-output
+  strictness, Anthropic server tools, and Gemini built-in tools/code execution are not preserved.
+- Anthropic requests currently use an explicit `max_tokens` value of 8192 because the canonical
+  request has no provider-neutral output-token limit.
+- Gemini emits only the first candidate. Repeated full function-call chunks are de-duplicated.
+- The canonical completion event exposes `end_turn`, not a raw vendor finish-reason field. Known
+  finish reasons are mapped explicitly; unknown reasons remain unknown. A parsed tool call always
+  maps to `end_turn = false`.
+- Native stream reconnection is not attempted after partial output. HTTP and SSE failures are
+  surfaced to the existing provider error path.
+
+## Manual smoke tests
+
+Anthropic:
+
+```sh
+export ANTHROPIC_API_KEY='...'
+cargo run -p codex-tui --bin elpis -- --provider anthropic
+# In the TUI: run /model and confirm Claude Sonnet 4.6 is listed, then ask for a simple
+# answer and a task that invokes a local function tool.
+```
+
+Gemini:
+
+```sh
+export GEMINI_API_KEY='...'
+cargo run -p codex-tui --bin elpis -- --provider google-gemini
+# In the TUI: run /model and confirm Gemini 3.5 Flash is listed, then exercise text and a
+# function-tool turn.
+```
+
+Compatibility-route check:
+
+```sh
+export OPENROUTER_API_KEY='...'
+cargo run -p codex-tui --bin elpis -- --provider claude
+# Confirm logs/config show model_provider=openrouter and the compatibility model alias.
+```

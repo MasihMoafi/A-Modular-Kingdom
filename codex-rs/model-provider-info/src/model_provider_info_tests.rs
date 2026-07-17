@@ -513,3 +513,73 @@ refresh_interval_ms = 0
     assert_eq!(auth.refresh_interval_ms, 0);
     assert_eq!(auth.refresh_interval(), None);
 }
+
+#[test]
+fn native_provider_metadata_is_explicit_and_truthful() {
+    let anthropic = provider_metadata(ANTHROPIC_PROVIDER_ID).expect("Anthropic metadata");
+    assert_eq!(anthropic.provider_id, "anthropic");
+    assert_eq!(anthropic.api_base_url, ANTHROPIC_BASE_URL);
+    assert_eq!(anthropic.environment_variable, Some(ANTHROPIC_API_KEY_ENV));
+    assert_eq!(anthropic.wire_protocol, WireApi::AnthropicMessages);
+    assert_eq!(anthropic.default_model, ANTHROPIC_DEFAULT_MODEL);
+
+    let gemini = provider_metadata(GOOGLE_GEMINI_PROVIDER_ID).expect("Gemini metadata");
+    assert_eq!(gemini.provider_id, "google-gemini");
+    assert_eq!(gemini.api_base_url, GOOGLE_GEMINI_BASE_URL);
+    assert_eq!(gemini.environment_variable, Some(GOOGLE_GEMINI_API_KEY_ENV));
+    assert_eq!(gemini.wire_protocol, WireApi::GeminiGenerateContent);
+    assert_eq!(gemini.default_model, GOOGLE_GEMINI_DEFAULT_MODEL);
+
+    let openrouter = provider_metadata(OPENROUTER_PROVIDER_ID).expect("OpenRouter metadata");
+    assert_eq!(openrouter.provider_id, OPENROUTER_PROVIDER_ID);
+    assert_eq!(openrouter.wire_protocol, WireApi::Responses);
+
+    let claude_compat = compatibility_route_metadata(OPENROUTER_CLAUDE_COMPAT_ALIAS)
+        .expect("Claude compatibility route");
+    assert_eq!(claude_compat.provider_id, OPENROUTER_PROVIDER_ID);
+    assert_eq!(claude_compat.model, OPENROUTER_CLAUDE_COMPAT_MODEL);
+    assert!(claude_compat.display_name.contains("compatibility"));
+}
+
+#[test]
+fn native_providers_are_built_in_with_vendor_wire_protocols() {
+    let providers = built_in_model_providers(None);
+    let anthropic = providers
+        .get(ANTHROPIC_PROVIDER_ID)
+        .expect("Anthropic provider");
+    assert_eq!(anthropic.base_url.as_deref(), Some(ANTHROPIC_BASE_URL));
+    assert_eq!(anthropic.env_key.as_deref(), Some(ANTHROPIC_API_KEY_ENV));
+    assert_eq!(anthropic.wire_api, WireApi::AnthropicMessages);
+    assert_eq!(
+        anthropic
+            .http_headers
+            .as_ref()
+            .and_then(|headers| headers.get("anthropic-version"))
+            .map(String::as_str),
+        Some("2023-06-01")
+    );
+
+    let gemini = providers
+        .get(GOOGLE_GEMINI_PROVIDER_ID)
+        .expect("Gemini provider");
+    assert_eq!(gemini.base_url.as_deref(), Some(GOOGLE_GEMINI_BASE_URL));
+    assert_eq!(gemini.env_key.as_deref(), Some(GOOGLE_GEMINI_API_KEY_ENV));
+    assert_eq!(gemini.wire_api, WireApi::GeminiGenerateContent);
+}
+
+#[test]
+fn native_wire_protocols_round_trip_through_toml() {
+    for (wire, serialized) in [
+        (WireApi::AnthropicMessages, "anthropic_messages"),
+        (WireApi::GeminiGenerateContent, "gemini_generate_content"),
+    ] {
+        let provider = ModelProviderInfo {
+            wire_api: wire,
+            ..ModelProviderInfo::default()
+        };
+        let encoded = toml::to_string(&provider).expect("serialize provider");
+        assert!(encoded.contains(&format!("wire_api = \"{serialized}\"")));
+        let decoded: ModelProviderInfo = toml::from_str(&encoded).expect("deserialize provider");
+        assert_eq!(decoded.wire_api, wire);
+    }
+}
