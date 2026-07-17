@@ -1,5 +1,5 @@
 diff --git a/codex-rs/model-provider/Cargo.toml b/codex-rs/model-provider/Cargo.toml
-index 2ce0f15..fe6a8b1 100644
+index b6ee6ac..fe6a8b1 100644
 --- a/codex-rs/model-provider/Cargo.toml
 +++ b/codex-rs/model-provider/Cargo.toml
 @@ -27,12 +27,12 @@ codex-protocol = { workspace = true }
