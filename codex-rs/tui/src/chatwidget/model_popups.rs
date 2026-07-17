@@ -32,12 +32,54 @@ impl ChatWidget {
         self.open_model_popup_with_presets(presets);
     }
 
+    fn model_provider_display_name(&self) -> String {
+        let provider_id = self.config.model_provider_id.trim();
+        let provider_name = self.config.model_provider.name.trim();
+        match (provider_name.is_empty(), provider_id.is_empty()) {
+            (true, true) => "configured provider".to_string(),
+            (true, false) => provider_id.to_string(),
+            (false, true) => provider_name.to_string(),
+            (false, false) if provider_name.eq_ignore_ascii_case(provider_id) => {
+                provider_name.to_string()
+            }
+            (false, false) => format!("{provider_name} ({provider_id})"),
+        }
+    }
+
+    fn model_provider_route(&self) -> crate::branding::ProviderRoute {
+        if self.config.model_provider.is_openai() && self.custom_openai_base_url().is_none() {
+            crate::branding::ProviderRoute::Native
+        } else {
+            crate::branding::ProviderRoute::Compatibility
+        }
+    }
+
+    fn model_route_description(&self, description: &str) -> String {
+        let route = self.model_provider_route().long_label();
+        if description.is_empty() {
+            route.to_string()
+        } else {
+            format!("{route} · {description}")
+        }
+    }
+
     fn model_menu_header(&self, title: &str, subtitle: &str) -> Box<dyn Renderable> {
-        let title = title.to_string();
-        let subtitle = subtitle.to_string();
+        let provider = self.model_provider_display_name();
+        let route = self.model_provider_route().long_label();
         let mut header = ColumnRenderable::new();
-        header.push(Line::from(title.bold()));
-        header.push(Line::from(subtitle.dim()));
+        header.push(Line::from(
+            title.to_string().style(crate::style::brand_style()),
+        ));
+        header.push(Line::from(
+            format!("Provider: {provider}").style(crate::style::status_symbol_style()),
+        ));
+        header.push(Line::from(
+            format!("Route: {route}").style(crate::style::status_symbol_style()),
+        ));
+        header.push(Line::from(
+            format!("Current model: {}", self.current_model()).bold(),
+        ));
+        header.push(Line::from(subtitle.to_string().dim()));
         if let Some(warning) = self.model_menu_warning_line() {
             header.push(warning);
         }
@@ -47,9 +89,11 @@ impl ChatWidget {
     fn model_menu_warning_line(&self) -> Option<Line<'static>> {
         let base_url = self.custom_openai_base_url()?;
         let warning = format!(
-            "Warning: OpenAI base URL is overridden to {base_url}. Selecting models may not be supported or work properly."
+            "Compatibility route: OpenAI base URL is overridden to {base_url}. Model discovery and selection depend on that endpoint."
         );
-        Some(Line::from(warning.red()))
+        Some(Line::from(
+            warning.style(crate::style::popup_border_style()),
+        ))
     }
 
     fn custom_openai_base_url(&self) -> Option<String> {
@@ -97,8 +141,7 @@ impl ChatWidget {
         let mut items: Vec<SelectionItem> = auto_presets
             .into_iter()
             .map(|preset| {
-                let description =
-                    (!preset.description.is_empty()).then_some(preset.description.clone());
+                let description = Some(self.model_route_description(&preset.description));
                 let model = preset.model.clone();
                 let requires_advanced_selection =
                     Self::is_advanced_reasoning_effort(&preset.default_reasoning_effort)
@@ -148,7 +191,7 @@ impl ChatWidget {
 
             let is_current = !items.iter().any(|item| item.is_current);
             let description = Some(format!(
-                "Choose a specific model and reasoning level (current: {current_label})"
+                "Browse this provider's full catalog (current: {current_label})"
             ));
 
             items.push(SelectionItem {
@@ -162,8 +205,8 @@ impl ChatWidget {
         }
 
         let header = self.model_menu_header(
-            "Select Model",
-            "Pick a quick auto mode or browse all models.",
+            "Choose a model",
+            "Provider and route stay fixed; choose a quick model or browse the full catalog.",
         );
         self.bottom_pane.show_selection_view(SelectionViewParams {
             footer_hint: Some(standard_popup_hint_line()),
@@ -197,8 +240,7 @@ impl ChatWidget {
 
         let mut items: Vec<SelectionItem> = Vec::new();
         for preset in presets.into_iter() {
-            let description =
-                (!preset.description.is_empty()).then_some(preset.description.to_string());
+            let description = Some(self.model_route_description(&preset.description));
             let is_current = preset.model.as_str() == self.current_model();
             let single_supported_effort = preset.supported_reasoning_efforts.len() == 1;
             let preset_for_action = preset.clone();
@@ -221,8 +263,8 @@ impl ChatWidget {
         }
 
         let header = self.model_menu_header(
-            "Select Model and Effort",
-            "Access legacy models by running codex -m <model_name> or in your config.toml",
+            "Choose a model and effort",
+            "Models are grouped under the active provider and routing mode.",
         );
         self.bottom_pane.show_selection_view(SelectionViewParams {
             footer_hint: Some(self.bottom_pane.standard_popup_hint_line()),
@@ -620,7 +662,9 @@ impl ChatWidget {
 
         let mut header = ColumnRenderable::new();
         header.push(Line::from("Advanced Reasoning".bold()));
-        header.push(Line::from("⚠ Consumes usage limits faster".cyan()));
+        header.push(Line::from(
+            "⚠ Consumes usage limits faster".style(crate::style::status_symbol_style()),
+        ));
         self.bottom_pane.show_selection_view(SelectionViewParams {
             header: Box::new(header),
             footer_hint: Some(standard_popup_hint_line()),
