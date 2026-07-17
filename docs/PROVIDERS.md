@@ -77,6 +77,19 @@ history or tool shapes.
 - Native stream reconnection is not attempted after partial output. HTTP and SSE failures are
   surfaced to the existing provider error path.
 
+## Validation commands
+
+Run these from `codex-rs` after changing provider metadata, routing, authentication, translation, or
+model selection:
+
+```sh
+cargo fmt --all --check
+cargo test -p codex-model-provider-info --locked
+cargo test -p codex-core --lib --locked chat_completions
+cargo test -p codex-tui --bin elpis --locked
+cargo build -p codex-tui --bin elpis --locked
+```
+
 ## Manual smoke tests
 
 Anthropic:
