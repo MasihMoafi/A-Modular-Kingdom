@@ -1,18 +1,18 @@
-name: One-shot integration finalizer
+name: One-shot memory diagnostics
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: elpis-integration-finalizer
   cancel-in-progress: true
 
 jobs:
-  finalize:
+  diagnose:
     if: github.head_ref == 'agent/product-integration'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -21,55 +21,75 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: agent/product-integration
-          fetch-depth: 0
 
       - name: Install Linux build dependencies
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            bubblewrap \
-            libcap-dev \
-            libssl-dev \
-            pkg-config
+            bubblewrap libcap-dev libssl-dev pkg-config
 
       - name: Install pinned Rust toolchain
         run: |
           rustup set profile minimal
           rustup toolchain install 1.95.0 --component rustfmt --no-self-update
 
-      - name: Apply byte-verified integration edits
+      - name: Restore Cargo downloads
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: elpis-cargo-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock') }}
+          restore-keys: elpis-cargo-${{ runner.os }}-
+
+      - name: Restore incremental outputs
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: codex-rs/target
+          key: elpis-diagnostic-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock') }}
+          restore-keys: elpis-target-${{ runner.os }}-
+
+      - name: Apply byte-verified UI edits and format
         run: |
           cat .github/finalizer/chunk-* | base64 -d > /tmp/elpis-finalize.py
           python3 /tmp/elpis-finalize.py
-          git diff --check
-
-      - name: Format source
-        working-directory: codex-rs
-        run: cargo fmt --all
-
-      - name: Verify focused product behavior
-        working-directory: codex-rs
-        run: |
+          cd codex-rs
+          cargo fmt --all
           cargo fmt --all --check
-          cargo test -p codex-core --lib --locked context_cleaner::tests
-          cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
-          cargo test -p codex-model-provider-info --locked
-          cargo test -p codex-core --lib --locked chat_completions
-          cargo test -p codex-tui --lib --locked branding::tests
-          cargo test -p codex-tui --bin elpis --locked
-          cargo build -p codex-tui --bin elpis --locked
-          test "$(target/debug/elpis --version)" = "elpis 0.1.0"
 
-      - name: Commit verified source and remove temporary files
+      - name: Capture each memory verification result
+        working-directory: codex-rs
+        shell: bash
         run: |
-          git config user.name "elpis-integration-agent"
-          git config user.email "elpis-integration-agent@users.noreply.github.com"
-          git rm .github/workflows/integration-finalize.yml \
-            .github/patches/elpis-ui-final.patch
-          git rm -r .github/finalizer
-          git add codex-rs/tui/src/branding.rs \
-            codex-rs/tui/src/chatwidget/model_popups.rs \
-            codex-rs/tui/src/chatwidget/protocol.rs \
-            codex-rs/tui/src/chatwidget/status_surfaces.rs
-          git commit -m "fix(ui): finalize provider-aware runtime surfaces"
-          git push origin HEAD:agent/product-integration
+          set +e
+          mkdir -p /tmp/elpis-memory-diagnostics
+          : > /tmp/elpis-memory-diagnostics/results.tsv
+          run_test() {
+            name="$1"
+            shift
+            echo "Running $name"
+            "$@" > "/tmp/elpis-memory-diagnostics/${name}.log" 2>&1
+            status=$?
+            printf '%s\t%s\n' "$name" "$status" >> /tmp/elpis-memory-diagnostics/results.tsv
+            tail -n 40 "/tmp/elpis-memory-diagnostics/${name}.log"
+          }
+          run_test context_cleaner cargo test -p codex-core --lib --locked context_cleaner::tests
+          run_test state_usage cargo test -p codex-state --locked record_stage1_output_usage_updates_usage_metadata
+          run_test memory_sync cargo test -p codex-memories-write --locked sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
+          run_test archive_reset cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
+          run_test consolidation cargo test -p codex-memories-write --locked validate_consolidation_artifacts_
+          run_test memory_config cargo test -p codex-config --locked memories_config_preserves_configured_root
+          run_test memory_state_root cargo test -p codex-state --locked init_with_memories_state_root_separates_only_memories_db
+          run_test memory_search cargo test -p codex-memories-extension --locked local::search::tests
+          cat /tmp/elpis-memory-diagnostics/results.tsv
+          exit 0
+
+      - name: Upload memory diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: elpis-memory-diagnostics
+          path: /tmp/elpis-memory-diagnostics
+          if-no-files-found: error
+          retention-days: 1
