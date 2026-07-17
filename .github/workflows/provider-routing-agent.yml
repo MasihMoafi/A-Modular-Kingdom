@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/provider-routing
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
