@@ -15,9 +15,59 @@ impl ChatWidget {
             return;
         }
 
+        let thread_id = self.thread_id().map(|id| id.to_string());
+        let provider_name = if self.config.model_provider_id.trim().is_empty() {
+            let name = self.config.model_provider.name.trim();
+            if name.is_empty() {
+                "configured".to_string()
+            } else {
+                name.to_string()
+            }
+        } else {
+            self.config.model_provider_id.clone()
+        };
+        let custom_openai_base = self
+            .config
+            .model_provider
+            .base_url
+            .as_deref()
+            .is_some_and(|base_url| {
+                let normalized = base_url.trim().trim_end_matches('/');
+                !normalized.is_empty() && normalized != DEFAULT_OPENAI_BASE_URL
+            });
+        let provider_route =
+            if self.config.model_provider.is_openai() && !custom_openai_base {
+                crate::branding::ProviderRoute::Native
+            } else {
+                crate::branding::ProviderRoute::Compatibility
+            };
+        let current_model = self.current_model().to_string();
+        if crate::branding::sync_runtime_identity(
+            thread_id.as_deref(),
+            &provider_name,
+            provider_route,
+            &current_model,
+            self.config.features.enabled(Feature::MemoryTool),
+        ) {
+            self.refresh_status_line();
+        }
+
         let from_replay = replay_kind.is_some();
         let is_resume_initial_replay =
             matches!(replay_kind, Some(ReplayKind::ResumeInitialMessages));
+        if is_resume_initial_replay && crate::branding::mark_resume_announced() {
+            let evidence = thread_id
+                .as_deref()
+                .map_or_else(|| "thread:pending".to_string(), |id| format!("thread:{id}"));
+            self.add_info_message(
+                "Continuity restored after resume.".to_string(),
+                Some(format!(
+                    "Provider {provider_name} · model {current_model} · evidence {evidence}"
+                )),
+            );
+            self.refresh_status_line();
+        }
+
         let is_retry_error = matches!(
             &notification,
             ServerNotification::Error(ErrorNotification {
@@ -30,9 +80,14 @@ impl ChatWidget {
         }
         match notification {
             ServerNotification::ThreadTokenUsageUpdated(notification) => {
+                crate::branding::record_context_usage(
+                    notification.token_usage.last.total_tokens,
+                    notification.token_usage.model_context_window,
+                );
                 self.set_token_info(Some(token_usage_info_from_app_server(
                     notification.token_usage,
                 )));
+                self.refresh_status_line();
             }
             ServerNotification::ThreadNameUpdated(notification) => {
                 match ThreadId::from_string(&notification.thread_id) {
@@ -55,7 +110,21 @@ impl ChatWidget {
                 self.on_thread_goal_cleared(notification.thread_id.as_str());
             }
             ServerNotification::ThreadSettingsUpdated(notification) => {
+                let previous_provider = self.config.model_provider_id.clone();
+                let next_provider = notification.thread_settings.model_provider.clone();
+                let next_model = notification.thread_settings.model.clone();
+                let evidence = format!("thread:{}", notification.thread_id);
                 self.on_thread_settings_updated(notification);
+                if previous_provider != next_provider {
+                    crate::branding::record_provider_switch(&next_provider, &next_model);
+                    self.add_info_message(
+                        "Continuity preserved across provider switch.".to_string(),
+                        Some(format!(
+                            "{previous_provider} → {next_provider} · model {next_model} · evidence {evidence}"
+                        )),
+                    );
+                    self.refresh_status_line();
+                }
             }
             ServerNotification::TurnStarted(notification) => {
                 self.turn_lifecycle.last_turn_id = Some(notification.turn.id);
@@ -143,7 +212,24 @@ impl ChatWidget {
             ServerNotification::SkillsChanged(_) => {
                 self.refresh_skills_for_current_cwd(/*force_reload*/ true);
             }
-            ServerNotification::ModelRerouted(_) => {}
+            ServerNotification::ModelRerouted(notification) => {
+                crate::branding::record_model_reroute(
+                    &notification.from_model,
+                    &notification.to_model,
+                );
+                self.add_info_message(
+                    "Continuity preserved after model reroute.".to_string(),
+                    Some(format!(
+                        "{} → {} · reason {:?} · evidence thread:{}/turn:{}",
+                        notification.from_model,
+                        notification.to_model,
+                        notification.reason,
+                        notification.thread_id,
+                        notification.turn_id
+                    )),
+                );
+                self.refresh_status_line();
+            }
             ServerNotification::ModelVerification(notification) => {
                 self.on_app_server_model_verification(&notification.verifications)
             }
@@ -228,7 +314,29 @@ impl ChatWidget {
             | ServerNotification::WindowsWorldWritableWarning(_)
             | ServerNotification::WindowsSandboxSetupCompleted(_)
             | ServerNotification::AccountLoginCompleted(_) => {}
-            ServerNotification::ContextCompacted(_) => {}
+            ServerNotification::ContextCompacted(notification) => {
+                let notice = crate::branding::record_compaction(
+                    &notification.thread_id,
+                    &notification.turn_id,
+                );
+                if from_replay {
+                    if crate::branding::mark_snapshot_restore_announced() {
+                        self.add_info_message(
+                            "Compacted context restored.".to_string(),
+                            Some(format!(
+                                "{} · evidence {} · eviction count {}",
+                                notice.reason, notice.evidence, notice.count
+                            )),
+                        );
+                    }
+                } else {
+                    self.add_warning_message(format!(
+                        "Elpis evicted context: {}. Evidence: {}. Eviction count: {}.",
+                        notice.reason, notice.evidence, notice.count
+                    ));
+                }
+                self.refresh_status_line();
+            }
         }
     }
 
@@ -333,6 +441,15 @@ impl ChatWidget {
         notification: ItemCompletedNotification,
         replay_kind: Option<ReplayKind>,
     ) {
+        if let ThreadItem::AgentMessage {
+            memory_citation: Some(citation),
+            ..
+        } = &notification.item
+            && !citation.entries.is_empty()
+        {
+            crate::branding::record_memory_citation(citation.entries.len());
+            self.refresh_status_line();
+        }
         self.handle_thread_item(
             notification.item,
             notification.turn_id,
