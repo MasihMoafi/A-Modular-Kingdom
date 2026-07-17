@@ -14,9 +14,11 @@ use codex_login::auth::AgentIdentityAuth;
 use codex_login::auth::AgentIdentityAuthError;
 use codex_login::auth::AgentIdentityAuthPolicy;
 use codex_model_provider_info::ModelProviderInfo;
+use codex_model_provider_info::WireApi;
 use codex_protocol::error::CodexErr;
 use codex_protocol::protocol::SessionSource;
 use http::HeaderMap;
+use http::HeaderName;
 use http::HeaderValue;
 
 use crate::bearer_auth_provider::BearerAuthProvider;
@@ -163,6 +165,29 @@ pub fn unauthenticated_auth_provider() -> SharedAuthProvider {
     Arc::new(UnauthenticatedAuthProvider)
 }
 
+#[derive(Clone, Debug)]
+struct ApiKeyHeaderAuthProvider {
+    header_name: HeaderName,
+    api_key: String,
+}
+
+impl ApiKeyHeaderAuthProvider {
+    fn new(header_name: HeaderName, api_key: String) -> Self {
+        Self {
+            header_name,
+            api_key,
+        }
+    }
+}
+
+impl AuthProvider for ApiKeyHeaderAuthProvider {
+    fn add_auth_headers(&self, headers: &mut HeaderMap) {
+        if let Ok(value) = HeaderValue::from_str(&self.api_key) {
+            headers.insert(self.header_name.clone(), value);
+        }
+    }
+}
+
 /// Returns the provider-scoped auth manager when this provider uses command-backed auth.
 ///
 /// Providers without custom auth continue using the caller-supplied base manager, when present.
@@ -184,6 +209,10 @@ pub(crate) fn resolve_provider_auth(
         return Err(CodexErr::UnsupportedOperation(
             BEDROCK_API_KEY_UNSUPPORTED_MESSAGE.to_string(),
         ));
+    }
+
+    if let Some(api_key) = provider.api_key()? {
+        return Ok(api_key_auth_provider(provider.wire_api, api_key));
     }
 
     if let Some(auth) = bearer_auth_for_provider(provider)? {
@@ -264,13 +293,23 @@ fn should_bootstrap_chatgpt_agent_identity(
         && matches!(auth, Some(CodexAuth::Chatgpt(_)))
 }
 
+fn api_key_auth_provider(wire_api: WireApi, api_key: String) -> SharedAuthProvider {
+    match wire_api {
+        WireApi::AnthropicMessages => Arc::new(ApiKeyHeaderAuthProvider::new(
+            HeaderName::from_static("x-api-key"),
+            api_key,
+        )),
+        WireApi::GeminiGenerateContent => Arc::new(ApiKeyHeaderAuthProvider::new(
+            HeaderName::from_static("x-goog-api-key"),
+            api_key,
+        )),
+        WireApi::Responses => Arc::new(BearerAuthProvider::new(api_key)),
+    }
+}
+
 fn bearer_auth_for_provider(
     provider: &ModelProviderInfo,
 ) -> codex_protocol::error::Result<Option<BearerAuthProvider>> {
-    if let Some(api_key) = provider.api_key()? {
-        return Ok(Some(BearerAuthProvider::new(api_key)));
-    }
-
     if let Some(token) = provider.experimental_bearer_token.clone() {
         return Ok(Some(BearerAuthProvider::new(token)));
     }
@@ -445,6 +484,33 @@ mod tests {
         let auth = resolve_provider_auth(/*auth*/ None, &provider).expect("auth should resolve");
 
         assert!(auth.to_auth_headers().is_empty());
+    }
+
+    #[test]
+    fn native_wire_protocols_use_vendor_api_key_headers() {
+        for (wire_api, header_name) in [
+            (WireApi::AnthropicMessages, "x-api-key"),
+            (WireApi::GeminiGenerateContent, "x-goog-api-key"),
+        ] {
+            let headers =
+                api_key_auth_provider(wire_api, "provider-secret".to_string()).to_auth_headers();
+            assert_eq!(
+                headers
+                    .get(header_name)
+                    .and_then(|value| value.to_str().ok()),
+                Some("provider-secret")
+            );
+            assert!(!headers.contains_key(AUTHORIZATION));
+        }
+
+        let headers = api_key_auth_provider(WireApi::Responses, "openai-secret".to_string())
+            .to_auth_headers();
+        assert_eq!(
+            headers
+                .get(AUTHORIZATION)
+                .and_then(|value| value.to_str().ok()),
+            Some("Bearer openai-secret")
+        );
     }
 
     #[test]

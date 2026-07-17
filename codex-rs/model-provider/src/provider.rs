@@ -9,12 +9,16 @@ use codex_api::Provider;
 use codex_api::SharedAuthProvider;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
+use codex_model_provider_info::ANTHROPIC_DEFAULT_MODEL;
+use codex_model_provider_info::GOOGLE_GEMINI_DEFAULT_MODEL;
 use codex_model_provider_info::ModelProviderInfo;
+use codex_model_provider_info::WireApi;
 use codex_models_manager::manager::OpenAiModelsManager;
 use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::manager::StaticModelsManager;
 use codex_protocol::account::ProviderAccount;
 use codex_protocol::error::CodexErr;
+use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelsResponse;
 
 use crate::amazon_bedrock::AmazonBedrockModelProvider;
@@ -257,9 +261,83 @@ impl ConfiguredModelProvider {
     }
 }
 
+fn native_default_model(info: &ModelProviderInfo) -> Option<&'static str> {
+    match info.wire_api {
+        WireApi::AnthropicMessages => Some(ANTHROPIC_DEFAULT_MODEL),
+        WireApi::GeminiGenerateContent => Some(GOOGLE_GEMINI_DEFAULT_MODEL),
+        WireApi::Responses => None,
+    }
+}
+
+fn native_model_catalog(info: &ModelProviderInfo) -> Option<ModelsResponse> {
+    let model = native_default_model(info)?;
+    let display_name = match info.wire_api {
+        WireApi::AnthropicMessages => "Claude Sonnet 4.6",
+        WireApi::GeminiGenerateContent => "Gemini 3.5 Flash",
+        WireApi::Responses => return None,
+    };
+    let context_window = match info.wire_api {
+        WireApi::AnthropicMessages => 200_000,
+        WireApi::GeminiGenerateContent => 1_000_000,
+        WireApi::Responses => return None,
+    };
+    let model_info: ModelInfo = serde_json::from_value(serde_json::json!({
+        "slug": model,
+        "display_name": display_name,
+        "description": format!("Native {} route", info.name),
+        "default_reasoning_level": null,
+        "supported_reasoning_levels": [],
+        "shell_type": "shell_command",
+        "visibility": "list",
+        "supported_in_api": true,
+        "priority": 0,
+        "availability_nux": null,
+        "upgrade": null,
+        "base_instructions": "",
+        "supports_reasoning_summary_parameter": false,
+        "support_verbosity": false,
+        "default_verbosity": null,
+        "apply_patch_tool_type": null,
+        "truncation_policy": {"mode": "bytes", "limit": 10000},
+        "supports_parallel_tool_calls": true,
+        "supports_image_detail_original": false,
+        "context_window": context_window,
+        "max_context_window": context_window,
+        "experimental_supported_tools": [],
+        "input_modalities": ["text"]
+    }))
+    .expect("native provider model metadata must remain valid");
+    Some(ModelsResponse {
+        models: vec![model_info],
+    })
+}
+
 impl ModelProvider for ConfiguredModelProvider {
     fn info(&self) -> &ModelProviderInfo {
         &self.info
+    }
+
+    fn capabilities(&self) -> ProviderCapabilities {
+        match self.info.wire_api {
+            WireApi::Responses => ProviderCapabilities::default(),
+            WireApi::AnthropicMessages | WireApi::GeminiGenerateContent => ProviderCapabilities {
+                namespace_tools: false,
+                image_generation: false,
+                web_search: false,
+            },
+        }
+    }
+
+    fn approval_review_preferred_model(&self) -> &'static str {
+        native_default_model(&self.info).unwrap_or(DEFAULT_APPROVAL_REVIEW_PREFERRED_MODEL)
+    }
+
+    fn memory_extraction_preferred_model(&self) -> &'static str {
+        native_default_model(&self.info).unwrap_or(DEFAULT_MEMORY_EXTRACTION_PREFERRED_MODEL)
+    }
+
+    fn memory_consolidation_preferred_model(&self) -> &'static str {
+        native_default_model(&self.info).unwrap_or(DEFAULT_MEMORY_CONSOLIDATION_PREFERRED_MODEL)
     }
 
     fn auth_manager(&self) -> Option<Arc<AuthManager>> {
@@ -330,7 +408,7 @@ impl ModelProvider for ConfiguredModelProvider {
         codex_home: PathBuf,
         config_model_catalog: Option<ModelsResponse>,
     ) -> SharedModelsManager {
-        match config_model_catalog {
+        match config_model_catalog.or_else(|| native_model_catalog(&self.info)) {
             Some(model_catalog) => Arc::new(StaticModelsManager::new(
                 self.auth_manager.clone(),
                 model_catalog,
@@ -353,7 +431,7 @@ impl ModelProvider for ConfiguredModelProvider {
         &self,
         config_model_catalog: Option<ModelsResponse>,
     ) -> SharedModelsManager {
-        match config_model_catalog {
+        match config_model_catalog.or_else(|| native_model_catalog(&self.info)) {
             Some(model_catalog) => Arc::new(StaticModelsManager::new(
                 self.auth_manager.clone(),
                 model_catalog,
@@ -420,6 +498,28 @@ mod tests {
 
     fn test_codex_home() -> std::path::PathBuf {
         std::env::temp_dir().join(format!("codex-model-provider-test-{}", std::process::id()))
+    }
+
+    #[test]
+    fn native_provider_catalogs_feed_the_model_picker() {
+        for (provider, expected_model) in [
+            (
+                ModelProviderInfo::create_anthropic_provider(),
+                ANTHROPIC_DEFAULT_MODEL,
+            ),
+            (
+                ModelProviderInfo::create_google_gemini_provider(),
+                GOOGLE_GEMINI_DEFAULT_MODEL,
+            ),
+        ] {
+            let catalog = native_model_catalog(&provider).expect("native model catalog");
+            assert_eq!(catalog.models.len(), 1);
+            assert_eq!(catalog.models[0].slug, expected_model);
+            assert_eq!(
+                catalog.models[0].input_modalities,
+                vec![codex_protocol::openai_models::InputModality::Text]
+            );
+        }
     }
 
     fn provider_for(base_url: String) -> ModelProviderInfo {

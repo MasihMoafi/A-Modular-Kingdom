@@ -1407,6 +1407,60 @@ impl ModelClientSession {
         }
     }
 
+    /// Streams a turn through a native hosted-provider adapter.
+    #[allow(clippy::too_many_arguments)]
+    async fn stream_native_api(
+        &self,
+        prompt: &Prompt,
+        model_info: &ModelInfo,
+        session_telemetry: &SessionTelemetry,
+        effort: Option<ReasoningEffortConfig>,
+        summary: ReasoningSummaryConfig,
+        service_tier: Option<String>,
+        responses_metadata: &CodexResponsesMetadata,
+        inference_trace: &InferenceTraceContext,
+        wire_api: WireApi,
+    ) -> Result<ResponseStream> {
+        let client_setup = self.client.current_client_setup().await?;
+        let mut request = self.client.build_responses_request(
+            &client_setup.api_provider,
+            prompt,
+            model_info,
+            effort,
+            summary,
+            service_tier,
+            responses_metadata,
+        )?;
+        self.client
+            .prepare_response_items_for_request(&mut request.input, /*store*/ false);
+        let request_session_telemetry = session_telemetry_for_request(session_telemetry, &request);
+        let trace_attempt = inference_trace.start_attempt();
+        trace_attempt.record_started(&request);
+        let stream = crate::chat_completions::stream_native_request(
+            client_setup.api_provider,
+            client_setup.api_auth.as_ref(),
+            &self.client.http_client_factory,
+            request,
+            wire_api,
+        )
+        .await
+        .map_err(|error| {
+            trace_attempt.record_failed(
+                &error,
+                /*request_id*/ None,
+                /*output_items*/ &[],
+            );
+            self.client.state.provider.map_api_error(error)
+        })?;
+        let (stream, _) = map_response_stream(
+            stream,
+            request_session_telemetry,
+            trace_attempt,
+            Arc::clone(&self.client.state.provider),
+        );
+        Ok(stream)
+    }
+
     /// Streams a turn via the OpenAI Responses API.
     ///
     /// Handles reasoning summaries, verbosity, and the `text` controls used for output schemas.
@@ -1850,6 +1904,20 @@ impl ModelClientSession {
                     service_tier,
                     responses_metadata,
                     inference_trace,
+                )
+                .await
+            }
+            WireApi::AnthropicMessages | WireApi::GeminiGenerateContent => {
+                self.stream_native_api(
+                    prompt,
+                    model_info,
+                    session_telemetry,
+                    effort,
+                    summary,
+                    service_tier,
+                    responses_metadata,
+                    inference_trace,
+                    wire_api,
                 )
                 .await
             }
