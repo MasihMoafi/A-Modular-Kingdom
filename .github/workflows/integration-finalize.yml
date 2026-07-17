@@ -1,11 +1,8 @@
 name: One-shot integration finalizer
 
 on:
-  push:
-    branches:
-      - agent/product-integration
-    paths:
-      - .github/workflows/integration-finalize.yml
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -16,22 +13,21 @@ concurrency:
 
 jobs:
   finalize:
+    if: github.head_ref == 'agent/product-integration'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - name: Checkout integration branch
+      - name: Checkout integration head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: agent/product-integration
+          fetch-depth: 0
 
       - name: Install Linux build dependencies
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            bubblewrap \
-            libcap-dev \
-            libssl-dev \
-            pkg-config
+            bubblewrap libcap-dev libssl-dev pkg-config
 
       - name: Install pinned Rust toolchain
         run: |
@@ -43,14 +39,21 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if old not in text:
+                  raise SystemExit(f"missing expected {label} anchor")
+              return text.replace(old, new, 1)
+
           branding = Path("codex-rs/tui/src/branding.rs")
           s = branding.read_text()
-          s = s.replace(
+          s = replace_once(
+              s,
               "use ratatui::style::Style;",
               "use codex_model_provider_info::WireApi;\nuse ratatui::style::Style;",
-              1,
+              "branding import",
           )
-          s = s.replace(
+          s = replace_once(
+              s,
               '''    pub(crate) fn long_label(self) -> &'static str {
                   match self {
                       Self::Native => "native Responses route",
@@ -85,48 +88,20 @@ jobs:
                   }
               }
           ''',
-              1,
+              "provider route implementation",
           )
-          s = s.replace(
+          s = replace_once(
+              s,
               "    eviction_count: u64,\n    latest_eviction: Option<EvictionNotice>,",
               "    eviction_count: u64,\n    cleaner_eviction_count: usize,\n    latest_eviction: Option<EvictionNotice>,",
-              1,
+              "cleaner eviction state",
           )
-          s = s.replace(
+          s = replace_once(
+              s,
               "            eviction_count: 0,\n            latest_eviction: None,",
               "            eviction_count: 0,\n            cleaner_eviction_count: 0,\n            latest_eviction: None,",
-              1,
+              "cleaner eviction default",
           )
-          s = s.replace(
-              '''        let provider = normalized_value(provider, "configured");
-                  let model = normalized_value(model, "starting");
-                  let changed = state.thread_id.as_deref() != thread_id
-          ''',
-              '''        let provider = normalized_value(provider, "configured");
-                  let model = normalized_value(model, "starting");
-                  let route = normalize_runtime_route(&provider, route);
-                  let changed = state.thread_id.as_deref() != thread_id
-          ''',
-              1,
-          )
-          marker = "\npub(crate) fn record_context_usage(last_total_tokens: i64, context_window: Option<i64>) {"
-          helper = '''
-          fn normalize_runtime_route(provider: &str, requested: ProviderRoute) -> ProviderRoute {
-              let provider = provider.to_ascii_lowercase();
-              if provider.contains("openrouter") {
-                  ProviderRoute::Compatibility
-              } else if provider.contains("anthropic")
-                  || provider.contains("google-gemini")
-                  || provider.contains("google gemini")
-              {
-                  ProviderRoute::Native
-              } else {
-                  requested
-              }
-          }
-          '''
-          if helper.strip() not in s:
-              s = s.replace(marker, helper + marker, 1)
           marker = "\npub(crate) fn record_model_reroute(from_model: &str, to_model: &str) {"
           cleaner = '''
           pub(crate) fn sync_context_eviction(count: usize, event: Option<&str>) -> bool {
@@ -154,26 +129,20 @@ jobs:
               })
           }
           '''
-          if cleaner.strip() not in s:
-              s = s.replace(marker, cleaner + marker, 1)
-          s = s.replace(
-              '''        state.provider = normalized_value(provider, "configured");
-                  state.model = normalized_value(model, "starting");
-          ''',
-              '''        state.provider = normalized_value(provider, "configured");
-                  state.route = normalize_runtime_route(&state.provider, state.route);
-                  state.model = normalized_value(model, "starting");
-          ''',
-              1,
-          )
-          evidence_anchor = '''    push_field(
+          if marker not in s:
+              raise SystemExit("missing context eviction insertion anchor")
+          s = s.replace(marker, cleaner + marker, 1)
+          evict_block = '''    push_field(
                   &mut spans,
                   "evict",
                   &eviction,
                   crate::style::status_symbol_style(),
               );
           '''
-          evidence_block = evidence_anchor + '''    if let Some(latest) = state.latest_eviction.as_ref() {
+          s = replace_once(
+              s,
+              evict_block,
+              evict_block + '''    if let Some(latest) = state.latest_eviction.as_ref() {
                   push_field(
                       &mut spans,
                       "evidence",
@@ -181,10 +150,11 @@ jobs:
                       crate::style::status_symbol_style(),
                   );
               }
-          '''
-          if '"evidence",\n            &latest.evidence' not in s:
-              s = s.replace(evidence_anchor, evidence_block, 1)
-          s = s.replace(
+          ''',
+              "eviction evidence field",
+          )
+          s = replace_once(
+              s,
               '''        "context compaction" => "compact",
                   other => other,
           ''',
@@ -192,17 +162,19 @@ jobs:
                   "tool output compacted" => "tool",
                   other => other,
           ''',
-              1,
+              "compact reason",
           )
-          s = s.replace(
+          s = replace_once(
+              s,
               '"ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact"',
               '"ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact · evidence thread:t/turn:u"',
-              1,
+              "identity expectation",
           )
-          s = s.replace(
+          s = replace_once(
+              s,
               'assert_eq!(ProviderRoute::Native.long_label(), "native Responses route");',
               'assert_eq!(ProviderRoute::Native.long_label(), "native provider protocol");',
-              1,
+              "native route expectation",
           )
           test_anchor = '''        assert_eq!(
                       ProviderRoute::Compatibility.long_label(),
@@ -210,7 +182,10 @@ jobs:
                   );
               }
           '''
-          test_replacement = '''        assert_eq!(
+          s = replace_once(
+              s,
+              test_anchor,
+              '''        assert_eq!(
                       ProviderRoute::Compatibility.long_label(),
                       "OpenAI-compatible Responses route"
                   );
@@ -233,13 +208,15 @@ jobs:
                       ProviderRoute::Compatibility
                   );
               }
-          '''
-          s = s.replace(test_anchor, test_replacement, 1)
+          ''',
+              "provider route tests",
+          )
           branding.write_text(s)
 
           popup = Path("codex-rs/tui/src/chatwidget/model_popups.rs")
           s = popup.read_text()
-          s = s.replace(
+          s = replace_once(
+              s,
               '''    fn model_provider_route(&self) -> crate::branding::ProviderRoute {
                   if self.config.model_provider.is_openai() && self.custom_openai_base_url().is_none() {
                       crate::branding::ProviderRoute::Native
@@ -292,9 +269,10 @@ jobs:
 
               fn model_route_description(&self, description: &str) -> String {
           ''',
-              1,
+              "model provider route",
           )
-          s = s.replace(
+          s = replace_once(
+              s,
               '''        let provider = self.model_provider_display_name();
                   let route = self.model_provider_route().long_label();
                   let mut header = ColumnRenderable::new();
@@ -305,14 +283,17 @@ jobs:
                   let credential = self.model_credential_label();
                   let mut header = ColumnRenderable::new();
           ''',
-              1,
+              "model menu metadata",
           )
           route_line = '''        header.push(Line::from(Span::styled(
                   format!("Route: {route}"),
                   crate::style::status_symbol_style(),
               )));
           '''
-          details = route_line + '''        header.push(Line::from(Span::styled(
+          s = replace_once(
+              s,
+              route_line,
+              route_line + '''        header.push(Line::from(Span::styled(
                   format!("Protocol: {protocol}"),
                   crate::style::status_symbol_style(),
               )));
@@ -320,19 +301,42 @@ jobs:
                   format!("Credential: {credential}"),
                   crate::style::status_symbol_style(),
               )));
-          '''
-          if 'format!("Protocol: {protocol}")' not in s:
-              s = s.replace(route_line, details, 1)
-          s = s.replace(
+          ''',
+              "model menu protocol and credential",
+          )
+          s = replace_once(
+              s,
               '"Provider and route stay fixed; choose a quick model or browse the full catalog."',
               '"Provider, protocol, route, and credential source remain visible while choosing."',
-              1,
+              "model menu subtitle",
           )
           popup.write_text(s)
 
+          protocol = Path("codex-rs/tui/src/chatwidget/protocol.rs")
+          s = protocol.read_text()
+          s = replace_once(
+              s,
+              '''        let provider_route = if self.config.model_provider.is_openai() && !custom_openai_base {
+                  crate::branding::ProviderRoute::Native
+              } else {
+                  crate::branding::ProviderRoute::Compatibility
+              };
+          ''',
+              '''        let provider_route = crate::branding::ProviderRoute::for_provider(
+                  &self.config.model_provider_id,
+                  &self.config.model_provider.name,
+                  self.config.model_provider.wire_api,
+                  custom_openai_base,
+              );
+          ''',
+              "live provider route",
+          )
+          protocol.write_text(s)
+
           surfaces = Path("codex-rs/tui/src/chatwidget/status_surfaces.rs")
           s = surfaces.read_text()
-          s = s.replace(
+          s = replace_once(
+              s,
               '''    fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
                   let enabled = !selections.status_line_items.is_empty();
                   self.bottom_pane.set_status_line_enabled(enabled);
@@ -345,9 +349,9 @@ jobs:
                   let mut segments = Vec::new();
           ''',
               '''    fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
-                  let latest_eviction = codex_core::context_cleaner::latest_eviction_event();
+                  let latest_eviction = crate::legacy_core::context_cleaner::latest_eviction_event();
                   crate::branding::sync_context_eviction(
-                      codex_core::context_cleaner::eviction_count(),
+                      crate::legacy_core::context_cleaner::eviction_count(),
                       latest_eviction.as_deref(),
                   );
 
@@ -357,7 +361,7 @@ jobs:
 
                   let mut segments = Vec::new();
           ''',
-              1,
+              "persistent status line",
           )
           surfaces.write_text(s)
           PY
@@ -366,25 +370,14 @@ jobs:
         working-directory: codex-rs
         run: cargo fmt --all
 
-      - name: Verify formatting
-        working-directory: codex-rs
-        run: cargo fmt --all --check
-
-      - name: Verify context lifecycle and archive failure safety
+      - name: Verify focused product behavior
         working-directory: codex-rs
         run: |
+          cargo fmt --all --check
           cargo test -p codex-core --lib --locked context_cleaner::tests
           cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
-
-      - name: Verify native provider boundaries
-        working-directory: codex-rs
-        run: |
           cargo test -p codex-model-provider-info --locked
           cargo test -p codex-core --lib --locked chat_completions
-
-      - name: Verify UI identity and build
-        working-directory: codex-rs
-        run: |
           cargo test -p codex-tui --lib --locked branding::tests
           cargo test -p codex-tui --bin elpis --locked
           cargo build -p codex-tui --bin elpis --locked
@@ -397,6 +390,7 @@ jobs:
           git rm .github/workflows/integration-finalize.yml
           git add codex-rs/tui/src/branding.rs \
             codex-rs/tui/src/chatwidget/model_popups.rs \
+            codex-rs/tui/src/chatwidget/protocol.rs \
             codex-rs/tui/src/chatwidget/status_surfaces.rs
           git commit -m "fix(ui): finalize provider-aware runtime surfaces"
           git push origin HEAD:agent/product-integration
