@@ -1,0 +1,310 @@
+name: Apply context and memory specialist
+
+on:
+  push:
+    branches:
+      - agent/context-memory
+    paths:
+      - .github/workflows/context-memory-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/context-memory
+          fetch-depth: 0
+
+      - name: Apply production source changes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          cleaner = r'''use codex_protocol::models::FunctionCallOutputBody;
+          use codex_protocol::models::ResponseItem;
+          use std::sync::Mutex;
+          use std::sync::atomic::AtomicUsize;
+          use std::sync::atomic::Ordering;
+
+          const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 4_000;
+          const RETAINED_EDGE_CHARS: usize = 700;
+          const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 2;
+          static EVICTED_TOOL_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
+          static LAST_EVICTION_EVENT: Mutex<Option<String>> = Mutex::new(None);
+
+          /// Number of transient tool outputs compacted during this Elpis process.
+          pub fn eviction_count() -> usize {
+              EVICTED_TOOL_OUTPUTS.load(Ordering::Relaxed)
+          }
+
+          /// Most recent visible eviction event, including its durable evidence pointer.
+          pub fn latest_eviction_event() -> Option<String> {
+              LAST_EVICTION_EVENT
+                  .lock()
+                  .ok()
+                  .and_then(|event| event.clone())
+          }
+
+          /// Applies Elpis's deterministic lifecycle to transient tool output.
+          ///
+          /// The newest outputs remain intact. Older oversized outputs retain bounded head/tail
+          /// excerpts plus a stable pointer to the complete output in the durable rollout.
+          pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize {
+              let tool_indices = input
+                  .iter()
+                  .enumerate()
+                  .filter_map(|(index, item)| match item {
+                      ResponseItem::FunctionCallOutput { .. }
+                      | ResponseItem::CustomToolCallOutput { .. } => Some(index),
+                      _ => None,
+                  })
+                  .collect::<Vec<_>>();
+              let keep_from = tool_indices.len().saturating_sub(RECENT_TOOL_OUTPUTS_TO_KEEP);
+              let mut evicted = 0;
+              let mut latest_event = None;
+
+              for index in tool_indices.into_iter().take(keep_from) {
+                  let (call_id, name, body) = match &mut input[index] {
+                      ResponseItem::FunctionCallOutput {
+                          call_id, output, ..
+                      } => (call_id.as_str(), "function", &mut output.body),
+                      ResponseItem::CustomToolCallOutput {
+                          call_id,
+                          name,
+                          output,
+                          ..
+                      } => (
+                          call_id.as_str(),
+                          name.as_deref().unwrap_or("custom-tool"),
+                          &mut output.body,
+                      ),
+                      _ => continue,
+                  };
+                  let FunctionCallOutputBody::Text(text) = body else {
+                      continue;
+                  };
+                  let original_chars = text.chars().count();
+                  if original_chars <= MAX_INLINE_TOOL_OUTPUT_CHARS {
+                      continue;
+                  }
+                  let head = take_chars(text, RETAINED_EDGE_CHARS);
+                  let tail = take_last_chars(text, RETAINED_EDGE_CHARS);
+                  let evidence = format!("rollout://tool-call/{call_id}");
+                  *text = format!(
+                      "[ELPIS EVICTION]\nreason=older transient tool output exceeded {MAX_INLINE_TOOL_OUTPUT_CHARS} chars\nevidence={evidence}\ntool={name}\noriginal_chars={original_chars}\nretained=head:{RETAINED_EDGE_CHARS}+tail:{RETAINED_EDGE_CHARS}\n--- head ---\n{head}\n--- omitted; full evidence remains in durable rollout ---\n{tail}\n--- tail ---"
+                  );
+                  latest_event = Some(format!(
+                      "ELPIS continuity: compacted older {name} output ({original_chars} chars); exact evidence: {evidence}"
+                  ));
+                  evicted += 1;
+              }
+              if evicted > 0 {
+                  EVICTED_TOOL_OUTPUTS.fetch_add(evicted, Ordering::Relaxed);
+                  if let Ok(mut event) = LAST_EVICTION_EVENT.lock() {
+                      *event = latest_event;
+                  }
+              }
+              evicted
+          }
+
+          fn take_chars(text: &str, count: usize) -> String {
+              text.chars().take(count).collect()
+          }
+
+          fn take_last_chars(text: &str, count: usize) -> String {
+              let chars = text.chars().collect::<Vec<_>>();
+              chars[chars.len().saturating_sub(count)..].iter().collect()
+          }
+
+          #[cfg(test)]
+          mod tests {
+              use super::*;
+              use codex_protocol::models::FunctionCallOutputPayload;
+
+              fn output(call_id: &str, text: String) -> ResponseItem {
+                  ResponseItem::FunctionCallOutput {
+                      id: None,
+                      call_id: call_id.to_string(),
+                      output: FunctionCallOutputPayload::from_text(text),
+                      internal_chat_message_metadata_passthrough: None,
+                  }
+              }
+
+              #[test]
+              fn evicts_only_old_large_outputs_and_preserves_evidence_pointer() {
+                  let large = format!("HEAD{}TAIL", "x".repeat(5_000));
+                  let mut input = vec![
+                      output("old", large.clone()),
+                      output("recent-1", large.clone()),
+                      output("recent-2", large.clone()),
+                  ];
+
+                  assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+                  let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+                      panic!("function output");
+                  };
+                  let text = output.text_content().expect("text");
+                  assert!(text.contains("evidence=rollout://tool-call/old"));
+                  assert!(text.contains("HEAD"));
+                  assert!(text.contains("TAIL"));
+                  assert!(text.contains("full evidence remains in durable rollout"));
+                  for item in &input[1..] {
+                      let ResponseItem::FunctionCallOutput { output, .. } = item else {
+                          panic!("function output");
+                      };
+                      assert_eq!(output.text_content(), Some(large.as_str()));
+                  }
+              }
+
+              #[test]
+              fn custom_tool_output_uses_tool_name_and_rollout_pointer() {
+                  let large = "z".repeat(5_000);
+                  let mut input = vec![
+                      ResponseItem::CustomToolCallOutput {
+                          id: None,
+                          call_id: "custom-old".to_string(),
+                          name: Some("browser".to_string()),
+                          output: FunctionCallOutputPayload::from_text(large.clone()),
+                          internal_chat_message_metadata_passthrough: None,
+                      },
+                      output("recent-1", large.clone()),
+                      output("recent-2", large),
+                  ];
+
+                  assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+                  let ResponseItem::CustomToolCallOutput { output, .. } = &input[0] else {
+                      panic!("custom output");
+                  };
+                  let text = output.text_content().expect("text");
+                  assert!(text.contains("tool=browser"));
+                  assert!(text.contains("evidence=rollout://tool-call/custom-old"));
+              }
+
+              #[test]
+              fn leaves_small_outputs_untouched() {
+                  let mut input = vec![output("small", "ok".to_string())];
+                  assert_eq!(clean_transient_tool_outputs(&mut input), 0);
+                  let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+                      panic!("function output");
+                  };
+                  assert_eq!(output.text_content(), Some("ok"));
+              }
+          }
+          '''
+          cleaner = "\n".join(line[10:] if line.startswith("          ") else line for line in cleaner.splitlines()) + "\n"
+          Path("codex-rs/core/src/context_cleaner.rs").write_text(cleaner)
+
+          client = Path("codex-rs/core/src/client.rs")
+          text = client.read_text()
+          import_marker = "use crate::client_common::ResponseStream;\n"
+          assert text.count(import_marker) == 1
+          text = text.replace(import_marker, import_marker + "use crate::context_cleaner::clean_transient_tool_outputs;\n", 1)
+          old = '''        if !store {
+              for item in input.iter_mut() {
+                  match item {
+                      ResponseItem::FunctionCallOutput { output, .. } => {
+                          if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
+                              output.body
+                          {
+                              if text.len() > 1000 {
+                                  *text = format!(
+                                      "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
+                                      text.len()
+                                  );
+                              }
+                          }
+                      }
+                      ResponseItem::CustomToolCallOutput { output, .. } => {
+                          if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
+                              output.body
+                          {
+                              if text.len() > 1000 {
+                                  *text = format!(
+                                      "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
+                                      text.len()
+                                  );
+                              }
+                          }
+                      }
+                      _ => {}
+                  }
+              }
+          }
+          '''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines()) + "\n"
+          new = '''        if !store {
+              clean_transient_tool_outputs(input);
+          }
+          '''
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines()) + "\n"
+          assert text.count(old) == 1
+          client.write_text(text.replace(old, new, 1))
+
+          lib = Path("codex-rs/core/src/lib.rs")
+          text = lib.read_text()
+          marker = "mod context_manager;\n"
+          assert text.count(marker) == 1
+          lib.write_text(text.replace(marker, marker + "pub mod context_cleaner;\n", 1))
+
+          tests = Path("codex-rs/memories/write/src/workspace_tests.rs")
+          text = tests.read_text()
+          marker = "#[tokio::test]\nasync fn prepare_memory_workspace_recovers_unusable_git_dir()"
+          assert text.count(marker) == 1
+          test = r'''#[tokio::test]
+          async fn reset_memory_workspace_baseline_propagates_archive_write_failure() {
+              let home = TempDir::new().expect("tempdir");
+              let root = home.path().join("memories");
+              fs::create_dir_all(&root).expect("create memory root");
+              fs::write(root.join("MEMORY.md"), "keep\narchive this fact\n").expect("write memory");
+              prepare_memory_workspace(&root)
+                  .await
+                  .expect("prepare memory workspace");
+
+              fs::write(root.join("MEMORY.md"), "keep\n").expect("remove memory line");
+              fs::create_dir(root.join("archive.md")).expect("block archive file write");
+
+              let err = reset_memory_workspace_baseline(&root)
+                  .await
+                  .expect_err("archive failure must stop baseline reset");
+              assert!(err.to_string().contains("memory archive"));
+
+              let diff = memory_workspace_diff(&root)
+                  .await
+                  .expect("load workspace diff after failed reset");
+              assert!(!diff.changes.is_empty(), "baseline must remain unmodified");
+              assert!(diff.unified_diff.contains("archive this fact"));
+          }
+
+          '''
+          test = "\n".join(line[10:] if line.startswith("          ") else line for line in test.splitlines()) + "\n"
+          tests.write_text(text.replace(marker, test + marker, 1))
+          PY
+
+      - name: Install dependencies and Rust
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libcap-dev libssl-dev pkg-config
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+
+      - name: Format and run focused tests
+        working-directory: codex-rs
+        run: |
+          cargo fmt --all --check
+          cargo test -p codex-core --lib --locked context_cleaner::tests
+          cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
+
+      - name: Commit verified production source and remove bootstrap
+        run: |
+          rm .github/workflows/context-memory-apply.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add codex-rs/core/src/client.rs codex-rs/core/src/context_cleaner.rs codex-rs/core/src/lib.rs codex-rs/memories/write/src/workspace_tests.rs .github/workflows/context-memory-apply.yml
+          git commit -m "feat(context): compact older transient evidence safely"
+          git push origin HEAD:agent/context-memory
