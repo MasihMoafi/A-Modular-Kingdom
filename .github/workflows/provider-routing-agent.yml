@@ -31,8 +31,15 @@ jobs:
             | base64 --decode \
             | gzip --decompress \
             > /tmp/provider-routing.patch
-          git apply --index --whitespace=nowarn /tmp/provider-routing.patch
-          git apply --index .github/provider-routing-patch/fix.patch
+          if ! git apply --index --whitespace=nowarn /tmp/provider-routing.patch > /tmp/base-apply.log 2>&1; then
+            cat /tmp/base-apply.log
+            exit 1
+          fi
+          git diff --cached > /tmp/provider-staged.diff
+          if ! git apply --index .github/provider-routing-patch/fix.patch > /tmp/fix-apply.log 2>&1; then
+            cat /tmp/fix-apply.log
+            exit 1
+          fi
 
       - name: Format production source
         working-directory: codex-rs
@@ -78,6 +85,10 @@ jobs:
         with:
           name: provider-routing-diagnostics
           path: |
+            /tmp/base-apply.log
+            /tmp/fix-apply.log
+            /tmp/provider-staged.diff
+            /tmp/provider-routing.patch
             /tmp/native-provider.log
             /tmp/provider-core.log
           if-no-files-found: ignore
