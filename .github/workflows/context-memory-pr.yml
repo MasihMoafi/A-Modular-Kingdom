@@ -1,0 +1,56 @@
+name: Verify and commit context specialist
+
+on:
+  pull_request:
+    branches:
+      - agent/product-integration
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/context-memory
+          fetch-depth: 0
+
+      - name: Apply production source changes
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/context-memory-apply.yml').read_text()
+          marker = "          python3 <<'PY'\n"
+          start = source.index(marker)
+          end = source.index("          PY\n", start) + len("          PY\n")
+          block = source[start:end]
+          block = "\n".join(line[10:] if line.startswith("          ") else line for line in block.splitlines()) + "\n"
+          Path('/tmp/apply-context.sh').write_text(block)
+          PY
+          bash /tmp/apply-context.sh
+
+      - name: Install dependencies and Rust
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libcap-dev libssl-dev pkg-config
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+
+      - name: Format and run focused tests
+        working-directory: codex-rs
+        run: |
+          cargo fmt --all
+          cargo test -p codex-core --lib --locked context_cleaner::tests
+          cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
+
+      - name: Commit verified production source and remove bootstraps
+        run: |
+          rm .github/workflows/context-memory-apply.yml .github/workflows/context-memory-pr.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add codex-rs/core/src/client.rs codex-rs/core/src/context_cleaner.rs codex-rs/core/src/lib.rs codex-rs/memories/write/src/workspace_tests.rs .github/workflows/context-memory-apply.yml .github/workflows/context-memory-pr.yml
+          git commit -m "feat(context): compact older transient evidence safely"
+          git push origin HEAD:agent/context-memory
