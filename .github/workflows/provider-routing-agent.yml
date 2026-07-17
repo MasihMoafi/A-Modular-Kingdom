@@ -32,6 +32,7 @@ jobs:
             | gzip --decompress \
             > /tmp/provider-routing.patch
           git apply --index --whitespace=nowarn /tmp/provider-routing.patch
+          git apply --index .github/provider-routing-patch/fix.patch
 
       - name: Format production source
         working-directory: codex-rs
@@ -71,8 +72,19 @@ jobs:
         working-directory: codex-rs
         run: cargo build -p codex-tui --bin elpis --locked
 
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-routing-diagnostics
+          path: |
+            /tmp/native-provider.log
+            /tmp/provider-core.log
+          if-no-files-found: ignore
+          retention-days: 1
+
       - name: Commit validated production files
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && success()
         run: |
           rm -rf .github/provider-routing-patch
           rm .github/workflows/provider-routing-agent.yml

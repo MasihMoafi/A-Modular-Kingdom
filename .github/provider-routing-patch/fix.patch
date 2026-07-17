@@ -1,0 +1,14 @@
+diff --git a/codex-rs/model-provider/src/provider.rs b/codex-rs/model-provider/src/provider.rs
+index 773a86f..f493c0c 100644
+--- a/codex-rs/model-provider/src/provider.rs
++++ b/codex-rs/model-provider/src/provider.rs
+@@ -465,8 +465,7 @@ mod tests {
+     use codex_protocol::account::PlanType;
+     use codex_protocol::config_types::ModelProviderAuthInfo;
+     use codex_protocol::openai_models::ModelInfo;
+-    use codex_protocol::openai_models::ModelInfo;
+-use codex_protocol::openai_models::ModelsResponse;
++    use codex_protocol::openai_models::ModelsResponse;
+     use codex_protocol::protocol::SessionSource;
+     use pretty_assertions::assert_eq;
+     use serde_json::json;
