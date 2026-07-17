@@ -1,0 +1,321 @@
+diff --git a/codex-rs/core/src/client.rs b/codex-rs/core/src/client.rs
+index b292ef5..f17d891 100644
+--- a/codex-rs/core/src/client.rs
++++ b/codex-rs/core/src/client.rs
+@@ -33,6 +33,7 @@ use std::sync::atomic::Ordering;
+ use codex_api::AgentIdentityTelemetry;
+ use codex_api::ApiError;
+ use codex_api::AuthProvider;
++use codex_api::ChatCompletionsClient as ApiChatCompletionsClient;
+ use codex_api::CompactClient as ApiCompactClient;
+ use codex_api::CompactionInput as ApiCompactionInput;
+ use codex_api::Compression;
+@@ -110,9 +111,12 @@ use tracing::warn;
+ use crate::attestation::AttestationContext;
+ use crate::attestation::AttestationProvider;
+ use crate::attestation::X_OAI_ATTESTATION_HEADER;
++use crate::chat_completions::build_chat_completions_request;
++use crate::chat_completions::chat_completion_response_stream;
+ use crate::client_common::Prompt;
+ use crate::client_common::ResponseEvent;
+ use crate::client_common::ResponseStream;
++use crate::context_cleaner::clean_transient_tool_outputs;
+ use crate::feedback_tags;
+ use crate::responses_metadata::CodexResponsesMetadata;
+ use crate::responses_metadata::subagent_header_value;
+@@ -156,6 +160,7 @@ const X_OPENAI_INTERNAL_CODEX_RESPONSES_LITE_HEADER: &str =
+     "x-openai-internal-codex-responses-lite";
+ const REALTIME_CALLS_ENDPOINT: &str = "/realtime/calls";
+ const RESPONSES_ENDPOINT: &str = "/responses";
++const CHAT_COMPLETIONS_ENDPOINT: &str = "/chat/completions";
+ const RESPONSES_COMPACT_ENDPOINT: &str = "/responses/compact";
+ // `/responses/compact` is unary, so the timeout covers the full response rather than one idle
+ // period between stream events.
+@@ -915,35 +920,7 @@ impl ModelClient {
+         }
+ 
+         if !store {
+-            for item in input.iter_mut() {
+-                match item {
+-                    ResponseItem::FunctionCallOutput { output, .. } => {
+-                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
+-                            output.body
+-                        {
+-                            if text.len() > 1000 {
+-                                *text = format!(
+-                                    "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
+-                                    text.len()
+-                                );
+-                            }
+-                        }
+-                    }
+-                    ResponseItem::CustomToolCallOutput { output, .. } => {
+-                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
+-                            output.body
+-                        {
+-                            if text.len() > 1000 {
+-                                *text = format!(
+-                                    "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
+-                                    text.len()
+-                                );
+-                            }
+-                        }
+-                    }
+-                    _ => {}
+-                }
+-            }
++            clean_transient_tool_outputs(input);
+         }
+ 
+         if self.state.item_ids_enabled || store {
+@@ -1853,9 +1830,72 @@ impl ModelClientSession {
+                 )
+                 .await
+             }
++            WireApi::Chat => {
++                self.stream_chat_completions(
++                    prompt,
++                    model_info,
++                    session_telemetry,
++                    responses_metadata,
++                )
++                .await
++            }
+         }
+     }
+ 
++    #[instrument(
++        name = "model_client.stream_chat_completions",
++        level = "info",
++        skip_all,
++        fields(
++            model = %model_info.slug,
++            wire_api = %self.client.state.provider.info().wire_api,
++            transport = "chat_completions_http",
++            http.method = "POST",
++            api.path = "chat/completions"
++        )
++    )]
++    async fn stream_chat_completions(
++        &self,
++        prompt: &Prompt,
++        model_info: &ModelInfo,
++        session_telemetry: &SessionTelemetry,
++        responses_metadata: &CodexResponsesMetadata,
++    ) -> Result<ResponseStream> {
++        let client_setup = self.client.current_client_setup().await?;
++        let transport = self
++            .client
++            .build_api_transport(&client_setup.api_provider, CHAT_COMPLETIONS_ENDPOINT)?;
++        let auth_context = AuthRequestTelemetryContext::new(
++            client_setup.auth.as_ref().map(CodexAuth::auth_mode),
++            client_setup.api_auth.as_ref(),
++            client_setup.agent_identity_telemetry.clone(),
++            PendingUnauthorizedRetry::default(),
++        );
++        let (request_telemetry, _) = Self::build_streaming_telemetry(
++            session_telemetry,
++            auth_context,
++            RequestRouteTelemetry::for_endpoint(CHAT_COMPLETIONS_ENDPOINT),
++            self.client.state.auth_env_telemetry.clone(),
++        );
++        let mut headers = build_session_headers(
++            Some(responses_metadata.session_id.to_string()),
++            Some(responses_metadata.thread_id.to_string()),
++        );
++        add_originator_header(&mut headers, self.client.state.originator.as_str());
++        let request = build_chat_completions_request(prompt, &model_info.slug);
++        let client = ApiChatCompletionsClient::new(
++            transport,
++            client_setup.api_provider,
++            client_setup.api_auth,
++        )
++        .with_telemetry(Some(request_telemetry));
++        let response = client
++            .complete(request, headers)
++            .await
++            .map_err(|err| self.client.state.provider.map_api_error(err))?;
++        chat_completion_response_stream(response)
++    }
++
+     /// Permanently disables WebSockets for this Codex session and resets WebSocket state.
+     ///
+     /// This is used after exhausting the provider retry budget, to force subsequent requests onto
+ diff --git a/codex-rs/core/src/context_cleaner.rs b/codex-rs/core/src/context_cleaner.rs
+new file mode 100644
+index 0000000..99b9ef4
+--- /dev/null
++++ b/codex-rs/core/src/context_cleaner.rs
+@@ -0,0 +1,152 @@
++use codex_protocol::models::FunctionCallOutputBody;
++use codex_protocol::models::ResponseItem;
++use std::sync::atomic::AtomicUsize;
++use std::sync::atomic::Ordering;
++
++const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 4_000;
++const RETAINED_EDGE_CHARS: usize = 700;
++const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 2;
++static EVICTED_TOOL_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
++
++/// Number of transient tool outputs compacted during this Elpis process.
++pub fn eviction_count() -> usize {
++    EVICTED_TOOL_OUTPUTS.load(Ordering::Relaxed)
++}
++
++/// Applies Elpis's deterministic context lifecycle to transient tool output.
++///
++/// The newest outputs remain intact so the active step is never deprived of evidence. Older,
++/// oversized outputs are represented by bounded head/tail excerpts plus a stable rollout pointer;
++/// the complete output remains in the session rollout on disk.
++pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize {
++    let tool_indices = input
++        .iter()
++        .enumerate()
++        .filter_map(|(index, item)| match item {
++            ResponseItem::FunctionCallOutput { .. }
++            | ResponseItem::CustomToolCallOutput { .. } => Some(index),
++            _ => None,
++        })
++        .collect::<Vec<_>>();
++    let keep_from = tool_indices.len().saturating_sub(RECENT_TOOL_OUTPUTS_TO_KEEP);
++    let mut evicted = 0;
++
++    for index in tool_indices.into_iter().take(keep_from) {
++        let (call_id, name, body) = match &mut input[index] {
++            ResponseItem::FunctionCallOutput {
++                call_id, output, ..
++            } => (call_id.as_str(), "function", &mut output.body),
++            ResponseItem::CustomToolCallOutput {
++                call_id,
++                name,
++                output,
++                ..
++            } => (
++                call_id.as_str(),
++                name.as_deref().unwrap_or("custom-tool"),
++                &mut output.body,
++            ),
++            _ => continue,
++        };
++        let FunctionCallOutputBody::Text(text) = body else {
++            continue;
++        };
++        let original_chars = text.chars().count();
++        if original_chars <= MAX_INLINE_TOOL_OUTPUT_CHARS {
++            continue;
++        }
++        let head = take_chars(text, RETAINED_EDGE_CHARS);
++        let tail = take_last_chars(text, RETAINED_EDGE_CHARS);
++        *text = format!(
++            "[ELPIS EVICTION]\nreason=older transient tool output exceeded {MAX_INLINE_TOOL_OUTPUT_CHARS} chars\nsource=rollout://tool-call/{call_id}\ntool={name}\noriginal_chars={original_chars}\nretained=head:{RETAINED_EDGE_CHARS}+tail:{RETAINED_EDGE_CHARS}\n--- head ---\n{head}\n--- omitted; full evidence remains in rollout ---\n{tail}\n--- tail ---"
++        );
++        evicted += 1;
++    }
++    if evicted > 0 {
++        EVICTED_TOOL_OUTPUTS.fetch_add(evicted, Ordering::Relaxed);
++    }
++    evicted
++}
++
++fn take_chars(text: &str, count: usize) -> String {
++    text.chars().take(count).collect()
++}
++
++fn take_last_chars(text: &str, count: usize) -> String {
++    let chars = text.chars().collect::<Vec<_>>();
++    chars[chars.len().saturating_sub(count)..].iter().collect()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use codex_protocol::models::FunctionCallOutputPayload;
++
++    fn output(call_id: &str, text: String) -> ResponseItem {
++        ResponseItem::FunctionCallOutput {
++            id: None,
++            call_id: call_id.to_string(),
++            output: FunctionCallOutputPayload::from_text(text),
++            internal_chat_message_metadata_passthrough: None,
++        }
++    }
++
++    #[test]
++    fn evicts_only_old_large_outputs_and_preserves_evidence_pointer() {
++        let large = format!("HEAD{}TAIL", "x".repeat(5_000));
++        let mut input = vec![
++            output("old", large.clone()),
++            output("recent-1", large.clone()),
++            output("recent-2", large.clone()),
++        ];
++
++        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
++        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
++            panic!("function output");
++        };
++        let text = output.text_content().expect("text");
++        assert!(text.contains("source=rollout://tool-call/old"));
++        assert!(text.contains("HEAD"));
++        assert!(text.contains("TAIL"));
++        for item in &input[1..] {
++            let ResponseItem::FunctionCallOutput { output, .. } = item else {
++                panic!("function output");
++            };
++            assert_eq!(output.text_content(), Some(large.as_str()));
++        }
++    }
++
++    #[test]
++    fn custom_tool_output_uses_tool_name_and_rollout_pointer() {
++        let large = "z".repeat(5_000);
++        let mut input = vec![
++            ResponseItem::CustomToolCallOutput {
++                id: None,
++                call_id: "custom-old".to_string(),
++                name: Some("browser".to_string()),
++                output: FunctionCallOutputPayload::from_text(large.clone()),
++                internal_chat_message_metadata_passthrough: None,
++            },
++            output("recent-1", large.clone()),
++            output("recent-2", large),
++        ];
++
++        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
++        let ResponseItem::CustomToolCallOutput { output, .. } = &input[0] else {
++            panic!("custom output");
++        };
++        let text = output.text_content().expect("text");
++        assert!(text.contains("tool=browser"));
++        assert!(text.contains("source=rollout://tool-call/custom-old"));
++    }
++
++    #[test]
++    fn leaves_small_outputs_untouched() {
++        let mut input = vec![output("small", "ok".to_string())];
++        assert_eq!(clean_transient_tool_outputs(&mut input), 0);
++        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
++            panic!("function output");
++        };
++        assert_eq!(output.text_content(), Some("ok"));
++    }
++}
+diff --git a/codex-rs/core/src/lib.rs b/codex-rs/core/src/lib.rs
+index d0e3072..b75fa50 100644
+--- a/codex-rs/core/src/lib.rs
++++ b/codex-rs/core/src/lib.rs
+@@ -9,6 +9,7 @@ mod apply_patch;
+ mod apps;
+ mod client;
+ mod client_common;
++mod chat_completions;
+ mod realtime_context;
+ mod realtime_conversation;
+ mod realtime_prompt;
+@@ -40,6 +41,7 @@ pub mod config;
+ pub mod connectors;
+ pub mod context;
+ mod context_manager;
++pub mod context_cleaner;
+ mod current_time;
+ mod elicitation;
+ pub mod elpis_context;
