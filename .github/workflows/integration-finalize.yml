@@ -1,32 +1,41 @@
-name: One-shot memory diagnostics
+name: Finalize Elpis integration
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: elpis-integration-finalizer
   cancel-in-progress: true
 
 jobs:
-  diagnose:
+  finalize:
     if: github.head_ref == 'agent/product-integration'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: "1"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_TERM_COLOR: always
     steps:
       - name: Checkout integration head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: agent/product-integration
+          fetch-depth: 0
 
       - name: Install Linux build dependencies
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            bubblewrap libcap-dev libssl-dev pkg-config
+            bubblewrap \
+            libcap-dev \
+            libssl-dev \
+            pkg-config
 
       - name: Install pinned Rust toolchain
         run: |
@@ -41,55 +50,206 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git/db
           key: elpis-cargo-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock') }}
-          restore-keys: elpis-cargo-${{ runner.os }}-
+          restore-keys: |
+            elpis-cargo-${{ runner.os }}-
 
-      - name: Restore incremental outputs
+      - name: Restore incremental build outputs
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
         with:
           path: codex-rs/target
-          key: elpis-diagnostic-${{ runner.os }}-${{ hashFiles('codex-rs/Cargo.lock') }}
-          restore-keys: elpis-target-${{ runner.os }}-
+          key: elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-${{ hashFiles('codex-rs/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-${{ hashFiles('codex-rs/Cargo.lock') }}-
+            elpis-target-${{ runner.os }}-${{ hashFiles('codex-rs/rust-toolchain.toml') }}-
 
-      - name: Apply byte-verified UI edits and format
+      - name: Materialize reviewed source fixes
         run: |
-          cat .github/finalizer/chunk-* | base64 -d > /tmp/elpis-finalize.py
-          python3 /tmp/elpis-finalize.py
+          cat .github/finalizer/chunk-* | base64 -d > /tmp/elpis-finalize-ui.py
+          python3 /tmp/elpis-finalize-ui.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, label: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise RuntimeError(f"missing {label} in {path}")
+              file.write_text(text.replace(old, new, 1))
+
+          replace(
+              "codex-rs/config/src/thread_config/remote.rs",
+              """        Ok(proto::WireApi::Responses) => WireApi::Responses,
+          Ok(proto::WireApi::Unspecified) => {
+""",
+              """        Ok(proto::WireApi::Responses) => WireApi::Responses,
+          Ok(proto::WireApi::AnthropicMessages) => WireApi::AnthropicMessages,
+          Ok(proto::WireApi::GeminiGenerateContent) => WireApi::GeminiGenerateContent,
+          Ok(proto::WireApi::Unspecified) => {
+""",
+              "remote wire API decode arms",
+          )
+          replace(
+              "codex-rs/config/src/thread_config/remote.rs",
+              """    match wire_api {
+          WireApi::Responses => proto::WireApi::Responses,
+      }
+""",
+              """    match wire_api {
+          WireApi::Responses => proto::WireApi::Responses,
+          WireApi::AnthropicMessages => proto::WireApi::AnthropicMessages,
+          WireApi::GeminiGenerateContent => proto::WireApi::GeminiGenerateContent,
+      }
+""",
+              "remote wire API encode arms",
+          )
+          replace(
+              "codex-rs/config/src/thread_config/remote.rs",
+              """    fn model_provider_proto_roundtrips_through_domain_type() {
+          let expected = expected_provider();
+          let proto = model_provider_to_proto("local", expected.clone());
+          let (id, actual) = model_provider_from_proto(proto).expect("model provider from proto");
+
+          assert_eq!(id, "local");
+          assert_eq!(actual, expected);
+      }
+""",
+              """    fn model_provider_proto_roundtrips_through_domain_type() {
+          for wire_api in [
+              WireApi::Responses,
+              WireApi::AnthropicMessages,
+              WireApi::GeminiGenerateContent,
+          ] {
+              let mut expected = expected_provider();
+              expected.wire_api = wire_api;
+              let proto = model_provider_to_proto("local", expected.clone());
+              let (id, actual) =
+                  model_provider_from_proto(proto).expect("model provider from proto");
+
+              assert_eq!(id, "local");
+              assert_eq!(actual, expected);
+          }
+      }
+""",
+              "wire API roundtrip coverage",
+          )
+          replace(
+              "codex-rs/config/src/thread_config/proto/codex.thread_config.v1.proto",
+              """  WIRE_API_UNSPECIFIED = 0;
+          WIRE_API_RESPONSES = 1;
+""",
+              """  WIRE_API_UNSPECIFIED = 0;
+          WIRE_API_RESPONSES = 1;
+          WIRE_API_ANTHROPIC_MESSAGES = 2;
+          WIRE_API_GEMINI_GENERATE_CONTENT = 3;
+""",
+              "protobuf wire API values",
+          )
+          replace(
+              "codex-rs/config/src/thread_config/proto/codex.thread_config.v1.rs",
+              """    Unspecified = 0,
+          Responses = 1,
+""",
+              """    Unspecified = 0,
+          Responses = 1,
+          AnthropicMessages = 2,
+          GeminiGenerateContent = 3,
+""",
+              "generated wire API variants",
+          )
+          replace(
+              "codex-rs/config/src/thread_config/proto/codex.thread_config.v1.rs",
+              """            Self::Unspecified => "WIRE_API_UNSPECIFIED",
+              Self::Responses => "WIRE_API_RESPONSES",
+""",
+              """            Self::Unspecified => "WIRE_API_UNSPECIFIED",
+              Self::Responses => "WIRE_API_RESPONSES",
+              Self::AnthropicMessages => "WIRE_API_ANTHROPIC_MESSAGES",
+              Self::GeminiGenerateContent => "WIRE_API_GEMINI_GENERATE_CONTENT",
+""",
+              "generated wire API names",
+          )
+          replace(
+              "codex-rs/config/src/thread_config/proto/codex.thread_config.v1.rs",
+              """            "WIRE_API_UNSPECIFIED" => Some(Self::Unspecified),
+              "WIRE_API_RESPONSES" => Some(Self::Responses),
+              _ => None,
+""",
+              """            "WIRE_API_UNSPECIFIED" => Some(Self::Unspecified),
+              "WIRE_API_RESPONSES" => Some(Self::Responses),
+              "WIRE_API_ANTHROPIC_MESSAGES" => Some(Self::AnthropicMessages),
+              "WIRE_API_GEMINI_GENERATE_CONTENT" => Some(Self::GeminiGenerateContent),
+              _ => None,
+""",
+              "generated wire API parser",
+          )
+          replace(
+              ".github/workflows/embedded-elpis-linux.yml",
+              """  build:
+          if: github.head_ref != 'agent/product-integration'
+          name: Build and verify Elpis
+""",
+              """  build:
+          name: Build and verify Elpis
+""",
+              "integration workflow skip",
+          )
+          PY
           cd codex-rs
           cargo fmt --all
           cargo fmt --all --check
 
-      - name: Capture each memory verification result
+      - name: Verify launcher and provider entrypoints
         working-directory: codex-rs
-        shell: bash
-        run: |
-          set +e
-          mkdir -p /tmp/elpis-memory-diagnostics
-          : > /tmp/elpis-memory-diagnostics/results.tsv
-          run_test() {
-            name="$1"
-            shift
-            echo "Running $name"
-            "$@" > "/tmp/elpis-memory-diagnostics/${name}.log" 2>&1
-            status=$?
-            printf '%s\t%s\n' "$name" "$status" >> /tmp/elpis-memory-diagnostics/results.tsv
-            tail -n 40 "/tmp/elpis-memory-diagnostics/${name}.log"
-          }
-          run_test context_cleaner cargo test -p codex-core --lib --locked context_cleaner::tests
-          run_test state_usage cargo test -p codex-state --locked record_stage1_output_usage_updates_usage_metadata
-          run_test memory_sync cargo test -p codex-memories-write --locked sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
-          run_test archive_reset cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
-          run_test consolidation cargo test -p codex-memories-write --locked validate_consolidation_artifacts_
-          run_test memory_config cargo test -p codex-config --locked memories_config_preserves_configured_root
-          run_test memory_state_root cargo test -p codex-state --locked init_with_memories_state_root_separates_only_memories_db
-          run_test memory_search cargo test -p codex-memories-extension --locked local::search::tests
-          cat /tmp/elpis-memory-diagnostics/results.tsv
-          exit 0
+        run: cargo test -p codex-tui --bin elpis --locked
 
-      - name: Upload memory diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: elpis-memory-diagnostics
-          path: /tmp/elpis-memory-diagnostics
-          if-no-files-found: error
-          retention-days: 1
+      - name: Verify context lifecycle and archive failure safety
+        working-directory: codex-rs
+        run: |
+          cargo test -p codex-core --lib --locked context_cleaner::tests
+          cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
+
+      - name: Verify memory promotion, bounds, and retrieval
+        working-directory: codex-rs
+        run: |
+          cargo test -p codex-state --locked record_stage1_output_usage_updates_usage_metadata
+          cargo test -p codex-memories-write --locked sync_rollout_summaries_and_raw_memories_file_keeps_latest_memories_only
+          cargo test -p codex-memories-write --locked validate_consolidation_artifacts_
+          cargo test -p codex-config --locked memories_config_preserves_configured_root
+          cargo test -p codex-state --locked init_with_memories_state_root_separates_only_memories_db
+          cargo test -p codex-memories-extension --locked local::search::tests
+
+      - name: Verify provider protocol and authentication boundaries
+        working-directory: codex-rs
+        run: |
+          cargo test -p codex-model-provider-info --locked
+          cargo test -p codex-core --lib --locked chat_completions
+
+      - name: Verify runtime identity surfaces
+        working-directory: codex-rs
+        run: cargo test -p codex-tui --lib --locked branding::tests
+
+      - name: Build and verify executable identity
+        working-directory: codex-rs
+        run: |
+          cargo build -p codex-tui --bin elpis --locked
+          target/debug/elpis --help
+          test "$(target/debug/elpis --version)" = "elpis 0.1.0"
+
+      - name: Commit verified source and remove temporary machinery
+        run: |
+          git config user.name "elpis-integration-agent"
+          git config user.email "elpis-integration-agent@users.noreply.github.com"
+          git rm .github/workflows/integration-finalize.yml \
+            .github/patches/elpis-ui-final.patch
+          git rm -r .github/finalizer
+          git add .github/workflows/embedded-elpis-linux.yml \
+            codex-rs/config/src/thread_config/remote.rs \
+            codex-rs/config/src/thread_config/proto/codex.thread_config.v1.proto \
+            codex-rs/config/src/thread_config/proto/codex.thread_config.v1.rs \
+            codex-rs/tui/src/branding.rs \
+            codex-rs/tui/src/chatwidget/model_popups.rs \
+            codex-rs/tui/src/chatwidget/protocol.rs \
+            codex-rs/tui/src/chatwidget/status_surfaces.rs
+          git diff --cached --check
+          git commit -m "fix: finalize integration verification"
+          git push origin HEAD:agent/product-integration
