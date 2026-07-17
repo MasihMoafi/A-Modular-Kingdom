@@ -1,34 +1,88 @@
-name: Agent UI compiler diagnostics
+name: Apply UI span styling fix
 
 on:
-  pull_request:
+  push:
+    branches:
+      - agent/ui-ux
     paths:
       - .github/workflows/agent-ui-diagnostics.yml
 
 permissions:
-  actions: read
-  contents: read
+  contents: write
 
 jobs:
-  diagnostics:
+  apply:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
-      - name: Extract failed verification log
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          curl --fail --location --silent --show-error \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/87857665471/logs" \
-            --output /tmp/job.log
-          tail -n 260 /tmp/job.log > /tmp/verification-tail.log
-
-      - name: Upload verification diagnostics
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - name: Checkout UI branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          name: agent-ui-verification-tail
-          path: /tmp/verification-tail.log
-          if-no-files-found: error
-          retention-days: 1
+          ref: agent/ui-ux
+          fetch-depth: 0
+
+      - name: Use styled spans for model picker accents
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('codex-rs/tui/src/chatwidget/model_popups.rs')
+          text = path.read_text()
+          text = text.replace('use ratatui::style::Styled;\n', 'use ratatui::text::Span;\n')
+          replacements = {
+              '''        header.push(Line::from(
+              title.to_string().style(crate::style::brand_style()),
+          ));''': '''        header.push(Line::from(Span::styled(
+              title.to_string(),
+              crate::style::brand_style(),
+          )));''',
+              '''        header.push(Line::from(
+              format!("Provider: {provider}").style(crate::style::status_symbol_style()),
+          ));''': '''        header.push(Line::from(Span::styled(
+              format!("Provider: {provider}"),
+              crate::style::status_symbol_style(),
+          )));''',
+              '''        header.push(Line::from(
+              format!("Route: {route}").style(crate::style::status_symbol_style()),
+          ));''': '''        header.push(Line::from(Span::styled(
+              format!("Route: {route}"),
+              crate::style::status_symbol_style(),
+          )));''',
+              '''        Some(Line::from(
+              warning.style(crate::style::popup_border_style()),
+          ))''': '''        Some(Line::from(Span::styled(
+              warning,
+              crate::style::popup_border_style(),
+          )))''',
+              '''        header.push(Line::from(
+              "⚠ Consumes usage limits faster".style(crate::style::status_symbol_style()),
+          ));''': '''        header.push(Line::from(Span::styled(
+              "⚠ Consumes usage limits faster",
+              crate::style::status_symbol_style(),
+          )));''',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected block:\n{old}')
+              text = text.replace(old, new, 1)
+          if '.style(crate::style::' in text:
+              raise SystemExit('unconverted Elpis style call remains')
+          path.write_text(text)
+          PY
+
+      - name: Format with pinned toolchain
+        working-directory: codex-rs
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+          cargo fmt --all
+          cargo fmt --all --check
+
+      - name: Commit production fix and remove helper
+        run: |
+          rm .github/workflows/agent-ui-diagnostics.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add codex-rs/tui/src/chatwidget/model_popups.rs .github/workflows/agent-ui-diagnostics.yml
+          git commit -m "Fix model popup styled spans"
+          git push origin HEAD:agent/ui-ux
