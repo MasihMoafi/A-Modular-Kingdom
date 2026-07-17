@@ -1,6 +1,9 @@
 name: Finalize Elpis integration
 
 on:
+  push:
+    branches:
+      - agent/product-integration
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -13,7 +16,7 @@ concurrency:
 
 jobs:
   finalize:
-    if: github.head_ref == 'agent/product-integration'
+    if: github.ref == 'refs/heads/agent/product-integration' || github.head_ref == 'agent/product-integration'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
