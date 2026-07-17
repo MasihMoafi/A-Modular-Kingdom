@@ -38,30 +38,20 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          def replace_once(text: str, old: str, new: str, label: str) -> str:
-              if old not in text:
-                  raise SystemExit(f"missing expected {label} anchor")
-              return text.replace(old, new, 1)
+          def require(text: str, needle: str, label: str) -> None:
+              if needle not in text:
+                  raise SystemExit(f"finalizer invariant missing: {label}")
 
           branding = Path("codex-rs/tui/src/branding.rs")
           s = branding.read_text()
-          s = replace_once(
-              s,
+          s = s.replace(
               "use ratatui::style::Style;",
               "use codex_model_provider_info::WireApi;\nuse ratatui::style::Style;",
-              "branding import",
+              1,
           )
-          s = replace_once(
-              s,
-              '''    pub(crate) fn long_label(self) -> &'static str {
-                  match self {
-                      Self::Native => "native Responses route",
-                      Self::Compatibility => "OpenAI-compatible Responses route",
-                  }
-              }
-          ''',
-              '''    pub(crate) fn long_label(self) -> &'static str {
+          route_impl = '''    pub(crate) fn long_label(self) -> &'static str {
                   match self {
                       Self::Native => "native provider protocol",
                       Self::Compatibility => "OpenAI-compatible Responses route",
@@ -87,23 +77,27 @@ jobs:
                       }
                   }
               }
-          ''',
-              "provider route implementation",
-          )
-          s = replace_once(
+          '''
+          s, count = re.subn(
+              r"    pub\(crate\) fn long_label\(self\) -> &'static str \{.*?\n    \}\n",
+              route_impl,
               s,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit("finalizer could not replace provider route implementation")
+          s = s.replace(
               "    eviction_count: u64,\n    latest_eviction: Option<EvictionNotice>,",
               "    eviction_count: u64,\n    cleaner_eviction_count: usize,\n    latest_eviction: Option<EvictionNotice>,",
-              "cleaner eviction state",
+              1,
           )
-          s = replace_once(
-              s,
+          s = s.replace(
               "            eviction_count: 0,\n            latest_eviction: None,",
               "            eviction_count: 0,\n            cleaner_eviction_count: 0,\n            latest_eviction: None,",
-              "cleaner eviction default",
+              1,
           )
-          marker = "\npub(crate) fn record_model_reroute(from_model: &str, to_model: &str) {"
-          cleaner = '''
+          cleaner_fn = '''
           pub(crate) fn sync_context_eviction(count: usize, event: Option<&str>) -> bool {
               mutate_runtime_identity(|state| {
                   if count <= state.cleaner_eviction_count {
@@ -129,20 +123,17 @@ jobs:
               })
           }
           '''
-          if marker not in s:
-              raise SystemExit("missing context eviction insertion anchor")
-          s = s.replace(marker, cleaner + marker, 1)
-          evict_block = '''    push_field(
+          marker = "\npub(crate) fn record_model_reroute(from_model: &str, to_model: &str) {"
+          require(s, marker, "context eviction insertion point")
+          s = s.replace(marker, cleaner_fn + marker, 1)
+          evict_end = '''    push_field(
                   &mut spans,
                   "evict",
                   &eviction,
                   crate::style::status_symbol_style(),
               );
           '''
-          s = replace_once(
-              s,
-              evict_block,
-              evict_block + '''    if let Some(latest) = state.latest_eviction.as_ref() {
+          evidence_field = '''    if let Some(latest) = state.latest_eviction.as_ref() {
                   push_field(
                       &mut spans,
                       "evidence",
@@ -150,84 +141,32 @@ jobs:
                       crate::style::status_symbol_style(),
                   );
               }
-          ''',
-              "eviction evidence field",
+          '''
+          require(s, evict_end, "eviction display")
+          s = s.replace(evict_end, evict_end + evidence_field, 1)
+          s = s.replace(
+              '        "context compaction" => "compact",\n',
+              '        "context compaction" => "compact",\n        "tool output compacted" => "tool",\n',
+              1,
           )
-          s = replace_once(
-              s,
-              '''        "context compaction" => "compact",
-                  other => other,
-          ''',
-              '''        "context compaction" => "compact",
-                  "tool output compacted" => "tool",
-                  other => other,
-          ''',
-              "compact reason",
-          )
-          s = replace_once(
-              s,
+          s = s.replace(
               '"ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact"',
               '"ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact · evidence thread:t/turn:u"',
-              "identity expectation",
+              1,
           )
-          s = replace_once(
-              s,
+          s = s.replace(
               'assert_eq!(ProviderRoute::Native.long_label(), "native Responses route");',
               'assert_eq!(ProviderRoute::Native.long_label(), "native provider protocol");',
-              "native route expectation",
+              1,
           )
-          test_anchor = '''        assert_eq!(
-                      ProviderRoute::Compatibility.long_label(),
-                      "OpenAI-compatible Responses route"
-                  );
-              }
-          '''
-          s = replace_once(
-              s,
-              test_anchor,
-              '''        assert_eq!(
-                      ProviderRoute::Compatibility.long_label(),
-                      "OpenAI-compatible Responses route"
-                  );
-                  assert_eq!(
-                      ProviderRoute::for_provider(
-                          "anthropic",
-                          "Anthropic Claude (native)",
-                          WireApi::AnthropicMessages,
-                          false,
-                      ),
-                      ProviderRoute::Native
-                  );
-                  assert_eq!(
-                      ProviderRoute::for_provider(
-                          "openrouter",
-                          "OpenRouter",
-                          WireApi::Responses,
-                          false,
-                      ),
-                      ProviderRoute::Compatibility
-                  );
-              }
-          ''',
-              "provider route tests",
-          )
+          require(s, "pub(crate) fn for_provider(", "provider route selector")
+          require(s, "cleaner_eviction_count", "context cleaner counter")
+          require(s, '"evidence"', "evidence field")
           branding.write_text(s)
 
           popup = Path("codex-rs/tui/src/chatwidget/model_popups.rs")
           s = popup.read_text()
-          s = replace_once(
-              s,
-              '''    fn model_provider_route(&self) -> crate::branding::ProviderRoute {
-                  if self.config.model_provider.is_openai() && self.custom_openai_base_url().is_none() {
-                      crate::branding::ProviderRoute::Native
-                  } else {
-                      crate::branding::ProviderRoute::Compatibility
-                  }
-              }
-
-              fn model_route_description(&self, description: &str) -> String {
-          ''',
-              '''    fn model_provider_route(&self) -> crate::branding::ProviderRoute {
+          provider_helpers = '''    fn model_provider_route(&self) -> crate::branding::ProviderRoute {
                   crate::branding::ProviderRoute::for_provider(
                       &self.config.model_provider_id,
                       &self.config.model_provider.name,
@@ -268,32 +207,31 @@ jobs:
               }
 
               fn model_route_description(&self, description: &str) -> String {
-          ''',
-              "model provider route",
-          )
-          s = replace_once(
+          '''
+          s, count = re.subn(
+              r"    fn model_provider_route\(&self\) -> crate::branding::ProviderRoute \{.*?\n    fn model_route_description\(&self, description: &str\) -> String \{\n",
+              provider_helpers,
               s,
-              '''        let provider = self.model_provider_display_name();
-                  let route = self.model_provider_route().long_label();
-                  let mut header = ColumnRenderable::new();
-          ''',
-              '''        let provider = self.model_provider_display_name();
-                  let route = self.model_provider_route().long_label();
-                  let protocol = self.model_protocol_label();
-                  let credential = self.model_credential_label();
-                  let mut header = ColumnRenderable::new();
-          ''',
-              "model menu metadata",
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit("finalizer could not replace model provider helpers")
+          s = s.replace(
+              "        let route = self.model_provider_route().long_label();\n        let mut header = ColumnRenderable::new();",
+              "        let route = self.model_provider_route().long_label();\n        let protocol = self.model_protocol_label();\n        let credential = self.model_credential_label();\n        let mut header = ColumnRenderable::new();",
+              1,
           )
           route_line = '''        header.push(Line::from(Span::styled(
                   format!("Route: {route}"),
                   crate::style::status_symbol_style(),
               )));
           '''
-          s = replace_once(
-              s,
+          require(s, route_line, "model route header")
+          s = s.replace(
               route_line,
-              route_line + '''        header.push(Line::from(Span::styled(
+              route_line
+              + '''        header.push(Line::from(Span::styled(
                   format!("Protocol: {protocol}"),
                   crate::style::status_symbol_style(),
               )));
@@ -302,26 +240,21 @@ jobs:
                   crate::style::status_symbol_style(),
               )));
           ''',
-              "model menu protocol and credential",
+              1,
           )
-          s = replace_once(
-              s,
+          s = s.replace(
               '"Provider and route stay fixed; choose a quick model or browse the full catalog."',
               '"Provider, protocol, route, and credential source remain visible while choosing."',
-              "model menu subtitle",
+              1,
           )
+          require(s, "Protocol: {protocol}", "protocol disclosure")
+          require(s, "Credential: {credential}", "credential disclosure")
           popup.write_text(s)
 
           protocol = Path("codex-rs/tui/src/chatwidget/protocol.rs")
           s = protocol.read_text()
-          s = replace_once(
-              s,
-              '''        let provider_route = if self.config.model_provider.is_openai() && !custom_openai_base {
-                  crate::branding::ProviderRoute::Native
-              } else {
-                  crate::branding::ProviderRoute::Compatibility
-              };
-          ''',
+          s, count = re.subn(
+              r"        let provider_route = if self\.config\.model_provider\.is_openai\(\) && !custom_openai_base \{.*?        \};\n",
               '''        let provider_route = crate::branding::ProviderRoute::for_provider(
                   &self.config.model_provider_id,
                   &self.config.model_provider.name,
@@ -329,40 +262,32 @@ jobs:
                   custom_openai_base,
               );
           ''',
-              "live provider route",
+              s,
+              count=1,
+              flags=re.S,
           )
+          if count != 1:
+              raise SystemExit("finalizer could not replace live provider route")
           protocol.write_text(s)
 
           surfaces = Path("codex-rs/tui/src/chatwidget/status_surfaces.rs")
           s = surfaces.read_text()
-          s = replace_once(
-              s,
-              '''    fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
-                  let enabled = !selections.status_line_items.is_empty();
-                  self.bottom_pane.set_status_line_enabled(enabled);
-                  if !enabled {
-                      self.set_status_line(/*status_line*/ None);
-                      self.set_status_line_hyperlink(/*url*/ None);
-                      return;
-                  }
-
-                  let mut segments = Vec::new();
-          ''',
-              '''    fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
+          pattern = r"    fn refresh_status_line_from_selections\(&mut self, selections: &StatusSurfaceSelections\) \{\n        let enabled = !selections\.status_line_items\.is_empty\(\);\n        self\.bottom_pane\.set_status_line_enabled\(enabled\);\n        if !enabled \{.*?        \}\n\n        let mut segments = Vec::new\(\);"
+          replacement = '''    fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
                   let latest_eviction = crate::legacy_core::context_cleaner::latest_eviction_event();
                   crate::branding::sync_context_eviction(
                       crate::legacy_core::context_cleaner::eviction_count(),
                       latest_eviction.as_deref(),
                   );
 
-                  // Elpis runtime identity remains visible even when the inherited configurable
-                  // status-line item list is empty. User-selected items are appended as a tail.
+                  // Elpis identity remains visible even when no inherited tail items are selected.
                   self.bottom_pane.set_status_line_enabled(true);
 
-                  let mut segments = Vec::new();
-          ''',
-              "persistent status line",
-          )
+                  let mut segments = Vec::new();'''
+          s, count = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit("finalizer could not make the status line persistent")
+          require(s, "sync_context_eviction", "context eviction UI sync")
           surfaces.write_text(s)
           PY
 
