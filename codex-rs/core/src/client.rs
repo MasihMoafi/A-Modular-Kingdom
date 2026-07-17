@@ -113,6 +113,7 @@ use crate::attestation::X_OAI_ATTESTATION_HEADER;
 use crate::client_common::Prompt;
 use crate::client_common::ResponseEvent;
 use crate::client_common::ResponseStream;
+use crate::context_cleaner::clean_transient_tool_outputs;
 use crate::feedback_tags;
 use crate::responses_metadata::CodexResponsesMetadata;
 use crate::responses_metadata::subagent_header_value;
@@ -915,35 +916,7 @@ impl ModelClient {
         }
 
         if !store {
-            for item in input.iter_mut() {
-                match item {
-                    ResponseItem::FunctionCallOutput { output, .. } => {
-                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
-                            output.body
-                        {
-                            if text.len() > 1000 {
-                                *text = format!(
-                                    "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
-                                    text.len()
-                                );
-                            }
-                        }
-                    }
-                    ResponseItem::CustomToolCallOutput { output, .. } => {
-                        if let codex_protocol::models::FunctionCallOutputBody::Text(ref mut text) =
-                            output.body
-                        {
-                            if text.len() > 1000 {
-                                *text = format!(
-                                    "[Evicted by Elpis Context Cleaner: Output of {} characters pruned to keep context window clean]",
-                                    text.len()
-                                );
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            clean_transient_tool_outputs(input);
         }
 
         if self.state.item_ids_enabled || store {
