@@ -1,0 +1,26 @@
+name: Provider routing agent workspace
+
+on:
+  push:
+    branches:
+      - agent/provider-routing
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Export checked-out source
+        run: tar --exclude=.git --exclude=target -czf /tmp/elpis-source.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elpis-provider-source
+          path: /tmp/elpis-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
