@@ -62,15 +62,16 @@ jobs:
               file.write_text(text.replace(old, new, 1))
 
           facade = "codex-rs/app-server-client/src/lib.rs"
-          replace_once(
-              facade,
-              "    pub mod config {\n",
-              "    pub mod context_cleaner {\n"
-              "        pub use codex_core::context_cleaner::eviction_count;\n"
-              "        pub use codex_core::context_cleaner::latest_eviction_event;\n"
-              "    }\n\n"
-              "    pub mod config {\n",
-          )
+          if "pub mod context_cleaner" not in Path(facade).read_text():
+              replace_once(
+                  facade,
+                  "    pub mod config {\n",
+                  "    pub mod context_cleaner {\n"
+                  "        pub use codex_core::context_cleaner::eviction_count;\n"
+                  "        pub use codex_core::context_cleaner::latest_eviction_event;\n"
+                  "    }\n\n"
+                  "    pub mod config {\n",
+              )
 
           remote = "codex-rs/config/src/thread_config/remote.rs"
           replace_once(
