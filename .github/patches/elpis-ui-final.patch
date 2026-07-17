@@ -1,0 +1,300 @@
+diff --git a/codex-rs/tui/src/branding.rs b/codex-rs/tui/src/branding.rs
+index df9b575..a0b5ad6 100644
+--- a/codex-rs/tui/src/branding.rs
++++ b/codex-rs/tui/src/branding.rs
+@@ -1,6 +1,7 @@
+ use std::sync::OnceLock;
+ use std::sync::RwLock;
+ 
++use codex_model_provider_info::WireApi;
+ use ratatui::style::Style;
+ use ratatui::style::Stylize;
+ use ratatui::text::Line;
+@@ -27,10 +28,30 @@ impl ProviderRoute {
+ 
+     pub(crate) fn long_label(self) -> &'static str {
+         match self {
+-            Self::Native => "native Responses route",
++            Self::Native => "native provider protocol",
+             Self::Compatibility => "OpenAI-compatible Responses route",
+         }
+     }
++
++    pub(crate) fn for_provider(
++        provider_id: &str,
++        provider_name: &str,
++        wire_api: WireApi,
++        custom_openai_base_url: bool,
++    ) -> Self {
++        match wire_api {
++            WireApi::AnthropicMessages | WireApi::GeminiGenerateContent => Self::Native,
++            WireApi::Responses => {
++                let is_openai = provider_id.trim().eq_ignore_ascii_case("openai")
++                    || provider_name.trim().eq_ignore_ascii_case("openai");
++                if is_openai && !custom_openai_base_url {
++                    Self::Native
++                } else {
++                    Self::Compatibility
++                }
++            }
++        }
++    }
+ }
+ 
+ #[derive(Clone, Debug, Eq, PartialEq)]
+@@ -50,6 +71,7 @@ struct RuntimeIdentity {
+     durable_memory_enabled: bool,
+     memory_citations: usize,
+     eviction_count: u64,
++    cleaner_eviction_count: usize,
+     latest_eviction: Option<EvictionNotice>,
+    latest_continuity: Option<String>,
+    resume_announced: bool,
+@@ -67,6 +89,7 @@ impl Default for RuntimeIdentity {
+            durable_memory_enabled: false,
+            memory_citations: 0,
+            eviction_count: 0,
++            cleaner_eviction_count: 0,
+            latest_eviction: None,
+            latest_continuity: None,
+            resume_announced: false,
+@@ -154,6 +177,31 @@ pub(crate) fn record_compaction(thread_id: &str, turn_id: &str) -> EvictionNotic
+     })
+ }
+ 
++pub(crate) fn sync_context_eviction(count: usize, event: Option<&str>) -> bool {
++    mutate_runtime_identity(|state| {
++        if count <= state.cleaner_eviction_count {
++            return false;
++        }
++        let delta = count - state.cleaner_eviction_count;
++        state.cleaner_eviction_count = count;
++        state.eviction_count = state.eviction_count.saturating_add(delta as u64);
++        let event = event.unwrap_or("ELPIS continuity: compacted older tool output");
++        let evidence = event
++            .split_once("exact evidence:")
++            .map(|(_, evidence)| evidence.trim())
++            .filter(|evidence| !evidence.is_empty())
++            .unwrap_or("rollout://tool-call/unavailable")
++            .to_string();
++        state.latest_eviction = Some(EvictionNotice {
++            count: state.eviction_count,
++            reason: "tool output compacted".to_string(),
++            evidence,
++        });
++        state.latest_continuity = Some("tool evidence compacted".to_string());
++        true
++    })
++}
++
+ pub(crate) fn record_model_reroute(from_model: &str, to_model: &str) {
+    mutate_runtime_identity(|state| {
+        state.model = normalized_value(to_model, "starting");
+@@ -261,6 +309,14 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
+        &eviction,
+        crate::style::status_symbol_style(),
+    );
++    if let Some(latest) = state.latest_eviction.as_ref() {
++        push_field(
++            &mut spans,
++            "evidence",
++            &latest.evidence,
++            crate::style::status_symbol_style(),
++        );
++    }
+    if let Some(continuity) = state.latest_continuity.as_deref() {
+        push_field(
+            &mut spans,
+@@ -292,6 +348,7 @@ fn normalized_value(value: &str, fallback: &str) -> String {
+ fn compact_reason(reason: &str) -> &str {
+    match reason {
+        "context compaction" => "compact",
++        "tool output compacted" => "tool",
+        other => other,
+    }
+ }
+@@ -328,7 +385,7 @@ mod tests {
+        let text = line_text(&Line::from(identity_spans(&state, None)));
+        assert_eq!(
+            text,
+-            "ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact"
++            "ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact · evidence thread:t/turn:u"
+        );
+        assert!(text.starts_with("ELPIS runtime · provider"));
+    }
+@@ -352,10 +409,37 @@ mod tests {
+ 
+    #[test]
+    fn provider_routes_are_explicit() {
+-        assert_eq!(ProviderRoute::Native.long_label(), "native Responses route");
++        assert_eq!(ProviderRoute::Native.long_label(), "native provider protocol");
+        assert_eq!(
+            ProviderRoute::Compatibility.long_label(),
+            "OpenAI-compatible Responses route"
+        );
++        assert_eq!(
++            ProviderRoute::for_provider(
++                "anthropic",
++                "Anthropic Claude (native)",
++                WireApi::AnthropicMessages,
++                false,
++            ),
++            ProviderRoute::Native
++        );
++        assert_eq!(
++            ProviderRoute::for_provider(
++                "google-gemini",
++                "Google Gemini (native)",
++                WireApi::GeminiGenerateContent,
++                false,
++            ),
++            ProviderRoute::Native
++        );
++        assert_eq!(
++            ProviderRoute::for_provider(
++                "openrouter",
++                "OpenRouter",
++                WireApi::Responses,
++                false,
++            ),
++            ProviderRoute::Compatibility
++        );
+    }
+}
+diff --git a/codex-rs/tui/src/chatwidget/model_popups.rs b/codex-rs/tui/src/chatwidget/model_popups.rs
+index 0417191..4a4f8fa 100644
+--- a/codex-rs/tui/src/chatwidget/model_popups.rs
++++ b/codex-rs/tui/src/chatwidget/model_popups.rs
+@@ -48,11 +48,48 @@ impl ChatWidget {
+    }
+ 
+    fn model_provider_route(&self) -> crate::branding::ProviderRoute {
+-        if self.config.model_provider.is_openai() && self.custom_openai_base_url().is_none() {
+-            crate::branding::ProviderRoute::Native
+-        } else {
+-            crate::branding::ProviderRoute::Compatibility
++        crate::branding::ProviderRoute::for_provider(
++            &self.config.model_provider_id,
++            &self.config.model_provider.name,
++            self.config.model_provider.wire_api,
++            self.custom_openai_base_url().is_some(),
++        )
++    }
++
++    fn model_protocol_label(&self) -> String {
++        self.config.model_provider.wire_api.to_string()
++    }
++
++    fn model_credential_label(&self) -> String {
++        if self.config.model_provider.requires_openai_auth {
++            return "OpenAI/ChatGPT credential store".to_string();
++        }
++        if let Some(env_key) = self.config.model_provider.env_key.as_deref() {
++            return format!("environment variable {env_key}");
++        }
++        if let Some(headers) = self.config.model_provider.env_http_headers.as_ref()
++            && !headers.is_empty()
++        {
++            let mut env_names = headers.values().cloned().collect::<Vec<_>>();
++            env_names.sort();
++            env_names.dedup();
++            return format!("environment header {}", env_names.join(", "));
++        }
++        if self.config.model_provider.auth.is_some() {
++            return "command-backed bearer token".to_string();
+        }
++        if self.config.model_provider.aws.is_some() {
++            return "AWS SigV4 credential chain".to_string();
++        if self
++            .config
++            .model_provider
++            .experimental_bearer_token
++            .is_some()
++        {
++            return "configured bearer token".to_string();
++        }
++        "not declared".to_string()
+    }
+ 
+    fn model_route_description(&self, description: &str) -> String {
+@@ -67,6 +104,8 @@ impl ChatWidget {
+    fn model_menu_header(&self, title: &str, subtitle: &str) -> Box<dyn Renderable> {
+        let provider = self.model_provider_display_name();
+        let route = self.model_provider_route().long_label();
++        let protocol = self.model_protocol_label();
++        let credential = self.model_credential_label();
+        let mut header = ColumnRenderable::new();
+        header.push(Line::from(Span::styled(
+            title.to_string(),
+@@ -80,6 +119,14 @@ impl ChatWidget {
+            format!("Route: {route}"),
+            crate::style::status_symbol_style(),
+        )));
++        header.push(Line::from(Span::styled(
++            format!("Protocol: {protocol}"),
++            crate::style::status_symbol_style(),
++        )));
++        header.push(Line::from(Span::styled(
++            format!("Credential: {credential}"),
++            crate::style::status_symbol_style(),
++        ));
+        header.push(Line::from(
+            format!("Current model: {}", self.current_model()).bold(),
+        ));
+@@ -211,7 +258,7 @@ impl ChatWidget {
+ 
+        let header = self.model_menu_header(
+            "Choose a model",
+-            "Provider and route stay fixed; choose a quick model or browse the full catalog.",
++            "Provider, protocol, route, and credential source remain visible while choosing.",
+        );
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            footer_hint: Some(standard_popup_hint_line()),
+diff --git a/codex-rs/tui/src/chatwidget/protocol.rs b/codex-rs/tui/src/chatwidget/protocol.rs
+index d9acee4..ab3aada 100644
+--- a/codex-rs/tui/src/chatwidget/protocol.rs
++++ b/codex-rs/tui/src/chatwidget/protocol.rs
+@@ -35,11 +35,12 @@ impl ChatWidget {
+                    let normalized = base_url.trim().trim_end_matches('/');
+                    !normalized.is_empty() && normalized != DEFAULT_OPENAI_BASE_URL
+                });
+-        let provider_route = if self.config.model_provider.is_openai() && !custom_openai_base {
+-            crate::branding::ProviderRoute::Native
+-        } else {
+-            crate::branding::ProviderRoute::Compatibility
+-        };
++        let provider_route = crate::branding::ProviderRoute::for_provider(
++            &self.config.model_provider_id,
++            &self.config.model_provider.name,
++            self.config.model_provider.wire_api,
++            custom_openai_base,
++        );
+        let current_model = self.current_model().to_string();
+        if crate::branding::sync_runtime_identity(
+            thread_id.as_deref(),
+diff --git a/codex-rs/tui/src/chatwidget/status_surfaces.rs b/codex-rs/tui/src/chatwidget/status_surfaces.rs
+index 7120462..3e6031d 100644
+--- a/codex-rs/tui/src/chatwidget/status_surfaces.rs
++++ b/codex-rs/tui/src/chatwidget/status_surfaces.rs
+@@ -175,13 +175,14 @@ impl ChatWidget {
+     }
+ 
+     fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
+-        let enabled = !selections.status_line_items.is_empty();
+-        self.bottom_pane.set_status_line_enabled(enabled);
+-        if !enabled {
+-            self.set_status_line(/*status_line*/ None);
+-            self.set_status_line_hyperlink(/*url*/ None);
+-            return;
+-        }
++        let latest_eviction = crate::legacy_core::context_cleaner::latest_eviction_event();
++        crate::branding::sync_context_eviction(
++            crate::legacy_core::context_cleaner::eviction_count(),
++            latest_eviction.as_deref(),
++        );
++
++        // Elpis identity remains visible even when no inherited tail items are selected.
++        self.bottom_pane.set_status_line_enabled(true);
+ 
+        let mut segments = Vec::new();
+        for item in &selections.status_line_items {

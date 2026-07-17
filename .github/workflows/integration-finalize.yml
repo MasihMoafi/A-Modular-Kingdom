@@ -1,39 +1,73 @@
-name: One-shot integration source export
+name: One-shot integration finalizer
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: elpis-integration-source-export
+  group: elpis-integration-finalizer
   cancel-in-progress: true
 
 jobs:
-  export:
+  finalize:
     if: github.head_ref == 'agent/product-integration'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 90
     steps:
       - name: Checkout integration head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: agent/product-integration
+          fetch-depth: 0
 
-      - name: Package exact source files
+      - name: Install Linux build dependencies
         run: |
-          tar -czf /tmp/elpis-integration-ui-source.tar.gz \
-            codex-rs/tui/src/branding.rs \
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bubblewrap \
+            libcap-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.95.0 --component rustfmt --no-self-update
+
+      - name: Apply reviewed integration patch
+        run: |
+          git apply --check .github/patches/elpis-ui-final.patch
+          git apply .github/patches/elpis-ui-final.patch
+
+      - name: Format source
+        working-directory: codex-rs
+        run: cargo fmt --all
+
+      - name: Verify focused product behavior
+        working-directory: codex-rs
+        run: |
+          cargo fmt --all --check
+          cargo test -p codex-core --lib --locked context_cleaner::tests
+          cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
+          cargo test -p codex-model-provider-info --locked
+          cargo test -p codex-core --lib --locked chat_completions
+          cargo test -p codex-tui --lib --locked branding::tests
+          cargo test -p codex-tui --bin elpis --locked
+          cargo build -p codex-tui --bin elpis --locked
+          test "$(target/debug/elpis --version)" = "elpis 0.1.0"
+
+      - name: Commit verified source and remove temporary files
+        run: |
+          git config user.name "elpis-integration-agent"
+          git config user.email "elpis-integration-agent@users.noreply.github.com"
+          git rm .github/workflows/integration-finalize.yml \
+            .github/patches/elpis-ui-final.patch
+          git add codex-rs/tui/src/branding.rs \
             codex-rs/tui/src/chatwidget/model_popups.rs \
             codex-rs/tui/src/chatwidget/protocol.rs \
             codex-rs/tui/src/chatwidget/status_surfaces.rs
-
-      - name: Upload exact source files
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: elpis-integration-ui-source
-          path: /tmp/elpis-integration-ui-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
+          git commit -m "fix(ui): finalize provider-aware runtime surfaces"
+          git push origin HEAD:agent/product-integration
