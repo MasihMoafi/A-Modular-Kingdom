@@ -24,11 +24,13 @@ Still requiring end-to-end acceptance:
 - related versus unrelated memory admission;
 - memory review, deletion, reset, and compaction behavior.
 
-The current deterministic cleaner replaces older function/tool output text longer than 4,000
-characters. It is an interim implementation: it does not distinguish current evidence from
-stale exploration, and retains head/tail excerpts plus an evidence pointer rather than a compact
-conclusion. Focused unit coverage exists, but no end-to-end check yet proves the expired material
-is absent from the actual next request. Earlier design notes about a lossless context database,
+The current deterministic cleaner keeps the two newest tool outputs intact and replaces older
+output text longer than 1,200 characters with a compact receipt: head/tail excerpts (cleaned of
+trailing whitespace and collapsed blank runs) plus a durable `rollout://tool-call/<id>` evidence
+pointer. This implements the deterministic first pass of the pruning contract below; the
+agent-authored turn outcome record and meaning-aware classification are not yet implemented.
+Focused unit coverage exists, but no end-to-end check yet proves the expired material is absent
+from the actual next request. Earlier design notes about a lossless context database,
 background summarizer, decoupled compaction model, or global vector session index are not
 implemented.
 
