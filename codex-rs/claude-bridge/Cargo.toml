@@ -15,6 +15,8 @@ tokio = { workspace = true, features = ["macros", "process", "rt", "io-util"] }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
+serial_test = { workspace = true }
+tempfile = { workspace = true }
 
 [lib]
 doctest = false

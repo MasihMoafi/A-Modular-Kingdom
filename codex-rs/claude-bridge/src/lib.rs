@@ -1,13 +1,11 @@
-//! Minimal, standalone subprocess bridge to the Claude Code CLI's non-interactive
-//! (`--print`) mode.
+//! Minimal subprocess bridge to the Claude Code CLI's non-interactive (`--print`) mode.
 //!
-//! This crate does exactly one thing: spawn `claude -p <prompt> --output-format
-//! stream-json` and parse its stdout into typed events. It is intentionally NOT wired
-//! into Elpis's runtime selection yet — no such selection point exists in the codebase
-//! today (Elpis's TUI talks to exactly one backend, `codex_app_server_client::AppServerClient`,
-//! via `codex-rs/tui/src/app_server_session.rs`; there is no enum or trait for "which
-//! agent backend owns this turn"). Introducing that abstraction is a separate, larger
-//! task. This crate is the foundation a future wiring step would build on.
+//! Spawns `claude -p <prompt> --output-format stream-json` and parses its stdout into
+//! typed events, or (via [`run_print_turn`]) aggregates a whole turn into one
+//! [`TurnOutcome`]. Wired into the TUI's `ActiveRuntime::ClaudeCode` path
+//! (`codex-rs/tui/src/chatwidget/claude_code_turn.rs`) as whole-message text-in/text-out
+//! only — no incremental streaming render, and `tool_use`/`tool_result` content blocks
+//! are not inspected or bridged to Elpis's approval/diff surfaces yet.
 //!
 //! The event schema below was captured empirically from a real `claude -p ... --verbose
 //! --output-format stream-json` run (Claude Code 2.1.214), not assumed from docs. Field
@@ -115,8 +113,16 @@ pub fn parse_event_line(line: &str) -> Result<ClaudeStreamEvent, ParseError> {
     })
 }
 
+/// Overrides the `claude` binary invoked, for tests only (points at a fake script instead
+/// of the real CLI, so routing logic can be exercised without a live authenticated session).
+pub const BINARY_OVERRIDE_ENV: &str = "CLAUDE_BRIDGE_BINARY";
+
+fn resolve_binary() -> String {
+    std::env::var(BINARY_OVERRIDE_ENV).unwrap_or_else(|_| "claude".to_string())
+}
+
 fn build_command(options: &ClaudePrintOptions) -> Command {
-    let mut cmd = Command::new("claude");
+    let mut cmd = Command::new(resolve_binary());
     cmd.arg("-p")
         .arg(&options.prompt)
         .arg("--output-format")
@@ -168,6 +174,60 @@ pub async fn spawn_and_stream_events(
     });
 
     Ok((child, rx))
+}
+
+/// Outcome of one whole `claude -p` turn, aggregated from the event stream. Whole-message,
+/// not incremental — callers wanting live token-by-token updates need `spawn_and_stream_events`
+/// directly. `tool_use`/`tool_result` content blocks are not inspected here; only `text`
+/// blocks are aggregated, since those block shapes are the only ones this crate has verified
+/// (see module doc comment).
+#[derive(Debug, Clone, Default)]
+pub struct TurnOutcome {
+    pub text: Option<String>,
+    pub session_id: Option<String>,
+    pub is_error: bool,
+    pub error_message: Option<String>,
+}
+
+/// Runs one `claude -p` turn to completion and aggregates it into a [`TurnOutcome`].
+/// Convenience wrapper over [`spawn_and_stream_events`] for callers that don't need
+/// incremental events. Waits for the child process to exit.
+pub async fn run_print_turn(options: ClaudePrintOptions) -> Result<TurnOutcome, ClaudeBridgeError> {
+    let (mut child, mut rx) = spawn_and_stream_events(options).await?;
+    let mut text = String::new();
+    let mut outcome = TurnOutcome::default();
+
+    while let Some(parsed) = rx.recv().await {
+        match parsed {
+            Ok(ClaudeStreamEvent::Assistant(message)) => {
+                if let Some(blocks) = message.message.get("content").and_then(Value::as_array) {
+                    for block in blocks {
+                        if block.get("type").and_then(Value::as_str) == Some("text")
+                            && let Some(chunk) = block.get("text").and_then(Value::as_str)
+                        {
+                            text.push_str(chunk);
+                        }
+                    }
+                }
+            }
+            Ok(ClaudeStreamEvent::Result(result)) => {
+                outcome.session_id = Some(result.session_id);
+                outcome.is_error = result.is_error;
+                if result.is_error {
+                    outcome.error_message = result.result.clone();
+                }
+            }
+            Ok(_) => {}
+            Err(_) => {
+                // Malformed line from the CLI itself (not our concern to fail the whole
+                // turn over) — skip it and keep aggregating.
+            }
+        }
+    }
+
+    let _ = child.wait().await;
+    outcome.text = if text.is_empty() { None } else { Some(text) };
+    Ok(outcome)
 }
 
 #[cfg(test)]
@@ -251,5 +311,95 @@ mod tests {
             .collect();
         assert!(args.contains(&"--resume".to_string()));
         assert!(args.contains(&"abc-123".to_string()));
+    }
+
+    /// Writes a fake `claude`-like script that ignores its arguments and prints canned
+    /// stream-json lines matching the real observed schema. Real subprocess, fake binary —
+    /// exercises the actual spawn/parse/aggregate path without needing an authenticated
+    /// `claude` session, which CI runners don't have.
+    #[cfg(unix)]
+    fn write_fake_claude_script(dir: &tempfile::TempDir, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = dir.path().join("fake-claude.sh");
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("write fake script");
+        let mut perms = std::fs::metadata(&path).expect("stat").permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&path, perms).expect("chmod");
+        path
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[serial_test::serial(claude_bridge_binary_env)]
+    async fn run_print_turn_against_fake_binary_aggregates_text_and_session_id() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let script = write_fake_claude_script(
+            &dir,
+            r#"cat <<'EOF'
+{"type":"assistant","message":{"content":[{"type":"text","text":"pong"}]}}
+{"type":"result","subtype":"success","is_error":false,"result":"pong","session_id":"fake-session-123"}
+EOF"#,
+        );
+
+        // SAFETY: process-global env var; serialized via #[serial] against the same key
+        // used by every test in this module that touches it.
+        unsafe {
+            std::env::set_var(BINARY_OVERRIDE_ENV, &script);
+        }
+
+        let result = run_print_turn(ClaudePrintOptions {
+            prompt: "ignored by fake script".to_string(),
+            resume_session_id: None,
+            cwd: None,
+        })
+        .await;
+
+        unsafe {
+            std::env::remove_var(BINARY_OVERRIDE_ENV);
+        }
+
+        let outcome = result.expect("run_print_turn should succeed against fake binary");
+        assert_eq!(outcome.text.as_deref(), Some("pong"));
+        assert_eq!(outcome.session_id.as_deref(), Some("fake-session-123"));
+        assert!(!outcome.is_error);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[serial_test::serial(claude_bridge_binary_env)]
+    async fn run_print_turn_passes_resume_flag_to_fake_binary() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        // Fake script echoes back the argument that followed --resume, proving the flag
+        // actually reached the subprocess rather than just being present in our own args.
+        let script = write_fake_claude_script(
+            &dir,
+            r#"resume_id=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--resume" ]; then
+    resume_id="$2"
+  fi
+  shift
+done
+printf '{"type":"result","subtype":"success","is_error":false,"result":"resumed","session_id":"%s"}\n' "$resume_id""#,
+        );
+
+        unsafe {
+            std::env::set_var(BINARY_OVERRIDE_ENV, &script);
+        }
+
+        let result = run_print_turn(ClaudePrintOptions {
+            prompt: "continue".to_string(),
+            resume_session_id: Some("prior-session-456".to_string()),
+            cwd: None,
+        })
+        .await;
+
+        unsafe {
+            std::env::remove_var(BINARY_OVERRIDE_ENV);
+        }
+
+        let outcome = result.expect("run_print_turn should succeed against fake binary");
+        assert_eq!(outcome.session_id.as_deref(), Some("prior-session-456"));
     }
 }

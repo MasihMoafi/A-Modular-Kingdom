@@ -2180,6 +2180,14 @@ impl App {
                     }
                 }
             }
+            AppEvent::ClaudeCodeTurnCompleted {
+                text,
+                session_id,
+                error,
+            } => {
+                self.chat_widget
+                    .handle_claude_code_turn_completed(text, session_id, error);
+            }
             AppEvent::StatusLineBranchUpdated { cwd, branch } => {
                 self.chat_widget.set_status_line_branch(cwd, branch);
                 self.refresh_status_line();
