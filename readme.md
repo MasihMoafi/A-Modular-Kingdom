@@ -73,6 +73,12 @@ flowchart LR
 
 Elpis admits rules, the current request, portable state, and relevant memory into a small working set. `/status` exposes why each source is present while full artifacts stay on disk.
 
+The working context is not the transcript. Full conversations, terminal events, and artifacts
+remain available as evidence, but are retrieved only when a later task needs them. Retrieval may
+use an exact evidence pointer first and RAG only when the relevant artifact is not already known;
+neither makes the full history a default prompt attachment. The aim is to make a modest context
+window useful and legible, rather than pay to resend an ever-growing one.
+
 ```mermaid
 flowchart LR
     rules["Rules + current request"] --> working["Small admitted working set"]
@@ -83,8 +89,8 @@ flowchart LR
     working --> runtime["Selected runtime request"]
     runtime --> results["Tool and function results"]
     results --> disk[("Full transcript + artifacts on disk")]
-    results --> large{"Model-visible output > 1,000 chars?"}
-    large -->|Yes| marker["Interim eviction marker"]
+    results --> large{"Old tool output > 4,000 chars?"}
+    large -->|Yes| marker["Temporary output cleaner"]
     large -->|No| keep["Keep in request context"]
 ```
 
