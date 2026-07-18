@@ -5,12 +5,24 @@ use std::path::PathBuf;
 
 const MAX_GOAL_CHARS: usize = 6_000;
 const MAX_CHECKPOINT_CHARS: usize = 8_000;
+const MAX_RULE_CHARS: usize = 8_000;
 const ADMISSION_FILE: &str = "admission.toml";
+
+const GLOBAL_RULES: &str = "Global AGENTS.md";
+const PROJECT_RULES: &str = "Project AGENTS.md";
+const DEV_AGENTS: &str = "dev/AGENTS.md";
+const DEV_ARTIFACT_RULES: &str = "dev/ARTIFACT_RULES.md";
+const DEV_CODING_GUIDELINES: &str = "dev/CODING_GUIDELINES.md";
+const DEV_TERMINAL_RULES: &str = "dev/TERMINAL_AND_GIT_RULES.md";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ContinuityAdmission {
     goal: bool,
     checkpoint: bool,
+    dev_agents: bool,
+    dev_artifact_rules: bool,
+    dev_coding_guidelines: bool,
+    dev_terminal_rules: bool,
 }
 
 impl Default for ContinuityAdmission {
@@ -18,6 +30,10 @@ impl Default for ContinuityAdmission {
         Self {
             goal: true,
             checkpoint: true,
+            dev_agents: true,
+            dev_artifact_rules: true,
+            dev_coding_guidelines: true,
+            dev_terminal_rules: true,
         }
     }
 }
@@ -44,25 +60,19 @@ pub fn workspace_context_dir(memories_root: Option<&Path>, cwd: &Path) -> Option
 }
 
 pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -> Option<String> {
-    let workspace_dir = workspace_context_dir(memories_root, cwd)?;
-    let admission = read_admission(&workspace_dir);
     let mut sections = Vec::new();
-    for (name, limit, admitted) in [
-        ("GOAL.md", MAX_GOAL_CHARS, admission.goal),
-        ("ES.md", MAX_CHECKPOINT_CHARS, admission.checkpoint),
-    ] {
-        if !admitted {
+    for source in continuity_sources(memories_root, cwd) {
+        if !source.admitted {
             continue;
         }
-        let path = workspace_dir.join(name);
-        let Ok(content) = tokio::fs::read_to_string(&path).await else {
+        let Ok(content) = tokio::fs::read_to_string(&source.path).await else {
             continue;
         };
-        let content = truncate_chars(content.trim(), limit);
+        let content = truncate_chars(content.trim(), source_char_limit(source.name));
         if !content.is_empty() {
             sections.push(format!(
                 "### Source: {} ({} characters)\n\n{}",
-                path.display(),
+                source.path.display(),
                 content.chars().count(),
                 content
             ));
@@ -72,8 +82,8 @@ pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -
         return None;
     }
     Some(format!(
-        "## Elpis Continuity\n\n\
-         Use these small, user-owned files to continue the current workspace. They are not a full\n\
+        "## Elpis Admitted Context\n\n\
+         These are the user-visible sources Elpis admitted for this workspace. They are not a full\n\
          transcript. Verify mutable repository state before acting, and prefer the current user\n\
          message when it changes the task.\n\n{}",
         sections.join("\n\n")
@@ -88,10 +98,65 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         return Vec::new();
     };
     let admission = read_admission(&workspace_dir);
+    let dev_dir = cwd
+        .parent()
+        .map(|parent| parent.join("skills-i-use/skills/dev"));
+    let global_rules = memories_root
+        .parent()
+        .and_then(Path::parent)
+        .map(|home| home.join(".codex/AGENTS.md"));
     [
         (
+            GLOBAL_RULES,
+            global_rules,
+            "persistent",
+            "applicable global rules",
+            true,
+            false,
+        ),
+        (
+            PROJECT_RULES,
+            Some(cwd.join("AGENTS.md")),
+            "workspace",
+            "applicable project rules",
+            true,
+            false,
+        ),
+        (
+            DEV_AGENTS,
+            dev_dir.as_ref().map(|dir| dir.join("AGENTS.md")),
+            "workspace",
+            "configured development rules",
+            admission.dev_agents,
+            true,
+        ),
+        (
+            DEV_ARTIFACT_RULES,
+            dev_dir.as_ref().map(|dir| dir.join("ARTIFACT_RULES.md")),
+            "workspace",
+            "configured development rules",
+            admission.dev_artifact_rules,
+            true,
+        ),
+        (
+            DEV_CODING_GUIDELINES,
+            dev_dir.as_ref().map(|dir| dir.join("CODING_GUIDELINES.md")),
+            "workspace",
+            "configured development rules",
+            admission.dev_coding_guidelines,
+            true,
+        ),
+        (
+            DEV_TERMINAL_RULES,
+            dev_dir.as_ref().map(|dir| dir.join("TERMINAL_AND_GIT_RULES.md")),
+            "workspace",
+            "configured development rules",
+            admission.dev_terminal_rules,
+            true,
+        ),
+        (
             "GOAL.md",
-            workspace_dir.join("GOAL.md"),
+            Some(workspace_dir.join("GOAL.md")),
             "durable",
             "active workspace goal",
             admission.goal,
@@ -99,23 +164,16 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         ),
         (
             "ES.md",
-            workspace_dir.join("ES.md"),
+            Some(workspace_dir.join("ES.md")),
             "task",
             "lean session checkpoint",
             admission.checkpoint,
             true,
         ),
-        (
-            "memory_summary.md",
-            memories_root.join("memory_summary.md"),
-            "durable",
-            "available for selective recall",
-            false,
-            false,
-        ),
     ]
     .into_iter()
     .filter_map(|(name, path, lifetime, reason, admitted, selectable)| {
+        let path = path?;
         let metadata = std::fs::metadata(&path).ok()?;
         (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
             name,
@@ -143,6 +201,10 @@ pub fn set_continuity_source_admitted(
     match source_name {
         "GOAL.md" => selection.goal = admitted,
         "ES.md" => selection.checkpoint = admitted,
+        DEV_AGENTS => selection.dev_agents = admitted,
+        DEV_ARTIFACT_RULES => selection.dev_artifact_rules = admitted,
+        DEV_CODING_GUIDELINES => selection.dev_coding_guidelines = admitted,
+        DEV_TERMINAL_RULES => selection.dev_terminal_rules = admitted,
         _ => return Ok(()),
     }
     std::fs::create_dir_all(&workspace_dir)?;
@@ -151,8 +213,13 @@ pub fn set_continuity_source_admitted(
     std::fs::write(
         &temporary_path,
         format!(
-            "# Elpis context admission for this workspace.\nGOAL.md = {}\nES.md = {}\n",
-            selection.goal, selection.checkpoint
+            "# Elpis context admission for this workspace.\nGOAL.md = {}\nES.md = {}\ndev/AGENTS.md = {}\ndev/ARTIFACT_RULES.md = {}\ndev/CODING_GUIDELINES.md = {}\ndev/TERMINAL_AND_GIT_RULES.md = {}\n",
+            selection.goal,
+            selection.checkpoint,
+            selection.dev_agents,
+            selection.dev_artifact_rules,
+            selection.dev_coding_guidelines,
+            selection.dev_terminal_rules,
         ),
     )?;
     std::fs::rename(temporary_path, path)
@@ -171,10 +238,22 @@ fn read_admission(workspace_dir: &Path) -> ContinuityAdmission {
         match key.trim() {
             "GOAL.md" => admission.goal = admitted,
             "ES.md" => admission.checkpoint = admitted,
+            DEV_AGENTS => admission.dev_agents = admitted,
+            DEV_ARTIFACT_RULES => admission.dev_artifact_rules = admitted,
+            DEV_CODING_GUIDELINES => admission.dev_coding_guidelines = admitted,
+            DEV_TERMINAL_RULES => admission.dev_terminal_rules = admitted,
             _ => {}
         }
     }
     admission
+}
+
+fn source_char_limit(name: &str) -> usize {
+    match name {
+        "GOAL.md" => MAX_GOAL_CHARS,
+        "ES.md" => MAX_CHECKPOINT_CHARS,
+        _ => MAX_RULE_CHARS,
+    }
 }
 
 pub async fn sync_continuity_before_compaction(

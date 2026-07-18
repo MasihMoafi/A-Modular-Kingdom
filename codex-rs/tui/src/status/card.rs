@@ -354,13 +354,10 @@ impl StatusHistoryCell {
             refreshing_rate_limits,
         }));
         let agents_summary = Arc::new(RwLock::new(agents_summary));
-        let mut continuity_sources = crate::legacy_core::elpis_context::continuity_sources(
+        let continuity_sources = crate::legacy_core::elpis_context::continuity_sources(
             config.memories.root.as_ref().map(|root| root.as_path()),
             config.cwd.as_path(),
         );
-        if !config.features.enabled(Feature::MemoryTool) || !config.memories.use_memories {
-            continuity_sources.retain(|source| source.name != "memory_summary.md");
-        }
 
         (
             Self {

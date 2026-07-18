@@ -245,20 +245,61 @@ impl SlashCommand {
 
     fn is_visible(self) -> bool {
         match self {
-            SlashCommand::Archive
-            | SlashCommand::MemoryDrop
+            // Elpis owns the continuity, context, memory, permissions, and runtime
+            // surfaces below. The remaining inherited commands are intentionally not
+            // part of the public Elpis command contract.
+            SlashCommand::Model
+            | SlashCommand::Permissions
+            | SlashCommand::Memories
+            | SlashCommand::Skills
+            | SlashCommand::Rag
+            | SlashCommand::Review
+            | SlashCommand::New
+            | SlashCommand::Resume
+            | SlashCommand::Init
+            | SlashCommand::Compact
+            | SlashCommand::Diff
+            | SlashCommand::Status
+            | SlashCommand::Mcp
+            | SlashCommand::Quit
+            | SlashCommand::Clear => true,
+            SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate
-            | SlashCommand::Mention
-            | SlashCommand::Personality
+            | SlashCommand::Keymap
+            | SlashCommand::Hooks
+            | SlashCommand::Rename
+            | SlashCommand::Delete
+            | SlashCommand::Fork
+            | SlashCommand::Goal
+            | SlashCommand::Agent
+            | SlashCommand::Side
+            | SlashCommand::Btw
+            | SlashCommand::Copy
+            | SlashCommand::Logout
+            | SlashCommand::Feedback
+            | SlashCommand::Ide
+            | SlashCommand::ElevateSandbox
+            | SlashCommand::SandboxReadRoot
+            | SlashCommand::Experimental
+            | SlashCommand::AutoReview
+            | SlashCommand::Import
+            | SlashCommand::Archive
+            | SlashCommand::App
             | SlashCommand::Plan
-            | SlashCommand::Pets
+            | SlashCommand::Mention
             | SlashCommand::Raw
             | SlashCommand::Usage
-            | SlashCommand::Vim => false,
-            SlashCommand::SandboxReadRoot => cfg!(target_os = "windows"),
-            SlashCommand::Copy => !cfg!(target_os = "android"),
-            SlashCommand::App => cfg!(any(target_os = "macos", target_os = "windows")),
-            _ => true,
+            | SlashCommand::DebugConfig
+            | SlashCommand::Title
+            | SlashCommand::Statusline
+            | SlashCommand::Theme
+            | SlashCommand::Pets
+            | SlashCommand::Apps
+            | SlashCommand::Plugins
+            | SlashCommand::Stop
+            | SlashCommand::Personality
+            | SlashCommand::Vim
+            | SlashCommand::MultiAgents => false,
         }
     }
 }
@@ -307,12 +348,31 @@ mod tests {
             .collect::<Vec<_>>();
         for removed in [
             "archive",
+            "agent",
+            "btw",
+            "copy",
+            "del",
             "exit",
+            "feedback",
+            "fork",
+            "goal",
+            "hooks",
+            "hotkeys",
+            "apps",
+            "app",
+            "debug-config",
+            "experimental",
+            "import",
             "mention",
             "personality",
             "plan",
             "pets",
+            "plugins",
             "raw",
+            "rename",
+            "settings",
+            "statusline",
+            "title",
             "usage",
             "vim",
         ] {

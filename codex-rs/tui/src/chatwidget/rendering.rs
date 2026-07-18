@@ -202,9 +202,9 @@ impl ChatWidget {
         let model = self.config.model.as_deref().unwrap_or("select a model");
         Line::from(vec![
             " Elpis ".cyan().bold(),
-            "· provider-neutral coding agent · model ".dim(),
+            "· model ".dim(),
             model.cyan(),
-            " · F6 Context Ledger".dim(),
+            " · Shift+Tab Context Ledger".dim(),
         ])
         .render(area, buf);
     }

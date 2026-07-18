@@ -8,7 +8,7 @@ use ratatui::text::Line;
 use ratatui::text::Span;
 
 pub(crate) const PRODUCT_NAME: &str = "Elpis";
-pub(crate) const CODEX_RUNTIME_TITLE: &str = "Elpis · continuity runtime";
+pub(crate) const CODEX_RUNTIME_TITLE: &str = "Elpis";
 
 const STATUS_SEPARATOR: &str = " · ";
 
@@ -19,16 +19,9 @@ pub(crate) enum ProviderRoute {
 }
 
 impl ProviderRoute {
-    pub(crate) fn label(self) -> &'static str {
-        match self {
-            Self::Native => "native",
-            Self::Compatibility => "compat",
-        }
-    }
-
     pub(crate) fn long_label(self) -> &'static str {
         match self {
-            Self::Native => "native provider protocol",
+            Self::Native => "direct provider connection",
             Self::Compatibility => "OpenAI-compatible Responses route",
         }
     }
@@ -265,24 +258,18 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
         .map_or_else(|| "admitted".to_string(), |used| format!("{used}%"));
     let memory = if state.durable_memory_enabled {
         if state.memory_citations == 0 {
-            "on".to_string()
+            "ready".to_string()
         } else {
             format!("{} refs", state.memory_citations)
         }
     } else {
         "off".to_string()
     };
-    let eviction = state.latest_eviction.as_ref().map_or_else(
-        || "0".to_string(),
-        |latest| format!("{}:{}", latest.count, compact_reason(&latest.reason)),
-    );
-
-    let mut spans = Vec::new();
-    push_field(&mut spans, "ELPIS", "runtime", crate::style::brand_style());
+    let mut spans = vec![Span::styled("ELPIS", crate::style::brand_style())];
     push_field(
         &mut spans,
         "provider",
-        &format!("{}/{}", state.provider, state.route.label()),
+        &state.provider,
         crate::style::status_symbol_style(),
     );
     push_field(
@@ -301,12 +288,6 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
         &mut spans,
         "memory",
         &memory,
-        crate::style::status_symbol_style(),
-    );
-    push_field(
-        &mut spans,
-        "evict",
-        &eviction,
         crate::style::status_symbol_style(),
     );
     if let Some(latest) = state.latest_eviction.as_ref() {
@@ -345,14 +326,6 @@ fn normalized_value(value: &str, fallback: &str) -> String {
     }
 }
 
-fn compact_reason(reason: &str) -> &str {
-    match reason {
-        "context compaction" => "compact",
-        "tool output compacted" => "tool",
-        other => other,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,9 +358,9 @@ mod tests {
         let text = line_text(&Line::from(identity_spans(&state, None)));
         assert_eq!(
             text,
-            "ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact · evidence thread:t/turn:u"
+            "ELPIS · provider OpenAI · model gpt-5.6 · ctx 41% · memory 6 refs · evidence thread:t/turn:u"
         );
-        assert!(text.starts_with("ELPIS runtime · provider"));
+        assert!(text.starts_with("ELPIS · provider"));
     }
 
     #[test]
@@ -411,7 +384,7 @@ mod tests {
     fn provider_routes_are_explicit() {
         assert_eq!(
             ProviderRoute::Native.long_label(),
-            "native provider protocol"
+            "direct provider connection"
         );
         assert_eq!(
             ProviderRoute::Compatibility.long_label(),

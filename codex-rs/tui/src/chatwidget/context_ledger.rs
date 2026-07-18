@@ -24,7 +24,7 @@ impl ChatWidget {
         if key_event.kind != KeyEventKind::Press {
             return false;
         }
-        if matches!(key_event.code, KeyCode::F(6))
+        if matches!(key_event.code, KeyCode::BackTab)
             && self
                 .last_rendered_width
                 .get()
@@ -97,10 +97,14 @@ impl ChatWidget {
             Span::raw("  "),
             Span::styled(format!("{} admitted", format_bytes(total_bytes)), cyan),
         ])];
+        let selected_source = sources.get(self.context_ledger.selected);
         lines.push(Line::from(if self.context_ledger.focused {
-            "Space toggle · ↑↓ navigate · F6 close".dim()
+            let action = selected_source.map_or("enable", |source| {
+                if source.admitted { "disable" } else { "enable" }
+            });
+            format!("Space {action} selected source · ↑↓ navigate · Shift+Tab close").dim()
         } else {
-            "F6 controls · exact next-turn sources".dim()
+            "Shift+Tab opens controls · exact next-turn sources".dim()
         }));
         lines.push(Line::from(""));
 
@@ -114,7 +118,7 @@ impl ChatWidget {
             } else {
                 "[-]"
             };
-            let state = if source.admitted { "INCLUDED" } else { "EXCLUDED" };
+            let state = if source.admitted { "ENABLED" } else { "DISABLED" };
             let marker_style = if source.admitted { cyan } else { Style::default().fg(Color::Yellow) };
             let prefix = if selected { "› " } else { "  " };
             lines.push(Line::from(vec![
