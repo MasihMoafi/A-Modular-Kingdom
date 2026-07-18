@@ -237,6 +237,87 @@ memory. Dreaming is optional scheduled review and promotion on top of that found
 Elpis's concrete context-record and session-checkpoint contract lives in
 `docs/CONTEXT_AND_SESSIONS.md`.
 
+### Codex import provenance
+
+Pinned candidate revision: repository `openai/codex`, revision
+`2e1607ee2fa8099a233df7437adee5f16a741905`, license Apache-2.0 (`LICENSE` and `NOTICE`
+retained under `codex-rs/`). The donor working tree at
+`/home/masih/Desktop/f/p/others/codex` has unrelated local edits; only committed content
+from the pinned revision was imported, never the donor's working-tree state.
+`codex-rs/ELPIS_UPSTREAM.md` records this provenance. After the imported foundation
+passed its authenticated milestone, the superseded root `tui/` prototype was archived on
+the `archive/pre-cleanup-20260716` branch and removed from canonical `main`. Crate and
+module boundaries remain upstream-shaped so later action-rendering, permission, and
+mouse-selection work can stay isolated and keep upstream tests.
+
+### Preserve-first behaviors
+
+Import these proven behaviors with their existing tests before subtracting features:
+
+| Behavior | Principal Codex source |
+| --- | --- |
+| Permission types and profiles | `protocol/src/protocol.rs`, `protocol/src/models.rs`, `utils/approval-presets/` |
+| Patch safety and writable-root checks | `core/src/safety.rs`, `core/src/tools/handlers/apply_patch.rs`, `apply-patch/` |
+| Shell lifecycle and running processes | `core/src/tools/handlers/shell.rs`, `core/src/tools/runtimes/shell/`, `exec/` |
+| Sandbox enforcement | `core/src/tools/sandboxing.rs`, `sandboxing/`, `linux-sandbox/`, `execpolicy/` |
+| Command event rendering | `tui/src/chatwidget/command_lifecycle.rs`, `exec_cell/`, `exec_state.rs` |
+| File/patch event rendering | `tui/src/chatwidget/tool_lifecycle.rs`, `history_cell/patches.rs`, `diff_render.rs` |
+| Approval interface | `tui/src/chatwidget/permissions_menu.rs`, `permission_popups.rs`, `bottom_pane/approval_overlay.rs` |
+| Event routing and replay | `tui/src/chatwidget/protocol.rs`, `replay.rs`, app-server protocol item types |
+| Session/thread storage | `rollout/`, `thread-store/`, `state/` |
+| OpenAI login and refresh | `login/` and its narrow auth dependencies |
+| Provider definitions | `model-provider/`, `model-provider-info/`, `core/src/client.rs` |
+
+All paths above are relative to `codex-rs/`. Codex's provider definition supports the
+OpenAI Responses wire format; it is not by itself a native Gemini/Claude abstraction —
+see [Providers](#providers) for the adapter layer Elpis adds on top.
+
+### Stable task boundaries
+
+Keep these ownership seams intact when changing shared rendering/permission code:
+
+| Task | Primary files | Preserved contract and tests |
+| --- | --- | --- |
+| Action rendering | `tui/src/chatwidget/command_lifecycle.rs`, `tool_lifecycle.rs`, `exec_state.rs`, `exec_cell/`, `history_cell/patches.rs`, `diff_render.rs` | Own command/file lifecycle projection and rendered cells. Keep colocated unit tests and `snapshots/` fixtures with any change. Treat `chatwidget/protocol.rs` as the shared event-routing seam. |
+| Permissions | `protocol/src/protocol.rs`, `protocol/src/models.rs`, `utils/approval-presets/`, `core/src/safety.rs`, `core/src/tools/sandboxing.rs`, `sandboxing/`, `linux-sandbox/`, `execpolicy/`, `tui/src/app_server_session.rs`, `tui/src/chatwidget/permissions_menu.rs`, `permission_popups.rs`, `bottom_pane/approval_overlay.rs` | Own permission types, preset selection, enforcement, and approval UI. Preserve crate tests plus approval snapshots; do not alter rendering lifecycle files while changing policy. |
+| Mouse selection and copy | `tui/src/tui.rs`, `tui/event_stream.rs`, `app/input.rs`, `app/event_dispatch.rs`, `app_event.rs`, `chatwidget.rs` raw-output methods, `history_cell/mod.rs` raw lines, `insert_history.rs` | Codex deliberately skips mouse events and does not enable mouse capture, leaving selection to the terminal. Raw scrollback supplies copy-faithful lines. Preserve `history_cell/tests.rs`, raw-mode chatwidget tests/snapshots, and terminal-mode tests. |
+
+`chatwidget.rs` and `chatwidget/protocol.rs` are shared seams, not general cleanup areas:
+rendering owns lifecycle routing, and mouse-selection work owns only raw-output state and
+copy-friendly transcript projection. Coordinate before changing either seam. All paths
+above are relative to `codex-rs/`.
+
+### Exact permission baseline
+
+Copy Codex's semantics before adding Elpis-specific policy:
+
+- **Read Only:** may read workspace files; edits or internet require approval.
+- **Default:** may read/edit within the workspace and run commands; internet or work
+  outside the workspace requires approval.
+- **Full Access:** no approval prompts; filesystem and internet restrictions are off.
+
+### Migration status
+
+The migration sequence (preserve prototype checkpoint → import pinned workspace →
+rename/package as Elpis → subtract cloud/product surfaces → replace branding → introduce
+the runtime contract → move Elpis product rules onto the new foundation → add Gemini/
+Claude adapters → add the OpenClaw-derived context/session/memory pipeline) is complete
+through native provider adapters; the OpenClaw-derived context/session/memory pipeline is
+the current foundation work — see [Current State](#current-state).
+
+Open questions not yet approved as requirements:
+
+- which Codex cloud, apps, realtime, and experimental surfaces remain (tracked as
+  reduction-campaign candidates in `docs/BUILD_AND_REDUCTION_AUDIT.md`);
+- the final visual redesign beyond the shipped cyan identity line and Context Ledger
+  (see [UI Identity](#ui-identity)).
+
+Two questions this document previously left open are now answered: Claude/Gemini use
+direct native APIs as well as OpenRouter compatibility aliases (see
+[Providers](#providers)), and live mid-session provider switching is not yet
+implemented — `ThreadSettingsUpdateParams` carries a model override but no provider
+field (see `TASKS.md` F5).
+
 ## Runtime Architecture
 
 ```text
