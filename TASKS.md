@@ -87,6 +87,13 @@ not claim unfinished behavior is available.
   above. `docs/UI_IDENTITY.md` is a contract, not proof.
 - Proof required: a new user watches a task cross compaction or provider change and can state
   what survived, what expired, which runtime acted, and where evidence lives.
+- Known bug, fixed 2026-07-18: `continuity_sources()` built the dev-skills path from a
+  directory name (`skills-i-use`) that no longer existed on disk, so `/skills` fell back to
+  built-in skills instead of Masih's own, and the Context Ledger showed only global sources.
+  Root cause was a stale path string, not a ledger rendering bug.
+- Remaining ledger gap: dev-skills-folder contents (`skills/dev/*`) must render as individual,
+  independently toggleable rows in the Context Ledger, admitted by default — not collapsed
+  into a single "global files" entry. Not yet verified after the path fix.
 
 ## Reduction campaign
 
@@ -100,6 +107,9 @@ not claim unfinished behavior is available.
 
 ## Important — after the first-release foundation
 
+- Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
+  structured selectable prompt (question, options, multi-select) instead of silently
+  assuming, and records the chosen answer in the session evidence.
 - Native Anthropic and Google protocol adapters.
 - Additional provider/runtime adapters using proven Pi/OpenClaw patterns.
 - Behavioral enforcement across runtimes.

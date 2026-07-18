@@ -52,6 +52,13 @@ This document tracks ideas and proposals for future Elpis versions, classifying 
 * The user can easily select files and toggle them on/off to manually adjust the active context.
 * Some context files are automatically added by default based on the active user task.
 
+### [Important] LSP-Backed Code Intelligence For The Active Runtime
+* Give whichever coding agent is active inside Elpis (Codex, or a future Claude/other bridge)
+  real language-server queries — go-to-definition, precise references, live diagnostics —
+  instead of relying on grep/text search for code navigation.
+* Note: this is not "replicate what Claude Code does" — no confirmed LSP client exists in any
+  current runtime being bridged into Elpis. Scope as its own investigation before committing.
+
 ### [Nice-to-have] Messaging Adapters (Telegram / Discord)
 * Porting OpenClaw/Pi messaging connection patterns so that Elpis can be run as a daemon connected to channels like Telegram.
 
