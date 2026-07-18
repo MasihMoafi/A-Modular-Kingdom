@@ -1,5 +1,46 @@
 # Elpis Build And Reduction Audit
 
+## Audit Methodology
+
+Use this as the standing brief when running a reduction audit (evidence-backed report,
+not a blanket refactor):
+
+- Read `AGENTS.md`, `GUIDE.md`, and `TASKS.md` first; verify the checkout before making
+  any claim.
+- Do not edit code, create branches/worktrees, commit, push, or open a PR during the
+  audit itself — it is a report, not an implementation pass.
+- Do not run Cargo or compile Rust on the local workstation.
+- Do not infer that code is unused from its name or a hidden slash command. Prove call
+  sites, ownership, configuration reachability, tests, and runtime purpose.
+- Preserve ChatGPT/Codex login, streaming, shell/file tools, approvals, sandboxing,
+  sessions, compaction, mouse selection, `/agent`, `/skills`, and `@` attachment.
+- Preserve the one-tool `elpis-rag` boundary. Do not restore deleted Python tools.
+- Do not mix appearance changes, feature deletion, and architecture work in one pass.
+
+Audit steps:
+
+1. Map the active launch path from the `elpis` command to the first usable Ratatui
+   frame.
+2. Identify startup work that blocks that frame and distinguish measured cost from
+   speculation. Use existing evidence or the installed binary only.
+3. Find duplicate, unreachable, obsolete, or Elpis-unwanted code. For each candidate,
+   name the exact path and symbol, references, tests, dependencies, user-visible
+   effect, removal risk, and smallest verification.
+4. Separate inherited Codex machinery Elpis still needs from dedicated product
+   surfaces Masih approved for deletion.
+5. Identify large dependencies or modules only when repository evidence shows they are
+   part of the active build or runtime.
+
+Required output: one report with three ranked sections — **Remove now** (proven unused
+or already superseded; low risk), **Investigate** (promising but not yet proven; state
+the missing evidence), and **Keep** (heavy-looking code that supports retained
+behavior; explain why). For every removal candidate, include difficulty (easy/medium/
+hard), expected benefit, exact acceptance test, and one bounded commit-sized task.
+Recommend only the single best first removal, then stop and wait for approval of what
+may be deleted. After approval, implement only one selected candidate per commit and
+use the remote Rust workflow for verification — never turn an audit into an open-ended
+cleanup campaign.
+
 ## Baseline
 
 The last verified pre-optimization run was GitHub Actions run `29534784054` for commit
