@@ -1,7 +1,6 @@
 //! Persistent, user-controlled view of Elpis-owned portable context.
 
 use super::*;
-use crate::render::renderable::Renderable;
 use ratatui::text::Span;
 use ratatui::widgets::Block;
 use ratatui::widgets::Borders;

@@ -12,7 +12,6 @@ use crate::version::CODEX_CLI_VERSION;
 use chrono::DateTime;
 use chrono::Local;
 use codex_app_server_protocol::AskForApproval;
-use codex_features::Feature;
 use codex_model_provider_info::WireApi;
 use codex_protocol::ThreadId;
 use codex_protocol::account::PlanType;

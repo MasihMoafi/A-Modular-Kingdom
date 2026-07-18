@@ -296,6 +296,7 @@ impl SlashCommand {
             | SlashCommand::Pets
             | SlashCommand::Apps
             | SlashCommand::Plugins
+            | SlashCommand::Ps
             | SlashCommand::Stop
             | SlashCommand::Personality
             | SlashCommand::Vim
