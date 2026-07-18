@@ -1,5 +1,8 @@
+use serde::Deserialize;
+use serde::Serialize;
 use sha2::Digest;
 use sha2::Sha256;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -15,32 +18,39 @@ const DEV_ARTIFACT_RULES: &str = "dev/ARTIFACT_RULES.md";
 const DEV_CODING_GUIDELINES: &str = "dev/CODING_GUIDELINES.md";
 const DEV_TERMINAL_RULES: &str = "dev/TERMINAL_AND_GIT_RULES.md";
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(default)]
 struct ContinuityAdmission {
+    global_rules: bool,
+    project_rules: bool,
     goal: bool,
     checkpoint: bool,
     dev_agents: bool,
     dev_artifact_rules: bool,
     dev_coding_guidelines: bool,
     dev_terminal_rules: bool,
+    custom_sources: BTreeMap<String, bool>,
 }
 
 impl Default for ContinuityAdmission {
     fn default() -> Self {
         Self {
+            global_rules: true,
+            project_rules: true,
             goal: true,
             checkpoint: true,
             dev_agents: true,
             dev_artifact_rules: true,
             dev_coding_guidelines: true,
             dev_terminal_rules: true,
+            custom_sources: BTreeMap::new(),
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContinuitySource {
-    pub name: &'static str,
+    pub name: String,
     pub path: PathBuf,
     pub bytes: u64,
     pub lifetime: &'static str,
@@ -68,7 +78,7 @@ pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -
         let Ok(content) = tokio::fs::read_to_string(&source.path).await else {
             continue;
         };
-        let content = truncate_chars(content.trim(), source_char_limit(source.name));
+        let content = truncate_chars(content.trim(), source_char_limit(&source.name));
         if !content.is_empty() {
             sections.push(format!(
                 "### Source: {} ({} characters)\n\n{}",
@@ -105,27 +115,27 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         .parent()
         .and_then(Path::parent)
         .map(|home| home.join(".codex/AGENTS.md"));
-    [
+    let mut sources = [
         (
             GLOBAL_RULES,
             global_rules,
-            "persistent",
+            "every turn",
             "applicable global rules",
+            admission.global_rules,
             true,
-            false,
         ),
         (
             PROJECT_RULES,
             Some(cwd.join("AGENTS.md")),
-            "workspace",
+            "every turn",
             "applicable project rules",
+            admission.project_rules,
             true,
-            false,
         ),
         (
             DEV_AGENTS,
             dev_dir.as_ref().map(|dir| dir.join("AGENTS.md")),
-            "workspace",
+            "every turn",
             "configured development rules",
             admission.dev_agents,
             true,
@@ -133,7 +143,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         (
             DEV_ARTIFACT_RULES,
             dev_dir.as_ref().map(|dir| dir.join("ARTIFACT_RULES.md")),
-            "workspace",
+            "every turn",
             "configured development rules",
             admission.dev_artifact_rules,
             true,
@@ -141,15 +151,17 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         (
             DEV_CODING_GUIDELINES,
             dev_dir.as_ref().map(|dir| dir.join("CODING_GUIDELINES.md")),
-            "workspace",
+            "every turn",
             "configured development rules",
             admission.dev_coding_guidelines,
             true,
         ),
         (
             DEV_TERMINAL_RULES,
-            dev_dir.as_ref().map(|dir| dir.join("TERMINAL_AND_GIT_RULES.md")),
-            "workspace",
+            dev_dir
+                .as_ref()
+                .map(|dir| dir.join("TERMINAL_AND_GIT_RULES.md")),
+            "every turn",
             "configured development rules",
             admission.dev_terminal_rules,
             true,
@@ -157,7 +169,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         (
             "GOAL.md",
             Some(workspace_dir.join("GOAL.md")),
-            "durable",
+            "every turn",
             "active workspace goal",
             admission.goal,
             true,
@@ -165,7 +177,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         (
             "ES.md",
             Some(workspace_dir.join("ES.md")),
-            "task",
+            "every turn",
             "lean session checkpoint",
             admission.checkpoint,
             true,
@@ -176,7 +188,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         let path = path?;
         let metadata = std::fs::metadata(&path).ok()?;
         (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
-            name,
+            name: name.to_string(),
             path,
             bytes: metadata.len(),
             lifetime,
@@ -185,7 +197,26 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
             selectable,
         })
     })
-    .collect()
+    .collect::<Vec<_>>();
+    sources.extend(
+        admission
+            .custom_sources
+            .iter()
+            .filter_map(|(path, admitted)| {
+                let path = PathBuf::from(path);
+                let metadata = std::fs::metadata(&path).ok()?;
+                (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
+                    name: path.display().to_string(),
+                    path,
+                    bytes: metadata.len(),
+                    lifetime: "every turn",
+                    reason: "manually added file",
+                    admitted: *admitted,
+                    selectable: true,
+                })
+            }),
+    );
+    sources
 }
 
 pub fn set_continuity_source_admitted(
@@ -199,29 +230,70 @@ pub fn set_continuity_source_admitted(
     };
     let mut selection = read_admission(&workspace_dir);
     match source_name {
+        GLOBAL_RULES => selection.global_rules = admitted,
+        PROJECT_RULES => selection.project_rules = admitted,
         "GOAL.md" => selection.goal = admitted,
         "ES.md" => selection.checkpoint = admitted,
         DEV_AGENTS => selection.dev_agents = admitted,
         DEV_ARTIFACT_RULES => selection.dev_artifact_rules = admitted,
         DEV_CODING_GUIDELINES => selection.dev_coding_guidelines = admitted,
         DEV_TERMINAL_RULES => selection.dev_terminal_rules = admitted,
-        _ => return Ok(()),
+        _ => {
+            let source_path = PathBuf::from(source_name);
+            let canonical = source_path.canonicalize()?;
+            if !selection
+                .custom_sources
+                .contains_key(&canonical.to_string_lossy().to_string())
+            {
+                return Ok(());
+            }
+            selection
+                .custom_sources
+                .insert(canonical.to_string_lossy().to_string(), admitted);
+        }
     }
+    write_admission(&workspace_dir, &selection)
+}
+
+pub fn add_continuity_source(
+    memories_root: Option<&Path>,
+    cwd: &Path,
+    requested_path: &Path,
+) -> std::io::Result<PathBuf> {
+    let Some(workspace_dir) = workspace_context_dir(memories_root, cwd) else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Elpis context storage is unavailable",
+        ));
+    };
+    let path = if requested_path.is_absolute() {
+        requested_path.to_path_buf()
+    } else {
+        cwd.join(requested_path)
+    };
+    let path = path.canonicalize()?;
+    let metadata = std::fs::metadata(&path)?;
+    if !metadata.is_file() || metadata.len() == 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "context source must be a non-empty file",
+        ));
+    }
+    let mut selection = read_admission(&workspace_dir);
+    selection
+        .custom_sources
+        .insert(path.to_string_lossy().to_string(), true);
+    write_admission(&workspace_dir, &selection)?;
+    Ok(path)
+}
+
+fn write_admission(workspace_dir: &Path, selection: &ContinuityAdmission) -> std::io::Result<()> {
     std::fs::create_dir_all(&workspace_dir)?;
     let path = workspace_dir.join(ADMISSION_FILE);
     let temporary_path = path.with_extension("toml.tmp");
-    std::fs::write(
-        &temporary_path,
-        format!(
-            "# Elpis context admission for this workspace.\nGOAL.md = {}\nES.md = {}\ndev/AGENTS.md = {}\ndev/ARTIFACT_RULES.md = {}\ndev/CODING_GUIDELINES.md = {}\ndev/TERMINAL_AND_GIT_RULES.md = {}\n",
-            selection.goal,
-            selection.checkpoint,
-            selection.dev_agents,
-            selection.dev_artifact_rules,
-            selection.dev_coding_guidelines,
-            selection.dev_terminal_rules,
-        ),
-    )?;
+    let contents = toml::to_string_pretty(selection)
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+    std::fs::write(&temporary_path, contents)?;
     std::fs::rename(temporary_path, path)
 }
 
@@ -229,6 +301,9 @@ fn read_admission(workspace_dir: &Path) -> ContinuityAdmission {
     let Ok(content) = std::fs::read_to_string(workspace_dir.join(ADMISSION_FILE)) else {
         return ContinuityAdmission::default();
     };
+    if let Ok(admission) = toml::from_str(&content) {
+        return admission;
+    }
     let mut admission = ContinuityAdmission::default();
     for line in content.lines().map(str::trim) {
         let Some((key, value)) = line.split_once('=') else {
@@ -236,6 +311,8 @@ fn read_admission(workspace_dir: &Path) -> ContinuityAdmission {
         };
         let admitted = matches!(value.trim(), "true");
         match key.trim() {
+            GLOBAL_RULES => admission.global_rules = admitted,
+            PROJECT_RULES => admission.project_rules = admitted,
             "GOAL.md" => admission.goal = admitted,
             "ES.md" => admission.checkpoint = admitted,
             DEV_AGENTS => admission.dev_agents = admitted,
@@ -352,7 +429,7 @@ mod tests {
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].name, "GOAL.md");
         assert_eq!(sources[0].bytes, 10);
-        assert_eq!(sources[0].lifetime, "durable");
+        assert_eq!(sources[0].lifetime, "every turn");
         Ok(())
     }
 
@@ -394,9 +471,72 @@ mod tests {
         assert!(prompt.contains("Ship the ledger"));
         assert!(!prompt.contains("Keep the checkpoint"));
         let sources = continuity_sources(Some(&memories), cwd);
-        assert!(sources
-            .iter()
-            .any(|source| source.name == "ES.md" && !source.admitted));
+        assert!(
+            sources
+                .iter()
+                .any(|source| source.name == "ES.md" && !source.admitted)
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn custom_source_is_visible_enabled_and_can_be_disabled() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = home.path().join("project");
+        let custom = cwd.join("notes.md");
+        tokio::fs::create_dir_all(&cwd).await?;
+        tokio::fs::write(&custom, "Keep this visible").await?;
+
+        let added = add_continuity_source(Some(&memories), &cwd, Path::new("notes.md"))?;
+        let sources = continuity_sources(Some(&memories), &cwd);
+        assert!(
+            sources
+                .iter()
+                .any(|source| source.path == added && source.admitted)
+        );
+        assert!(
+            build_continuity_prompt(Some(&memories), &cwd)
+                .await
+                .expect("prompt")
+                .contains("Keep this visible")
+        );
+
+        set_continuity_source_admitted(Some(&memories), &cwd, &added.display().to_string(), false)?;
+        assert!(
+            !build_continuity_prompt(Some(&memories), &cwd)
+                .await
+                .is_some_and(|prompt| prompt.contains("Keep this visible"))
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn applicable_rules_are_visible_and_toggleable() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = home.path().join("projects/Elpis");
+        let dev = home.path().join("projects/skills-i-use/skills/dev");
+        tokio::fs::create_dir_all(home.path().join(".codex")).await?;
+        tokio::fs::create_dir_all(&cwd).await?;
+        tokio::fs::create_dir_all(&dev).await?;
+        tokio::fs::write(home.path().join(".codex/AGENTS.md"), "Global rule").await?;
+        tokio::fs::write(cwd.join("AGENTS.md"), "Project rule").await?;
+        tokio::fs::write(dev.join("AGENTS.md"), "Dev rule").await?;
+
+        let sources = continuity_sources(Some(&memories), &cwd);
+        assert!(
+            sources
+                .iter()
+                .all(|source| source.selectable && source.admitted)
+        );
+        set_continuity_source_admitted(Some(&memories), &cwd, GLOBAL_RULES, false)?;
+        let prompt = build_continuity_prompt(Some(&memories), &cwd)
+            .await
+            .expect("prompt");
+        assert!(!prompt.contains("Global rule"));
+        assert!(prompt.contains("Project rule"));
+        assert!(prompt.contains("Dev rule"));
         Ok(())
     }
 

@@ -27,6 +27,7 @@ pub enum SlashCommand {
     #[strum(to_string = "approve")]
     AutoReview,
     Memories,
+    Add,
     Skills,
     Rag,
     Import,
@@ -136,6 +137,7 @@ impl SlashCommand {
             SlashCommand::Experimental => "configure Elpis settings",
             SlashCommand::AutoReview => "approve one retry of a recent auto-review denial",
             SlashCommand::Memories => "inspect durable memory and generation settings",
+            SlashCommand::Add => "add a file to the Context Ledger: /add <path>",
             SlashCommand::Mcp => "list configured MCP tools; use /mcp verbose for details",
             SlashCommand::Apps => "manage apps",
             SlashCommand::Plugins => "browse plugins",
@@ -154,6 +156,7 @@ impl SlashCommand {
         matches!(
             self,
             SlashCommand::Review
+                | SlashCommand::Add
                 | SlashCommand::Rag
                 | SlashCommand::Rename
                 | SlashCommand::Plan
@@ -201,6 +204,7 @@ impl SlashCommand {
             | SlashCommand::SandboxReadRoot
             | SlashCommand::Experimental
             | SlashCommand::Memories
+            | SlashCommand::Add
             | SlashCommand::Import
             | SlashCommand::Review
             | SlashCommand::Plan
@@ -251,6 +255,7 @@ impl SlashCommand {
             SlashCommand::Model
             | SlashCommand::Permissions
             | SlashCommand::Memories
+            | SlashCommand::Add
             | SlashCommand::Skills
             | SlashCommand::Rag
             | SlashCommand::Review
@@ -380,6 +385,7 @@ mod tests {
             assert!(!visible.contains(&removed), "{removed} should be removed");
         }
         assert!(visible.contains(&"memories"));
+        assert!(visible.contains(&"add"));
     }
 
     #[test]

@@ -256,15 +256,6 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
     let context = state
         .context_used_percent
         .map_or_else(|| "admitted".to_string(), |used| format!("{used}%"));
-    let memory = if state.durable_memory_enabled {
-        if state.memory_citations == 0 {
-            "ready".to_string()
-        } else {
-            format!("{} refs", state.memory_citations)
-        }
-    } else {
-        "off".to_string()
-    };
     let mut spans = vec![Span::styled("ELPIS", crate::style::brand_style())];
     push_field(
         &mut spans,
@@ -282,12 +273,6 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
         &mut spans,
         "ctx",
         &context,
-        crate::style::status_symbol_style(),
-    );
-    push_field(
-        &mut spans,
-        "memory",
-        &memory,
         crate::style::status_symbol_style(),
     );
     if let Some(latest) = state.latest_eviction.as_ref() {

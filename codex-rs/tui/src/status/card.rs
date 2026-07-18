@@ -777,7 +777,7 @@ impl HistoryCell for StatusHistoryCell {
             push_label(&mut labels, &mut seen, "Collaboration mode");
         }
         for source in &self.continuity_sources {
-            push_label(&mut labels, &mut seen, source.name);
+            push_label(&mut labels, &mut seen, &source.name);
         }
         push_label(&mut labels, &mut seen, "Token usage");
         if self.token_usage.context_window.is_some() {
@@ -844,7 +844,7 @@ impl HistoryCell for StatusHistoryCell {
         lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
         for source in &self.continuity_sources {
             lines.push(formatter.line(
-                source.name,
+                &source.name,
                 vec![
                     Span::from(source.path.display().to_string()),
                     Span::from(format!(

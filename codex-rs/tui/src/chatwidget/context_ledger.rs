@@ -16,7 +16,9 @@ pub(super) struct ContextLedgerState {
 
 impl ChatWidget {
     pub(super) fn context_ledger_width(&self, terminal_width: u16) -> u16 {
-        (terminal_width >= LEDGER_MIN_TERMINAL_WIDTH).then_some(LEDGER_WIDTH).unwrap_or(0)
+        (terminal_width >= LEDGER_MIN_TERMINAL_WIDTH)
+            .then_some(LEDGER_WIDTH)
+            .unwrap_or(0)
     }
 
     pub(super) fn handle_context_ledger_key_event(&mut self, key_event: KeyEvent) -> bool {
@@ -67,12 +69,18 @@ impl ChatWidget {
             }
             KeyCode::Char(' ') | KeyCode::Enter => {
                 let source = &sources[self.context_ledger.selected];
-                if let Err(error) = crate::legacy_core::elpis_context::set_continuity_source_admitted(
-                    self.config.memories.root.as_ref().map(|root| root.as_path()),
-                    self.config.cwd.as_path(),
-                    source.name,
-                    !source.admitted,
-                ) {
+                if let Err(error) =
+                    crate::legacy_core::elpis_context::set_continuity_source_admitted(
+                        self.config
+                            .memories
+                            .root
+                            .as_ref()
+                            .map(|root| root.as_path()),
+                        self.config.cwd.as_path(),
+                        &source.name,
+                        !source.admitted,
+                    )
+                {
                     self.add_error_message(format!("Could not update context admission: {error}"));
                 }
             }
@@ -96,15 +104,15 @@ impl ChatWidget {
             Span::raw("  "),
             Span::styled(format!("{} admitted", format_bytes(total_bytes)), cyan),
         ])];
-        let selected_source = sources.get(self.context_ledger.selected);
-        lines.push(Line::from(if self.context_ledger.focused {
+        if self.context_ledger.focused {
+            let selected_source = sources.get(self.context_ledger.selected);
             let action = selected_source.map_or("enable", |source| {
                 if source.admitted { "disable" } else { "enable" }
             });
-            format!("Space {action} selected source · ↑↓ navigate · Shift+Tab close").dim()
-        } else {
-            "Shift+Tab opens controls · exact next-turn sources".dim()
-        }));
+            lines.push(Line::from(
+                format!("Space {action} · ↑↓ select · Shift+Tab close").dim(),
+            ));
+        }
         lines.push(Line::from(""));
 
         if sources.is_empty() {
@@ -117,18 +125,36 @@ impl ChatWidget {
             } else {
                 "[-]"
             };
-            let state = if source.admitted { "ENABLED" } else { "DISABLED" };
-            let marker_style = if source.admitted { cyan } else { Style::default().fg(Color::Yellow) };
+            let state = if source.admitted {
+                "ENABLED"
+            } else {
+                "DISABLED"
+            };
+            let marker_style = if source.admitted {
+                cyan
+            } else {
+                Style::default().fg(Color::Yellow)
+            };
             let prefix = if selected { "› " } else { "  " };
             lines.push(Line::from(vec![
                 Span::styled(prefix, cyan),
                 Span::styled(marker, marker_style),
                 Span::raw(" "),
-                Span::styled(source.name, if selected { cyan.bold() } else { Style::default() }),
+                Span::styled(
+                    source.name.as_str(),
+                    if selected {
+                        cyan.bold()
+                    } else {
+                        Style::default()
+                    },
+                ),
             ]));
             lines.push(Line::from(vec![
                 Span::raw("      "),
-                Span::styled(format!("{} · {} · ", format_bytes(source.bytes), source.lifetime), muted),
+                Span::styled(
+                    format!("{} · {} · ", format_bytes(source.bytes), source.lifetime),
+                    muted,
+                ),
                 Span::styled(state, marker_style),
             ]));
             lines.push(Line::from(vec![
@@ -137,8 +163,9 @@ impl ChatWidget {
             ]));
             lines.push(Line::from(""));
         }
-        lines.push(Line::from("Admission applies before the next turn.".dim()));
-        lines.push(Line::from("Esc returns to the command composer.".dim()));
+        if self.context_ledger.focused {
+            lines.push(Line::from("Esc returns to the command composer.".dim()));
+        }
 
         Paragraph::new(lines)
             .block(
@@ -153,7 +180,11 @@ impl ChatWidget {
 
     fn continuity_sources(&self) -> Vec<crate::legacy_core::elpis_context::ContinuitySource> {
         crate::legacy_core::elpis_context::continuity_sources(
-            self.config.memories.root.as_ref().map(|root| root.as_path()),
+            self.config
+                .memories
+                .root
+                .as_ref()
+                .map(|root| root.as_path()),
             self.config.cwd.as_path(),
         )
     }
