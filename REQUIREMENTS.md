@@ -73,6 +73,22 @@ Elpis uses an amber visual identity and visibly separates runtime, model, contex
 permissions, and evidence. `docs/UI_IDENTITY.md` is the acceptance contract, not proof that
 those surfaces already ship.
 
+### R11. Claude Code as a selectable runtime
+
+Confirmed by Masih 2026-07-18. Claude Code (authenticated via its own subscription login, not
+an extracted/reused credential) becomes a second selectable runtime alongside Codex, not just
+another model under the existing runtime:
+
+- Appears in the `/model` picker as its own provider group, with its model shown beneath it —
+  same grouped pattern already proposed for other providers.
+- A dedicated `/claude-code` command switches the active session to it directly.
+- Foundation exists (`codex-rs/claude-bridge`, tested, CI-green — spawns
+  `claude -p --output-format stream-json` and parses real captured output): see
+  `agent/claude-runtime-bridge`. Not yet wired into any UI; today Elpis's TUI is hard-wired to
+  exactly one backend (`codex_app_server_client::AppServerClient`). Introducing the actual
+  runtime-selection abstraction (deciding Codex-app-server vs. this subprocess bridge, touched
+  in `ChatWidget`/`App` construction) is the confirmed next step.
+
 ## First-Release Order
 
 1. Keep the canonical repository and verification cycle clean.

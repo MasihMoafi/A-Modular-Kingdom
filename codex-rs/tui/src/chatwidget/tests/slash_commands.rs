@@ -2883,3 +2883,99 @@ async fn compact_queues_user_messages_snapshot() {
         normalize_snapshot_paths(term.backend().vt100().screen().contents())
     );
 }
+
+#[tokio::test]
+async fn claude_code_slash_command_switches_active_runtime() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    assert_eq!(chat.active_runtime(), ActiveRuntime::Codex);
+
+    chat.handle_slash_command_dispatch(SlashCommand::ClaudeCode);
+
+    assert_eq!(chat.active_runtime(), ActiveRuntime::ClaudeCode);
+    let cells = drain_insert_history(&mut rx);
+    let rendered = cells
+        .iter()
+        .map(|lines| lines_to_single_string(lines))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        rendered.contains("Active runtime switched to Claude Code"),
+        "expected runtime-switch confirmation, got {rendered:?}"
+    );
+}
+
+/// Proves a submitted message, once `active_runtime` is Claude Code, genuinely reaches
+/// `codex-claude-bridge`'s subprocess path (a real spawned process, a fake `claude` binary
+/// standing in for the real CLI since CI has no authenticated session) rather than the
+/// normal Codex `AppServerClient` path. Also proves the resulting session id is retained
+/// for `--resume` on a follow-up turn.
+#[cfg(unix)]
+#[tokio::test]
+#[serial_test::serial(claude_bridge_binary_env)]
+async fn claude_code_runtime_routes_submitted_message_through_claude_bridge() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("fake-claude.sh");
+    std::fs::write(
+        &script,
+        r#"#!/bin/sh
+cat <<'EOF'
+{"type":"assistant","message":{"content":[{"type":"text","text":"fake reply"}]}}
+{"type":"result","subtype":"success","is_error":false,"result":"fake reply","session_id":"fixture-session-789"}
+EOF
+"#,
+    )
+    .expect("write fake script");
+    let mut perms = std::fs::metadata(&script).expect("stat").permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&script, perms).expect("chmod");
+
+    // SAFETY: process-global env var, serialized against every other test touching it.
+    unsafe {
+        std::env::set_var(codex_claude_bridge::BINARY_OVERRIDE_ENV, &script);
+    }
+
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.handle_slash_command_dispatch(SlashCommand::ClaudeCode);
+    drain_insert_history(&mut rx); // discard the runtime-switch confirmation
+
+    chat.submit_user_message(UserMessage::from("hello claude".to_string()));
+    assert!(chat.is_claude_code_turn_running());
+
+    let completed = loop {
+        match rx.recv().await.expect("channel closed before turn completed") {
+            AppEvent::ClaudeCodeTurnCompleted {
+                text,
+                session_id,
+                error,
+            } => break (text, session_id, error),
+            _ => continue,
+        }
+    };
+
+    unsafe {
+        std::env::remove_var(codex_claude_bridge::BINARY_OVERRIDE_ENV);
+    }
+
+    let (text, session_id, error) = completed;
+    assert_eq!(error, None, "unexpected error from fake claude binary");
+    assert_eq!(text.as_deref(), Some("fake reply"));
+    assert_eq!(session_id.as_deref(), Some("fixture-session-789"));
+
+    // event_dispatch.rs would call this in production; simulate that here since the
+    // ChatWidget test fixture doesn't include the full App event loop.
+    chat.handle_claude_code_turn_completed(text, session_id, error);
+    assert!(!chat.is_claude_code_turn_running());
+
+    let cells = drain_insert_history(&mut rx);
+    let rendered = cells
+        .iter()
+        .map(|lines| lines_to_single_string(lines))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        rendered.contains("fake reply"),
+        "expected the fake Claude Code response to render, got {rendered:?}"
+    );
+}

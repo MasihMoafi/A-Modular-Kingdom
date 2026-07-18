@@ -995,6 +995,14 @@ pub(crate) enum AppEvent {
     /// Launch the external editor after a normal draw has completed.
     LaunchExternalEditor,
 
+    /// A `/claude-code` runtime turn finished (success or failure). Whole-message result,
+    /// not incremental streaming — see `chatwidget/claude_code_turn.rs`.
+    ClaudeCodeTurnCompleted {
+        text: Option<String>,
+        session_id: Option<String>,
+        error: Option<String>,
+    },
+
     /// Async update of the current git branch for status line rendering.
     StatusLineBranchUpdated {
         cwd: PathBuf,
