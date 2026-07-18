@@ -1,5 +1,15 @@
 # Elpis Technical Guide
 
+## Product Thesis
+
+> You put an agent into an Elpis, and it becomes Elpis. Be Elpis, my friend.
+
+Elpis is the environment an agent enters and assimilates into. The selected model or
+agent runtime may change, but the user's goals, working style, durable knowledge,
+context policy, evidence, and behavioral boundaries continue coherently. Elpis is both
+a state and a direction: it is never fully complete, and each verified change should
+make the environment clearer, more capable, and easier for its creator to control.
+
 ## Purpose
 
 Elpis is a provider-neutral coding-agent TUI. It does not try to make a new foundation
@@ -18,20 +28,63 @@ under them.
 
 ## Product Value
 
-Elpis should create value in four ways:
+Elpis should create value in five ways:
 
-1. **Context sovereignty:** the user can see and control what enters the agent's
+1. **Assimilation:** a selected runtime adopts the creator's applicable instructions,
+   goals, context, memory, and behavioral rules, rather than the user adapting to it.
+2. **Context sovereignty:** the user can see and control what enters the agent's
    working set. Selecting a file is an intentional context operation, not decoration.
-2. **Reliable continuity:** sessions preserve goals, decisions, changes, and evidence,
-   while disposable logs and stale file bodies fall away.
-3. **Safe agency:** edits and commands use explicit sandbox and approval contracts.
-   The UI shows what is proposed and records what happened.
-4. **Runtime choice:** Elpis keeps one surrounding control environment while allowing
-   the model provider and low-level agent runtime to change explicitly.
+3. **Reliable continuity:** sessions preserve goals, decisions, changes, and evidence
+   across model changes, compaction, and restarts, while disposable logs and stale
+   file bodies fall away instead of replaying an ever-growing transcript.
+4. **Safe, transparent agency:** edits and commands use explicit sandbox and approval
+   contracts. The UI shows what is proposed and records what happened; Elpis does not
+   claim success when it has only hidden or documented a gap.
+5. **Runtime choice and user ownership:** Elpis keeps one surrounding control
+   environment while allowing the model provider and low-level agent runtime to
+   change explicitly. Durable state is inspectable, editable, exportable, and not
+   tied to one model provider or agent runtime.
 
 Elpis is not primarily a provider switcher, a transcript viewer, or a collection of
 slash commands. A command belongs in the product only when the user deliberately
 selects it and its behavior has a stable contract.
+
+Elpis is not distinguished by having another terminal chat interface — existing
+projects already provide excellent model access, tools, permissions, terminal
+rendering, and agent loops, and Elpis reuses those implementations. It is
+distinguished by the five values above.
+
+## Desired Output: First Public Release
+
+Ship an installable terminal product, not a repository demo, in which a user can:
+
+1. authenticate and deliberately select a supported model and runtime;
+2. see which runtime owns the turn and which capabilities Elpis retains;
+3. give the agent a task under Read Only, Default, or Full Access permissions;
+4. watch readable commands, output, file changes, diffs, failures, and verification;
+5. inspect and control the exact working context admitted by Elpis;
+6. resume later from the same goal, decisions, changes, and relevant memory without
+   replaying irrelevant history;
+7. switch to at least one non-Codex runtime while retaining Elpis-owned continuity;
+8. install and complete a first real coding task from a clean environment.
+
+The release is successful only when these behaviors pass their acceptance checks from
+a clean checkout and the distinctive context/continuity behavior is visibly better than
+using the selected runtime alone.
+
+Not required for the first release: messaging channels, scheduled automation, voice,
+or desktop applications; dream narratives or autonomous skill creation; support for
+every provider or every upstream Codex/OpenClaw feature; a new implementation where a
+proven upstream component can satisfy the contract.
+
+## Proof Standard
+
+A feature is real only when its user-visible acceptance check passes and the evidence
+is recorded. Documentation, hidden code, or a plausible architecture is not proof. The
+defining evaluation: can a fresh supported runtime enter Elpis, receive the right
+current goal and relevant history, obey the creator's rules, perform visible work under
+the chosen permission mode, and resume later without irrelevant context? `TASKS.md` is
+the current-state record against this standard.
 
 ## Source Map
 
