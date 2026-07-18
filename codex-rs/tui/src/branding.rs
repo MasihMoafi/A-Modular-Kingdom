@@ -1,6 +1,7 @@
 use std::sync::OnceLock;
 use std::sync::RwLock;
 
+use codex_model_provider_info::WireApi;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
@@ -27,8 +28,28 @@ impl ProviderRoute {
 
     pub(crate) fn long_label(self) -> &'static str {
         match self {
-            Self::Native => "native Responses route",
+            Self::Native => "native provider protocol",
             Self::Compatibility => "OpenAI-compatible Responses route",
+        }
+    }
+
+    pub(crate) fn for_provider(
+        provider_id: &str,
+        provider_name: &str,
+        wire_api: WireApi,
+        custom_openai_base_url: bool,
+    ) -> Self {
+        match wire_api {
+            WireApi::AnthropicMessages | WireApi::GeminiGenerateContent => Self::Native,
+            WireApi::Responses => {
+                let is_openai = provider_id.trim().eq_ignore_ascii_case("openai")
+                    || provider_name.trim().eq_ignore_ascii_case("openai");
+                if is_openai && !custom_openai_base_url {
+                    Self::Native
+                } else {
+                    Self::Compatibility
+                }
+            }
         }
     }
 }
@@ -50,6 +71,7 @@ struct RuntimeIdentity {
     durable_memory_enabled: bool,
     memory_citations: usize,
     eviction_count: u64,
+    cleaner_eviction_count: usize,
     latest_eviction: Option<EvictionNotice>,
     latest_continuity: Option<String>,
     resume_announced: bool,
@@ -67,6 +89,7 @@ impl Default for RuntimeIdentity {
             durable_memory_enabled: false,
             memory_citations: 0,
             eviction_count: 0,
+            cleaner_eviction_count: 0,
             latest_eviction: None,
             latest_continuity: None,
             resume_announced: false,
@@ -151,6 +174,31 @@ pub(crate) fn record_compaction(thread_id: &str, turn_id: &str) -> EvictionNotic
         state.latest_eviction = Some(notice.clone());
         state.latest_continuity = Some("context compacted".to_string());
         notice
+    })
+}
+
+pub(crate) fn sync_context_eviction(count: usize, event: Option<&str>) -> bool {
+    mutate_runtime_identity(|state| {
+        if count <= state.cleaner_eviction_count {
+            return false;
+        }
+        let delta = count - state.cleaner_eviction_count;
+        state.cleaner_eviction_count = count;
+        state.eviction_count = state.eviction_count.saturating_add(delta as u64);
+        let event = event.unwrap_or("ELPIS continuity: compacted older tool output");
+        let evidence = event
+            .split_once("exact evidence:")
+            .map(|(_, evidence)| evidence.trim())
+            .filter(|evidence| !evidence.is_empty())
+            .unwrap_or("rollout://tool-call/unavailable")
+            .to_string();
+        state.latest_eviction = Some(EvictionNotice {
+            count: state.eviction_count,
+            reason: "tool output compacted".to_string(),
+            evidence,
+        });
+        state.latest_continuity = Some("tool evidence compacted".to_string());
+        true
     })
 }
 
@@ -261,6 +309,14 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
         &eviction,
         crate::style::status_symbol_style(),
     );
+    if let Some(latest) = state.latest_eviction.as_ref() {
+        push_field(
+            &mut spans,
+            "evidence",
+            &latest.evidence,
+            crate::style::status_symbol_style(),
+        );
+    }
     if let Some(continuity) = state.latest_continuity.as_deref() {
         push_field(
             &mut spans,
@@ -292,6 +348,7 @@ fn normalized_value(value: &str, fallback: &str) -> String {
 fn compact_reason(reason: &str) -> &str {
     match reason {
         "context compaction" => "compact",
+        "tool output compacted" => "tool",
         other => other,
     }
 }
@@ -328,7 +385,7 @@ mod tests {
         let text = line_text(&Line::from(identity_spans(&state, None)));
         assert_eq!(
             text,
-            "ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact"
+            "ELPIS runtime · provider OpenAI/native · model gpt-5.6 · ctx 41% · memory 6 refs · evict 2:compact · evidence thread:t/turn:u"
         );
         assert!(text.starts_with("ELPIS runtime · provider"));
     }
@@ -352,10 +409,35 @@ mod tests {
 
     #[test]
     fn provider_routes_are_explicit() {
-        assert_eq!(ProviderRoute::Native.long_label(), "native Responses route");
+        assert_eq!(
+            ProviderRoute::Native.long_label(),
+            "native provider protocol"
+        );
         assert_eq!(
             ProviderRoute::Compatibility.long_label(),
             "OpenAI-compatible Responses route"
+        );
+        assert_eq!(
+            ProviderRoute::for_provider(
+                "anthropic",
+                "Anthropic Claude (native)",
+                WireApi::AnthropicMessages,
+                false,
+            ),
+            ProviderRoute::Native
+        );
+        assert_eq!(
+            ProviderRoute::for_provider(
+                "google-gemini",
+                "Google Gemini (native)",
+                WireApi::GeminiGenerateContent,
+                false,
+            ),
+            ProviderRoute::Native
+        );
+        assert_eq!(
+            ProviderRoute::for_provider("openrouter", "OpenRouter", WireApi::Responses, false,),
+            ProviderRoute::Compatibility
         );
     }
 }
