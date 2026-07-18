@@ -715,6 +715,16 @@ modules are deleted; Codex owns those general agent capabilities. Future Elpis m
 and dictation work must be designed at the Elpis product layer, not restored inside the
 RAG MCP.
 
+RAG's vector storage (`src/rag/qdrant_backend.py`, `QdrantVectorDB`) supports both a
+local on-disk Qdrant client and Qdrant Cloud via a `mode: "local" | "cloud"`
+constructor argument plus a `url`/`api_key` pair for cloud mode; cloud mode avoids the
+local client's single-writer locking, at the cost of a separate, non-syncing
+collection — the first cloud query re-indexes rather than reusing a local index.
+`src/rag/core.py`'s `RAGPipelineV2` currently always constructs `QdrantVectorDB` in
+local mode (`persist_path` only, no `mode`/`url`/`api_key` passed); using cloud mode
+requires extending that call site to pass those parameters from environment
+variables, not hardcoding a key.
+
 ### Memory ownership
 
 Elpis memory artifacts default to `~/.elpis/memories` and memory database state defaults
