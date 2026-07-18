@@ -4,8 +4,8 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 4_000;
-const RETAINED_EDGE_CHARS: usize = 700;
+const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 1_200;
+const RETAINED_EDGE_CHARS: usize = 400;
 const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 2;
 static EVICTED_TOOL_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
 static LAST_EVICTION_EVENT: Mutex<Option<String>> = Mutex::new(None);
@@ -68,8 +68,8 @@ pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize 
         if original_chars <= MAX_INLINE_TOOL_OUTPUT_CHARS {
             continue;
         }
-        let head = take_chars(text, RETAINED_EDGE_CHARS);
-        let tail = take_last_chars(text, RETAINED_EDGE_CHARS);
+        let head = compact_terminal_excerpt(&take_chars(text, RETAINED_EDGE_CHARS));
+        let tail = compact_terminal_excerpt(&take_last_chars(text, RETAINED_EDGE_CHARS));
         let evidence = format!("rollout://tool-call/{call_id}");
         *text = format!(
             "[ELPIS CONTEXT UPDATE]\nreason=older transient tool output exceeded {MAX_INLINE_TOOL_OUTPUT_CHARS} chars\nevidence={evidence}\ntool={name}\noriginal_chars={original_chars}\nretained=head:{RETAINED_EDGE_CHARS}+tail:{RETAINED_EDGE_CHARS}\n--- head ---\n{head}\n--- omitted; full evidence remains in durable rollout ---\n{tail}\n--- tail ---"
@@ -86,6 +86,27 @@ pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize 
         }
     }
     evicted
+}
+
+/// Deterministic first-pass cleanup for expired terminal excerpts: strips
+/// trailing whitespace and collapses consecutive blank lines to one.
+/// Exact output remains in the durable rollout.
+fn compact_terminal_excerpt(text: &str) -> String {
+    let mut lines = Vec::new();
+    let mut blank_run = 0usize;
+    for line in text.lines() {
+        let line = line.trim_end();
+        if line.is_empty() {
+            blank_run += 1;
+            if blank_run > 1 {
+                continue;
+            }
+        } else {
+            blank_run = 0;
+        }
+        lines.push(line);
+    }
+    lines.join("\n")
 }
 
 fn take_chars(text: &str, count: usize) -> String {
@@ -159,6 +180,42 @@ mod tests {
         let text = output.text_content().expect("text");
         assert!(text.contains("tool=browser"));
         assert!(text.contains("evidence=rollout://tool-call/custom-old"));
+    }
+
+    #[test]
+    fn old_midsize_outputs_become_receipts_under_tightened_threshold() {
+        let midsize = "m".repeat(2_000);
+        let mut input = vec![
+            output("old-mid", midsize.clone()),
+            output("recent-1", "ok".to_string()),
+            output("recent-2", "ok".to_string()),
+        ];
+
+        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+            panic!("function output");
+        };
+        let text = output.text_content().expect("text");
+        assert!(text.contains("evidence=rollout://tool-call/old-mid"));
+        assert!(text.chars().count() < midsize.len());
+    }
+
+    #[test]
+    fn expired_excerpts_collapse_blank_runs_and_trailing_whitespace() {
+        let noisy = format!("line one   \n\n\n\n\nline two\t\n{}", "z".repeat(2_000));
+        let mut input = vec![
+            output("noisy", noisy),
+            output("recent-1", "ok".to_string()),
+            output("recent-2", "ok".to_string()),
+        ];
+
+        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+            panic!("function output");
+        };
+        let text = output.text_content().expect("text");
+        assert!(text.contains("line one\n\nline two"));
+        assert!(!text.contains("line one   "));
     }
 
     #[test]
