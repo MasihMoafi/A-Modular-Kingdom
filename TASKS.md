@@ -97,16 +97,19 @@ not claim unfinished behavior is available.
   directory name (`skills-i-use`) that no longer existed on disk, so `/skills` fell back to
   built-in skills instead of Masih's own, and the Context Ledger showed only global sources.
   Root cause was a stale path string, not a ledger rendering bug.
-- Remaining ledger gap: dev-skills-folder contents (`skills/dev/*`) must render as individual,
-  independently toggleable rows in the Context Ledger, admitted by default — not collapsed
-  into a single "global files" entry. Not yet verified after the path fix.
+- Ledger dev-skills rows: `skills/dev/*.md` files are now enumerated dynamically as
+  individual, independently toggleable rows admitted by default (commit `2f85ce3`, with a
+  focused regression in `core/src/elpis_context.rs`). Remote verification is in progress;
+  not accepted until the CI run passes and a terminal render check confirms the rows.
 
 ## Reduction campaign
 
 - Completed process subtraction: remove broad inherited regression from every ordinary push,
   remove CI auto-formatting, and remove the self-mutating build-status commit.
-- Bounded code subtraction selected next: issue #32 removes the inert `debug-m-drop` and
-  `debug-m-update` placeholders.
+- Bounded code subtraction: the issue #32 removal of the inert `debug-m-drop` and
+  `debug-m-update` placeholders was recovered from the unmerged `agent/product-integration`
+  branch and cherry-picked onto `agent/context-ledger-ui` (PR #49 closed as superseded);
+  lands with that branch after CI passes.
 - Measured candidates are recorded in `docs/BUILD_AND_REDUCTION_AUDIT.md`.
 - Do not delete arbitrary workspace crates: first prove they are reachable from the Elpis
   binary and optional under the product requirements.

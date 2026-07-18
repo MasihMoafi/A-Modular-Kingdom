@@ -56,9 +56,11 @@ interface, and a clean release path.
 - WIP, unverified: the Context Ledger uses `Shift+Tab` and its selectable rows write an
   inspectable workspace `admission.toml`. The same registry now drives next-turn admission for
   `GOAL.md`, `ES.md`, applicable global/project `AGENTS.md` rules, and the configured
-  `skills-i-use/skills/dev` rules. `memory_summary.md` and `archive.md` are not UI sources.
-  The identity line and public slash-command list were narrowed to Elpis terminology. No local
-  Rust check was run.
+  `skills/dev` rules — now enumerated dynamically so every `skills/dev/*.md` file is its own
+  toggleable row admitted by default. `memory_summary.md` and `archive.md` are not UI sources.
+  The identity line and public slash-command list were narrowed to Elpis terminology. The
+  issue #32 inert debug-command removal was cherry-picked onto this branch. No local Rust
+  check was run; remote verification pending.
 
 ## Known Gaps
 
