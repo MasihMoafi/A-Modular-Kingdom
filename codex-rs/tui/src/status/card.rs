@@ -12,7 +12,6 @@ use crate::version::CODEX_CLI_VERSION;
 use chrono::DateTime;
 use chrono::Local;
 use codex_app_server_protocol::AskForApproval;
-use codex_features::Feature;
 use codex_model_provider_info::WireApi;
 use codex_protocol::ThreadId;
 use codex_protocol::account::PlanType;
@@ -354,13 +353,10 @@ impl StatusHistoryCell {
             refreshing_rate_limits,
         }));
         let agents_summary = Arc::new(RwLock::new(agents_summary));
-        let mut continuity_sources = crate::legacy_core::elpis_context::continuity_sources(
+        let continuity_sources = crate::legacy_core::elpis_context::continuity_sources(
             config.memories.root.as_ref().map(|root| root.as_path()),
             config.cwd.as_path(),
         );
-        if !config.features.enabled(Feature::MemoryTool) || !config.memories.use_memories {
-            continuity_sources.retain(|source| source.name != "memory_summary.md");
-        }
 
         (
             Self {
@@ -781,7 +777,7 @@ impl HistoryCell for StatusHistoryCell {
             push_label(&mut labels, &mut seen, "Collaboration mode");
         }
         for source in &self.continuity_sources {
-            push_label(&mut labels, &mut seen, source.name);
+            push_label(&mut labels, &mut seen, &source.name);
         }
         push_label(&mut labels, &mut seen, "Token usage");
         if self.token_usage.context_window.is_some() {
@@ -848,7 +844,7 @@ impl HistoryCell for StatusHistoryCell {
         lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
         for source in &self.continuity_sources {
             lines.push(formatter.line(
-                source.name,
+                source.name.clone(),
                 vec![
                     Span::from(source.path.display().to_string()),
                     Span::from(format!(

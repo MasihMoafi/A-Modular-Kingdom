@@ -15,7 +15,7 @@ pub fn eviction_count() -> usize {
     EVICTED_TOOL_OUTPUTS.load(Ordering::Relaxed)
 }
 
-/// Most recent visible eviction event, including its durable evidence pointer.
+/// Most recent visible context-update event, including its durable evidence pointer.
 pub fn latest_eviction_event() -> Option<String> {
     LAST_EVICTION_EVENT
         .lock()
@@ -72,7 +72,7 @@ pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize 
         let tail = take_last_chars(text, RETAINED_EDGE_CHARS);
         let evidence = format!("rollout://tool-call/{call_id}");
         *text = format!(
-            "[ELPIS EVICTION]\nreason=older transient tool output exceeded {MAX_INLINE_TOOL_OUTPUT_CHARS} chars\nevidence={evidence}\ntool={name}\noriginal_chars={original_chars}\nretained=head:{RETAINED_EDGE_CHARS}+tail:{RETAINED_EDGE_CHARS}\n--- head ---\n{head}\n--- omitted; full evidence remains in durable rollout ---\n{tail}\n--- tail ---"
+            "[ELPIS CONTEXT UPDATE]\nreason=older transient tool output exceeded {MAX_INLINE_TOOL_OUTPUT_CHARS} chars\nevidence={evidence}\ntool={name}\noriginal_chars={original_chars}\nretained=head:{RETAINED_EDGE_CHARS}+tail:{RETAINED_EDGE_CHARS}\n--- head ---\n{head}\n--- omitted; full evidence remains in durable rollout ---\n{tail}\n--- tail ---"
         );
         latest_event = Some(format!(
             "ELPIS continuity: compacted older {name} output ({original_chars} chars); exact evidence: {evidence}"

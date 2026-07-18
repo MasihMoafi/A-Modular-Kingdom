@@ -2239,26 +2239,6 @@ async fn slash_archive_is_disabled_while_task_running() {
 }
 
 #[tokio::test]
-async fn slash_memory_drop_reports_stubbed_feature() {
-    let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-
-    chat.dispatch_command(SlashCommand::MemoryDrop);
-
-    let event = rx.try_recv().expect("expected unsupported-feature error");
-    match event {
-        AppEvent::InsertHistoryCell(cell) => {
-            let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
-            assert!(rendered.contains("Memory maintenance: Not available in TUI yet."));
-        }
-        other => panic!("expected InsertHistoryCell error, got {other:?}"),
-    }
-    assert!(
-        op_rx.try_recv().is_err(),
-        "expected no memory op to be sent"
-    );
-}
-
-#[tokio::test]
 async fn slash_mcp_requests_inventory_via_app_server() {
     let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
     let thread_id = ThreadId::new();
@@ -2326,26 +2306,6 @@ async fn slash_memories_opens_memory_menu() {
     assert!(render_bottom_popup(&chat, /*width*/ 80).contains("Use memories"));
     assert_matches!(rx.try_recv(), Err(TryRecvError::Empty));
     assert!(op_rx.try_recv().is_err(), "expected no core op to be sent");
-}
-
-#[tokio::test]
-async fn slash_memory_update_reports_stubbed_feature() {
-    let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-
-    chat.dispatch_command(SlashCommand::MemoryUpdate);
-
-    let event = rx.try_recv().expect("expected unsupported-feature error");
-    match event {
-        AppEvent::InsertHistoryCell(cell) => {
-            let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
-            assert!(rendered.contains("Memory maintenance: Not available in TUI yet."));
-        }
-        other => panic!("expected InsertHistoryCell error, got {other:?}"),
-    }
-    assert!(
-        op_rx.try_recv().is_err(),
-        "expected no memory op to be sent"
-    );
 }
 
 #[tokio::test]

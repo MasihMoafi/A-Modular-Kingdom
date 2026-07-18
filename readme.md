@@ -3,7 +3,7 @@
 [![Linux verification](https://github.com/MasihMoafi/Elpis/actions/workflows/embedded-elpis-linux.yml/badge.svg)](https://github.com/MasihMoafi/Elpis/actions/workflows/embedded-elpis-linux.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**A terminal coding agent built to continue the work, not restart it.**
+**The technical substrate is a provider-agnostic shell — goals, context, memory, permissions, evidence — that survives underneath whichever model or runtime you plug into it. The "become Elpis" framing is the narrative layer on top of that: instead of the user adapting to each tool's quirks, the tool adapts to the user and stays legible no matter which model sits inside it.**
 
 Elpis exists because long agent sessions lose shape. Goals get buried in transcripts,
 decisions disappear after compaction, and a new session often begins with the user explaining
@@ -26,6 +26,9 @@ context, local memory, provider support, behavior, and interface.
 - ChatGPT subscription authentication inherited from Codex.
 - OpenRouter support through `OPENROUTER_API_KEY`, separate from ChatGPT login.
 - Claude Sonnet and Gemini Pro/Flash launcher shortcuts through OpenRouter.
+- Native Anthropic Messages and Google Gemini adapters (`--provider anthropic`,
+  `--provider google-gemini`) with streaming and mock-server tests; live vendor
+  acceptance pending.
 - One internal, read-only RAG service with `/rag` and autonomous retrieval.
 - Portable workspace state through compact `GOAL.md` and `ES.md` files.
 - Exact thread resume or lean continuation in a fresh thread.
@@ -34,8 +37,10 @@ context, local memory, provider support, behavior, and interface.
   repeated use across distinct contexts, and an archive for deleted or faded facts.
 
 The context and memory foundations compile and pass focused remote checks, but their
-user-visible end-to-end acceptance is still pending. Claude and Gemini currently use
-OpenRouter compatibility routes; native vendor adapters are not implemented. The distinctive
+user-visible end-to-end acceptance is still pending. The `claude` and `gemini` launcher
+shortcuts use OpenRouter compatibility routes, while native Anthropic and Google adapters
+exist as the separate `anthropic` and `google-gemini` providers; live vendor acceptance is
+still pending. The distinctive
 amber continuity interface is specified but only partially implemented. [TASKS.md](TASKS.md)
 is the current-state record.
 
@@ -68,6 +73,12 @@ flowchart LR
 
 Elpis admits rules, the current request, portable state, and relevant memory into a small working set. `/status` exposes why each source is present while full artifacts stay on disk.
 
+The working context is not the transcript. Full conversations, terminal events, and artifacts
+remain available as evidence, but are retrieved only when a later task needs them. Retrieval may
+use an exact evidence pointer first and RAG only when the relevant artifact is not already known;
+neither makes the full history a default prompt attachment. The aim is to make a modest context
+window useful and legible, rather than pay to resend an ever-growing one.
+
 ```mermaid
 flowchart LR
     rules["Rules + current request"] --> working["Small admitted working set"]
@@ -78,8 +89,8 @@ flowchart LR
     working --> runtime["Selected runtime request"]
     runtime --> results["Tool and function results"]
     results --> disk[("Full transcript + artifacts on disk")]
-    results --> large{"Model-visible output > 1,000 chars?"}
-    large -->|Yes| marker["Interim eviction marker"]
+    results --> large{"Old tool output > 4,000 chars?"}
+    large -->|Yes| marker["Temporary output cleaner"]
     large -->|No| keep["Keep in request context"]
 ```
 
@@ -192,7 +203,15 @@ elpis --provider gemini
 elpis --provider gemini-flash
 ```
 
-These shortcuts use OpenRouter and are not native Anthropic or Google adapters.
+These shortcuts use OpenRouter. The native vendor adapters are separate providers:
+
+```bash
+export ANTHROPIC_API_KEY="your-key"
+elpis --provider anthropic
+
+export GEMINI_API_KEY="your-key"
+elpis --provider google-gemini
+```
 
 ## Verification
 

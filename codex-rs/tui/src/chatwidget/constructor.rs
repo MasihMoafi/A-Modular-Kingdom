@@ -105,6 +105,7 @@ impl ChatWidget {
                 animations_enabled: config.animations,
                 skills: None,
             }),
+            context_ledger: ContextLedgerState::default(),
             transcript: TranscriptState::new(active_cell),
             raw_output_mode: config.tui_raw_output_mode,
             active_runtime: ActiveRuntime::default(),
@@ -256,7 +257,7 @@ impl ChatWidget {
             .set_vim_enabled(widget.config.tui_vim_mode_default);
         widget
             .bottom_pane
-            .set_status_line_enabled(!widget.configured_status_line_items().is_empty());
+            .set_status_line_enabled(false);
         widget
             .bottom_pane
             .set_collaboration_modes_enabled(/*enabled*/ true);

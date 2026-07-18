@@ -82,7 +82,7 @@ impl HistoryCell for UpdateAvailableHistoryCell {
 }
 #[allow(clippy::disallowed_methods)]
 pub(crate) fn new_warning_event(message: String) -> PrefixedWrappedHistoryCell {
-    PrefixedWrappedHistoryCell::new(message.yellow(), "⚠ ".yellow(), "  ")
+    PrefixedWrappedHistoryCell::new(message.cyan(), "⚠ ".cyan(), "  ")
 }
 
 #[derive(Debug)]

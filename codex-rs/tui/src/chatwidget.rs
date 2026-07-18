@@ -323,6 +323,8 @@ use crate::text_formatting::truncate_text;
 use crate::tui::FrameRequester;
 mod claude_code_turn;
 mod command_lifecycle;
+mod context_ledger;
+use self::context_ledger::ContextLedgerState;
 mod connectors;
 mod constructor;
 use self::connectors::ConnectorsState;
@@ -532,6 +534,7 @@ pub(crate) struct ChatWidget {
     app_event_tx: AppEventSender,
     codex_op_target: CodexOpTarget,
     bottom_pane: BottomPane,
+    context_ledger: ContextLedgerState,
     transcript: TranscriptState,
     config: Config,
     raw_output_mode: bool,
