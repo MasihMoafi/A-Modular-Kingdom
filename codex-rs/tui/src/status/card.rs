@@ -844,7 +844,7 @@ impl HistoryCell for StatusHistoryCell {
         lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
         for source in &self.continuity_sources {
             lines.push(formatter.line(
-                source.name.clone(),
+                source.name.as_str(),
                 vec![
                     Span::from(source.path.display().to_string()),
                     Span::from(format!(
