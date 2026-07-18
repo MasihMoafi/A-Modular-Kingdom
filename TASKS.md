@@ -67,6 +67,11 @@ not claim unfinished behavior is available.
 - Remaining first-release acceptance: complete and resume one task through OpenAI and
   OpenRouter, proving Elpis-owned goal, context, memory, permissions, and evidence survive.
 - The provider-aware `Choose a mind` `/model` surface is not implemented.
+- Live provider switching mid-session is unimplemented at the protocol layer:
+  `ThreadSettingsUpdateParams` (`app-server-protocol/src/protocol/v2/thread.rs`) carries
+  `model` but no provider field, while the paired `ThreadSettings` read/notification struct
+  does carry `model_provider`. Provider choice still happens only at launch (`--provider`);
+  a live switch needs an explicit protocol/runtime slice, not a cosmetic selector.
 
 ### F6. Release readiness and build cycle — in progress
 
@@ -138,6 +143,8 @@ not claim unfinished behavior is available.
 2. Inspect the uploaded Cargo timing report and select the highest-cost optional dependency
    surface for one bounded deletion.
 3. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
-4. Implement the selected [`design-prototype.png`](design-prototype.png) direction: persistent
-   identity line plus the cyan Context Ledger. Its `GOAL.md` and `ES.md` controls must govern
-   next-turn admission before claiming unique UI/UX is complete.
+4. The persistent cyan identity line and Context Ledger are implemented; its `GOAL.md`/
+   `ES.md`/`AGENTS.md`/`skills/dev` controls already govern next-turn admission
+   (`core/src/elpis_context.rs`). Remaining before UI/UX is complete: rename `/model` to
+   `Choose a mind`, build the signature continuity event, and the evidence-first completion
+   hierarchy (see F7).
