@@ -181,8 +181,8 @@ impl ChatWidget {
             latest_eviction.as_deref(),
         );
 
-        // Elpis identity remains visible even when no inherited tail items are selected.
-        self.bottom_pane.set_status_line_enabled(true);
+        // Identity and runtime details live above the chat surface; keep its footer clear.
+        self.bottom_pane.set_status_line_enabled(false);
 
         let mut segments = Vec::new();
         for item in &selections.status_line_items {
@@ -751,13 +751,6 @@ impl ChatWidget {
             StatusLineItem::WorkspaceHeadline => self.status_line_workspace_headline.clone(),
             StatusLineItem::TaskProgress => self.terminal_title_task_progress(),
         }
-    }
-
-    fn status_line_pull_request_url(&self) -> Option<String> {
-        self.status_line_git_summary
-            .as_ref()
-            .and_then(|summary| summary.pull_request.as_ref())
-            .map(|pull_request| pull_request.url.clone())
     }
 
     pub(super) fn status_surface_preview_value_for_item(

@@ -133,7 +133,7 @@ impl ChatWidget {
             let marker_style = if source.admitted {
                 cyan
             } else {
-                Style::default().fg(Color::Yellow)
+                cyan
             };
             let prefix = if selected { "› " } else { "  " };
             lines.push(Line::from(vec![

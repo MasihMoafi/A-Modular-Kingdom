@@ -271,7 +271,7 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
     );
     push_field(
         &mut spans,
-        "ctx",
+        "context",
         &context,
         crate::style::status_symbol_style(),
     );
@@ -343,7 +343,7 @@ mod tests {
         let text = line_text(&Line::from(identity_spans(&state, None)));
         assert_eq!(
             text,
-            "ELPIS · provider OpenAI · model gpt-5.6 · ctx 41% · evidence thread:t/turn:u"
+            "ELPIS · provider OpenAI · model gpt-5.6 · context 41% · evidence thread:t/turn:u"
         );
         assert!(text.starts_with("ELPIS · provider"));
     }

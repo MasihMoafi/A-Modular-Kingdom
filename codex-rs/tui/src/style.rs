@@ -10,12 +10,12 @@ use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 
-const LIGHT_BG_PRIMARY_RGB: (u8, u8, u8) = (168, 92, 0);
-const DARK_BG_PRIMARY_RGB: (u8, u8, u8) = (255, 184, 48);
-const LIGHT_BG_SECONDARY_RGB: (u8, u8, u8) = (190, 69, 0);
-const DARK_BG_SECONDARY_RGB: (u8, u8, u8) = (255, 214, 92);
-const LIGHT_BG_STATUS_RGB: (u8, u8, u8) = (145, 95, 0);
-const DARK_BG_STATUS_RGB: (u8, u8, u8) = (255, 209, 102);
+const LIGHT_BG_PRIMARY_RGB: (u8, u8, u8) = (0, 111, 133);
+const DARK_BG_PRIMARY_RGB: (u8, u8, u8) = (70, 220, 242);
+const LIGHT_BG_SECONDARY_RGB: (u8, u8, u8) = (0, 130, 153);
+const DARK_BG_SECONDARY_RGB: (u8, u8, u8) = (120, 230, 248);
+const LIGHT_BG_STATUS_RGB: (u8, u8, u8) = (0, 98, 120);
+const DARK_BG_STATUS_RGB: (u8, u8, u8) = (100, 222, 242);
 // Decorative table rules should remain visible without competing with cell content.
 const TABLE_SEPARATOR_FG_ALPHA: f32 = 0.20;
 
@@ -52,7 +52,7 @@ pub(crate) fn popup_border_style() -> Style {
     secondary_style_for(default_bg())
 }
 
-/// Returns the Elpis gold used for meaningful status symbols.
+/// Returns the Elpis cyan used for meaningful status symbols.
 pub(crate) fn status_symbol_style() -> Style {
     status_style_for(default_bg())
 }
@@ -153,7 +153,7 @@ mod tests {
     use ratatui::style::Modifier;
 
     #[test]
-    fn accent_style_uses_darker_amber_on_light_backgrounds() {
+    fn accent_style_uses_darker_cyan_on_light_backgrounds() {
         let style = accent_style_for(Some((255, 255, 255)));
 
         assert_eq!(style.fg, Some(best_color(LIGHT_BG_PRIMARY_RGB)));
@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn accent_style_uses_amber_on_dark_or_unknown_backgrounds() {
+    fn accent_style_uses_cyan_on_dark_or_unknown_backgrounds() {
         let expected = Style::default().fg(best_color(DARK_BG_PRIMARY_RGB)).bold();
 
         assert_eq!(accent_style_for(Some((0, 0, 0))), expected);

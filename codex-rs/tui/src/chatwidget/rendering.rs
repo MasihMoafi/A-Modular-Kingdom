@@ -132,11 +132,7 @@ impl TranscriptAreaRenderable<'_> {
 impl Renderable for ChatWidget {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let ledger_width = self.context_ledger_width(area.width);
-        let header_height = if ledger_width == 0 || area.is_empty() {
-            0
-        } else {
-            1
-        };
+        let header_height = u16::from(!area.is_empty());
         let header_area = Rect::new(area.x, area.y, area.width, header_height);
         let content_area = Rect::new(
             area.x,
@@ -170,16 +166,12 @@ impl Renderable for ChatWidget {
         let ledger_width = self.context_ledger_width(width);
         self.as_renderable()
             .desired_height(width.saturating_sub(ledger_width))
-            .saturating_add(if ledger_width > 0 { 1 } else { 0 })
+            .saturating_add(1)
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
         let ledger_width = self.context_ledger_width(area.width);
-        let header_height = if ledger_width == 0 || area.is_empty() {
-            0
-        } else {
-            1
-        };
+        let header_height = u16::from(!area.is_empty());
         let content_area = Rect::new(
             area.x,
             area.y.saturating_add(header_height),
@@ -200,10 +192,16 @@ impl ChatWidget {
             return;
         }
         let model = self.config.model.as_deref().unwrap_or("select a model");
+        let context = self.status_line_context_used_percent().unwrap_or(0);
+        let location = format_directory_display(self.status_line_cwd(), /*max_width*/ None);
         Line::from(vec![
             " Elpis ".cyan().bold(),
             "· model ".dim(),
             model.cyan(),
+            " · context ".dim(),
+            format!("{context}%").cyan(),
+            " · location ".dim(),
+            location.cyan(),
             " · Shift+Tab Context Ledger".dim(),
         ])
         .render(area, buf);

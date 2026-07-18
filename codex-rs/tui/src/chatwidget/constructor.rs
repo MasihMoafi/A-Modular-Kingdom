@@ -254,7 +254,7 @@ impl ChatWidget {
             .set_vim_enabled(widget.config.tui_vim_mode_default);
         widget
             .bottom_pane
-            .set_status_line_enabled(!widget.configured_status_line_items().is_empty());
+            .set_status_line_enabled(false);
         widget
             .bottom_pane
             .set_collaboration_modes_enabled(/*enabled*/ true);
