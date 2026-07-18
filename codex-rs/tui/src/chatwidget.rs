@@ -321,6 +321,7 @@ use crate::status_indicator_widget::STATUS_DETAILS_DEFAULT_MAX_LINES;
 use crate::status_indicator_widget::StatusDetailsCapitalization;
 use crate::text_formatting::truncate_text;
 use crate::tui::FrameRequester;
+mod claude_code_turn;
 mod command_lifecycle;
 mod context_ledger;
 use self::context_ledger::ContextLedgerState;
@@ -353,6 +354,8 @@ mod keymap_picker;
 mod mcp_startup;
 use self::mcp_startup::McpStartupStatus;
 mod pets;
+mod runtime_selection;
+use self::runtime_selection::ActiveRuntime;
 mod session_flow;
 mod session_header;
 use self::session_header::SessionHeader;
@@ -535,6 +538,10 @@ pub(crate) struct ChatWidget {
     transcript: TranscriptState,
     config: Config,
     raw_output_mode: bool,
+    active_runtime: ActiveRuntime,
+    /// Prior `claude` CLI session id, passed as `--resume` on the next Claude Code turn.
+    claude_code_session_id: Option<String>,
+    claude_code_turn_running: bool,
     /// Runtime value resolved by core. `config.service_tier` remains the explicit user choice.
     effective_service_tier: Option<String>,
     /// The unmasked collaboration mode settings (always Default mode).

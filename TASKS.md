@@ -34,7 +34,7 @@ not claim unfinished behavior is available.
 - Remaining acceptance: resume one real task exactly and one leanly without replaying
   irrelevant work; verify `/status` against the actual next model request.
 - The tool-output cleaner is lifecycle-aware (`core/src/context_cleaner.rs`): older outputs
-  over 4,000 characters are reduced to bounded head/tail excerpts with a durable
+  over 1,200 characters are reduced to bounded head/tail excerpts with a durable
   `rollout://tool-call/<id>` evidence pointer, the two newest outputs stay intact, evictions
   surface in `/status`, and focused tests cover the behavior.
 - Remaining cleaner gap: the retained excerpt is positional (head/tail), not a semantic
@@ -66,7 +66,8 @@ not claim unfinished behavior is available.
   `core/src/chat_completions.rs`; live vendor acceptance is pending.
 - Remaining first-release acceptance: complete and resume one task through OpenAI and
   OpenRouter, proving Elpis-owned goal, context, memory, permissions, and evidence survive.
-- The provider-aware `Choose a mind` `/model` surface is not implemented.
+- The `/model` surface now uses the Elpis `Choose a mind` naming and shows provider,
+  protocol, route, and credential labels.
 - Live provider switching mid-session is unimplemented at the protocol layer:
   `ThreadSettingsUpdateParams` (`app-server-protocol/src/protocol/v2/thread.rs`) carries
   `model` but no provider field, while the paired `ThreadSettings` read/notification struct
@@ -91,11 +92,15 @@ not claim unfinished behavior is available.
 
 - Implemented: Elpis naming, the mature inherited Ratatui interaction model, a persistent
   cyan identity header (model, context-used percent, location — commit `49cd113`,
-  superseding the earlier amber design), and the Context Ledger with per-file
-  `skills/dev` rows.
-- Not yet implemented: the `Choose a mind` `/model` naming (still titled `Choose a
-  model`), the signature continuity event, and the evidence-first completion hierarchy.
-  GUIDE.md's UI Identity section is a contract, not proof.
+  superseding the earlier amber design), suppression of the conflicting inherited footer
+  status line, the Context Ledger with per-file `skills/dev` rows, and the `Choose a mind`
+  `/model` naming (commit `bae7108`).
+- Not yet implemented: the signature continuity event (only a generic eviction notice
+  exists, now naming what survived — commit `de4ed6f`, `"Survived: goal, checkpoint, and
+  admitted rules (see /status)."` — but not distinguishing resume/compaction/provider-change
+  events), the evidence-first completion hierarchy, and a render-verified
+  context-accounting consistency check. GUIDE.md's UI Identity section is a contract, not
+  proof.
 - Proof required: a new user watches a task cross compaction or provider change and can state
   what survived, what expired, which runtime acted, and where evidence lives.
 - Known bug, fixed 2026-07-18: `continuity_sources()` built the dev-skills path from a
@@ -106,6 +111,28 @@ not claim unfinished behavior is available.
   individual, independently toggleable rows admitted by default (commit `2f85ce3`, with a
   focused regression in `core/src/elpis_context.rs`). Remote verification is in progress;
   not accepted until the CI run passes and a terminal render check confirms the rows.
+
+### F8. Claude Code as a selectable runtime (R11) — first slice landed
+
+- `codex-rs/claude-bridge`: a subprocess bridge to the Claude Code CLI's `--print`
+  non-interactive mode (`claude -p --output-format stream-json`), with a typed event
+  parser built from an empirical capture (Claude Code 2.1.214), tested, CI-green.
+- `/claude-code` command and an `ActiveRuntime` (`Codex` | `ClaudeCode`) session enum
+  exist (`codex-rs/tui/src/chatwidget/runtime_selection.rs`) and switching prints a
+  confirmation in the transcript.
+- Turn submission is actually routed through `claude-bridge` when the active runtime is
+  Claude Code (`codex-rs/tui/src/chatwidget/claude_code_turn.rs`), not just recorded:
+  whole-message text-in/text-out only — no incremental streaming render (unlike Codex's
+  `StreamController`), and `tool_use`/`tool_result` content blocks are not inspected or
+  bridged to Elpis's approval/diff/permission surfaces. A Claude Code turn that calls a
+  tool shows nothing in the TUI until the process exits, then only its final text (if
+  any). `codex-rs/claude-bridge`'s own parser doesn't decode those block shapes yet
+  either, so this is a source-level limitation, not just an integration gap.
+- Not yet implemented: Claude Code does not appear in the `/model` picker as its own
+  provider group (`codex-rs/tui/src/chatwidget/model_popups.rs` has no Claude Code
+  entries) — `/claude-code` is currently the only way to select it.
+- Claude Code authenticates via its own subscription login, separate from Codex/ChatGPT
+  and from the native/OpenRouter provider credentials in F5.
 
 ## Reduction campaign
 
@@ -166,8 +193,7 @@ not claim unfinished behavior is available.
 2. Inspect the uploaded Cargo timing report and select the highest-cost optional dependency
    surface for one bounded deletion.
 3. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
-4. The persistent cyan identity line and Context Ledger are implemented; its `GOAL.md`/
-   `ES.md`/`AGENTS.md`/`skills/dev` controls already govern next-turn admission
-   (`core/src/elpis_context.rs`). Remaining before UI/UX is complete: rename `/model` to
-   `Choose a mind`, build the signature continuity event, and the evidence-first completion
-   hierarchy (see F7).
+4. The persistent cyan identity line, Context Ledger, and `Choose a mind` `/model` naming
+   are implemented; its `GOAL.md`/`ES.md`/`AGENTS.md`/`skills/dev` controls already govern
+   next-turn admission (`core/src/elpis_context.rs`). Remaining before UI/UX is complete:
+   the signature continuity event and the evidence-first completion hierarchy (see F7).

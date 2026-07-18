@@ -141,9 +141,9 @@ failure block baseline reset rather than silently losing deleted memory.
 Not complete at the time of this audit: user-visible exact-resume, lean-continuation,
 related/unrelated recall, review, reset, and compaction acceptance still must run
 locally. The context cleaner described here (1,000-character, no focused test, no
-age/turn distinction) was later replaced by a lifecycle-aware cleaner at a 4,000-character
-threshold with focused tests (`core/src/context_cleaner.rs`); it still does not satisfy the
-full context-cleaner contract in `docs/CONTEXT_AND_SESSIONS.md`.
+age/turn distinction) was later replaced by a lifecycle-aware cleaner with focused tests
+(`core/src/context_cleaner.rs`, currently a 1,200-character threshold); it still does not
+satisfy the full context-cleaner contract in `docs/CONTEXT_AND_SESSIONS.md`.
 
 ### Providers
 

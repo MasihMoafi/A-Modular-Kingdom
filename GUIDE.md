@@ -150,6 +150,13 @@ evidence and product optionality, not crate names.
 memory, permissions, and evidence. The [UI Identity](#ui-identity) section below is the
 acceptance contract, not proof that every surface it describes already ships.
 
+**R11. Claude Code as a selectable runtime** — Confirmed by Masih 2026-07-18. Claude
+Code, authenticated via its own subscription login (not an extracted/reused
+credential), is a second selectable runtime alongside Codex, not merely another model
+under the existing runtime: it appears in the `/model` picker as its own provider
+group with its model shown beneath it, and a dedicated `/claude-code` command switches
+the active session to it directly. See `TASKS.md` F8 for implementation status.
+
 ### First-Release Order
 
 1. Keep the canonical repository and verification cycle clean.
@@ -632,19 +639,19 @@ identity, admitted context, durable memory, continuity, permissions, and evidenc
   governs next-turn admission for `GOAL.md`, `ES.md`, applicable global/project
   `AGENTS.md` rules, and `skills/dev/*.md` rules. Each `skills/dev/*.md` file is
   enumerated as its own independently toggleable row, admitted by default.
+- The provider-aware **Choose a mind** naming for `/model`
+  (`codex-rs/tui/src/chatwidget/model_popups.rs`, commit `bae7108`), surfacing
+  provider, protocol, route, and credential labels.
 - `/status` context-source reporting.
 
 ### Not yet implemented
 
-- The provider-aware **Choose a mind** naming for `/model`. The picker currently
-  titles itself `Choose a model` (`codex-rs/tui/src/chatwidget/model_popups.rs`); it
-  already surfaces provider, protocol, route, and credential labels, but not under
-  the intended product name.
 - A signature **continuity event** for resume, compaction, and provider switches. The
-  only implemented notice is a generic context-eviction message (`"Elpis evicted
-  context: {reason}. Evidence: {evidence}. Eviction count: {count}."`,
-  `codex-rs/tui/src/chatwidget/protocol.rs`); it does not yet distinguish resume,
-  compaction, or provider-change events, or state what survived versus expired.
+  only implemented notice is a context-eviction message that now also names what
+  persisted (`"Elpis evicted context: {reason}. Evidence: {evidence}. Eviction count:
+  {count}. Survived: goal, checkpoint, and admitted rules (see /status)."`,
+  `codex-rs/tui/src/chatwidget/protocol.rs`, commit `de4ed6f`); it still does not
+  distinguish resume, compaction, or provider-change events from each other.
 - An **evidence-first completion hierarchy** that visually separates a generated
   claim, changed paths, command/test status, and unresolved gaps.
 

@@ -257,7 +257,7 @@ impl ChatWidget {
         }
 
         let header = self.model_menu_header(
-            "Choose a model",
+            "Choose a mind",
             "Provider, protocol, route, and credential source remain visible while choosing.",
         );
         self.bottom_pane.show_selection_view(SelectionViewParams {
@@ -315,7 +315,7 @@ impl ChatWidget {
         }
 
         let header = self.model_menu_header(
-            "Choose a model and effort",
+            "Choose a mind and effort",
             "Models are grouped under the active provider and routing mode.",
         );
         self.bottom_pane.show_selection_view(SelectionViewParams {

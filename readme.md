@@ -91,7 +91,7 @@ flowchart LR
     working --> runtime["Selected runtime request"]
     runtime --> results["Tool and function results"]
     results --> disk[("Full transcript + artifacts on disk")]
-    results --> large{"Old tool output > 4,000 chars?"}
+    results --> large{"Old tool output > 1,200 chars?"}
     large -->|Yes| marker["Temporary output cleaner"]
     large -->|No| keep["Keep in request context"]
 ```
