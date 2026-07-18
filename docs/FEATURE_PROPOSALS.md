@@ -11,9 +11,12 @@ This document tracks ideas and proposals for future Elpis versions, classifying 
 ## 1. RAG & Deep Research
 
 ### [Important] Workspace RAG Enhancements
-* **Directory Prompting**: When running `/rag <query>` without an explicit directory, the UI should ask the user to specify a directory (with a recommended default), or fall back to searching the terminal's Current Working Directory (CWD) and its subdirectories.
-* **Search Guardrail**: Implement a configurable folder depth and token hard limit for CWD searches to prevent scanning unintended large directories (e.g. `node_modules` or root).
-* **Archive Separation**: Ensure `/rag` defaults do not mix active workspace source code files with faded memories inside the global `archive.md` file.
+* **Interactive Path Prompt**: When `/rag` is executed, the UI prompts the user to enter a search path.
+  * If a path is selected, RAG is scoped to that path.
+  * If the user simply presses Enter without entering a path, RAG defaults to searching the terminal's Current Working Directory (CWD) and its subdirectories.
+  * **Search Guardrail**: Implement a configurable folder depth and token hard limit for CWD searches to prevent scanning massive directories (e.g. `node_modules` or root).
+* **Natural Language RAG Trigger**: The user should not have to manually run `/rag` commands. They can use natural language (e.g., "use RAG to search my project for X") and the agent must autonomously invoke RAG tools efficiently.
+* **Archive Separation**: Ensure RAG defaults do not mix active workspace source code files with faded memories inside the global `archive.md` file.
 
 ### [Important] `/deep-research` Option
 * An autonomous researcher mode that uses structured RAG, web search, and recursive crawling to build comprehensive reference context before proposing code edits.
@@ -21,6 +24,12 @@ This document tracks ideas and proposals for future Elpis versions, classifying 
 ---
 
 ## 2. Model & Team Orchestration
+
+### [Important] Provider-Grouped `/model` Picker
+* In the `/model` selection popup, models must be grouped and listed cleanly by provider:
+  * **OpenAI Models** (e.g. latest GPT-4o, GPT-o1, etc.)
+  * **Claude Models** (e.g. Claude 3.5 Sonnet, Claude 3 Opus)
+  * **OpenRouter Models** (a list of the latest models like Kimi 3, GLM 2.5, Gemini, DeepSeek, with proper names and routing)
 
 ### [Important] Intelligent `/auto` Cost Routing
 * An automatic classifier that routes incoming queries to different models based on complexity:
@@ -37,6 +46,11 @@ This document tracks ideas and proposals for future Elpis versions, classifying 
 ---
 
 ## 3. Interfaces & Channels
+
+### [Important] Dynamic Context Files Panel
+* A dynamic sidebar or panel in the TUI that displays all files currently admitted as context.
+* The user can easily select files and toggle them on/off to manually adjust the active context.
+* Some context files are automatically added by default based on the active user task.
 
 ### [Nice-to-have] Messaging Adapters (Telegram / Discord)
 * Porting OpenClaw/Pi messaging connection patterns so that Elpis can be run as a daemon connected to channels like Telegram.
