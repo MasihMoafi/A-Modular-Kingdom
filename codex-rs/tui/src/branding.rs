@@ -343,7 +343,7 @@ mod tests {
         let text = line_text(&Line::from(identity_spans(&state, None)));
         assert_eq!(
             text,
-            "ELPIS · provider OpenAI · model gpt-5.6 · ctx 41% · memory 6 refs · evidence thread:t/turn:u"
+            "ELPIS · provider OpenAI · model gpt-5.6 · ctx 41% · evidence thread:t/turn:u"
         );
         assert!(text.starts_with("ELPIS · provider"));
     }
