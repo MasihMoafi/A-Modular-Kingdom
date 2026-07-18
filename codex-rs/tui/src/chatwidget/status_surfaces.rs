@@ -431,7 +431,7 @@ impl ChatWidget {
         })
     }
 
-    fn status_line_cwd(&self) -> &Path {
+    pub(super) fn status_line_cwd(&self) -> &Path {
         self.current_cwd
             .as_deref()
             .unwrap_or(self.config.cwd.as_path())
@@ -751,6 +751,13 @@ impl ChatWidget {
             StatusLineItem::WorkspaceHeadline => self.status_line_workspace_headline.clone(),
             StatusLineItem::TaskProgress => self.terminal_title_task_progress(),
         }
+    }
+
+    fn status_line_pull_request_url(&self) -> Option<String> {
+        self.status_line_git_summary
+            .as_ref()
+            .and_then(|summary| summary.pull_request.as_ref())
+            .map(|pull_request| pull_request.url.clone())
     }
 
     pub(super) fn status_surface_preview_value_for_item(
