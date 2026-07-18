@@ -86,6 +86,96 @@ current goal and relevant history, obey the creator's rules, perform visible wor
 the chosen permission mode, and resume later without irrelevant context? `TASKS.md` is
 the current-state record against this standard.
 
+## Requirements
+
+This section preserves confirmed product requirements. A feature is not implemented
+until its user-visible behavior is verified; current implementation state lives in
+`TASKS.md`, not here, so the two documents do not drift against each other.
+
+### Working Agreement
+
+- Keep required work ahead of speculative features.
+- Challenge unnecessary complexity and solution-first requests.
+- Record evidence rather than confidence.
+- Prefer small, reversible changes and the smallest useful verification.
+
+### Confirmed Requirements
+
+**R1. Provider-neutral Elpis environment** — Elpis owns the TUI, provider/runtime
+selection, context projection, durable memory, provider-neutral continuity, behavioral
+policy, permissions bridge, and evidence. A selected runtime may own its low-level
+model loop and native tools, but authentication must never silently transfer
+Elpis-owned state or product identity to that runtime.
+
+**R2. Visible and controlled agency** — Commands and file changes follow explicit
+permission and sandbox policies. The interface must preserve changed paths, diffs,
+command status, failures, and verification evidence.
+
+**R3. Deliberate context lifecycle** — Elpis must know what the model receives. Rules,
+goal, selected files, conversation, tool output, and memory have visible sources,
+sizes, reasons, and lifetimes. Stale exploration leaves the next request only after
+its conclusion and exact evidence pointer are retained. A length threshold alone is not
+a complete context policy.
+
+**R4. Exact and lean continuity** — The active goal, decisions, constraints, changed
+files, verification, blockers, and next action survive restarts. Elpis supports exact
+native-thread resume and lean continuation from a compact portable checkpoint.
+
+**R5. Curated memory** — Memory stores reusable facts and proven procedures, not
+transcripts. Promotion requires repeated useful recall across distinct contexts.
+Memory remains searchable, attributable, reviewable, deletable, and bounded. Deleted
+or faded facts enter a searchable archive before baseline reset; archive failure must
+stop the reset.
+
+**R6. Enforceable creator and project rules** — Applicable `AGENTS.md`, project
+requirements, and behavioral rules reach the model and action layer. Hard safety rules
+are enforced by code where prompts are insufficient.
+
+**R7. Claims require proof** — Documentation separates implemented behavior, remote
+tests, and outstanding user acceptance. Design documents and hidden code are not proof.
+
+**R8. Internal read-only RAG** — `/rag <query>` searches the workspace and
+`/rag <path> -- <query>` targets a folder. The runtime may call the same read-only tool
+autonomously for broad discovery. Exact current-file evidence remains required before
+editing.
+
+**R9. Proportionate, measured development cycle** — Ordinary changes receive focused
+first-release checks. Exhaustive inherited TUI/app-server regression runs nightly,
+manually, and for releases unless the change directly touches that surface. CI must not
+edit source or create status-only commits. Dependency deletion follows Cargo timing
+evidence and product optionality, not crate names.
+
+**R10. Distinctive continuity-first identity** — Elpis uses a cyan visual identity
+(superseding an earlier amber design) and visibly separates runtime, model, context,
+memory, permissions, and evidence. The [UI Identity](#ui-identity) section below is the
+acceptance contract, not proof that every surface it describes already ships.
+
+### First-Release Order
+
+1. Keep the canonical repository and verification cycle clean.
+2. Preserve accepted internal RAG behavior.
+3. Finish memory acceptance, including archive, review, deletion, and reset.
+4. Finish exact/lean context and session acceptance; replace the length-only cleaner.
+5. Verify authenticated OpenAI and OpenRouter task/resume paths.
+6. Implement the persistent identity line and coherent cyan foundation.
+7. Install and complete a real task from a clean environment, then tag `v0.1.0`.
+
+### State Layout
+
+- `~/.elpis/context/workspaces/<workspace>/GOAL.md` — active goal.
+- `~/.elpis/context/workspaces/<workspace>/ES.md` — compact latest checkpoint.
+- `~/.elpis/memories/MEMORY.md` — curated durable memory.
+- `~/.elpis/memories/archive.md` — append-only faded/deleted evidence.
+- `~/.elpis/state/memories_1.sqlite` — recall, promotion, and consolidation state.
+- Provider transcripts and workspace artifacts remain the exact evidence sources.
+
+### Deferred Decisions
+
+- Whether goal changes require explicit confirmation.
+- Default threshold for switching from exact to lean continuation.
+- Native Anthropic and Google adapter order.
+- `/auto`, dreaming reports, voice, rich animation, and scheduled work.
+
 ## Source Map
 
 Treat upstream behavior as evidence, not inspiration copied from memory.
