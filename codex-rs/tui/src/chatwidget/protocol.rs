@@ -35,11 +35,12 @@ impl ChatWidget {
                     let normalized = base_url.trim().trim_end_matches('/');
                     !normalized.is_empty() && normalized != DEFAULT_OPENAI_BASE_URL
                 });
-        let provider_route = if self.config.model_provider.is_openai() && !custom_openai_base {
-            crate::branding::ProviderRoute::Native
-        } else {
-            crate::branding::ProviderRoute::Compatibility
-        };
+        let provider_route = crate::branding::ProviderRoute::for_provider(
+            &self.config.model_provider_id,
+            &self.config.model_provider.name,
+            self.config.model_provider.wire_api,
+            custom_openai_base,
+        );
         let current_model = self.current_model().to_string();
         if crate::branding::sync_runtime_identity(
             thread_id.as_deref(),

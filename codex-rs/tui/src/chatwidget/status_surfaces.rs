@@ -175,13 +175,14 @@ impl ChatWidget {
     }
 
     fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
-        let enabled = !selections.status_line_items.is_empty();
-        self.bottom_pane.set_status_line_enabled(enabled);
-        if !enabled {
-            self.set_status_line(/*status_line*/ None);
-            self.set_status_line_hyperlink(/*url*/ None);
-            return;
-        }
+        let latest_eviction = crate::legacy_core::context_cleaner::latest_eviction_event();
+        crate::branding::sync_context_eviction(
+            crate::legacy_core::context_cleaner::eviction_count(),
+            latest_eviction.as_deref(),
+        );
+
+        // Elpis identity remains visible even when no inherited tail items are selected.
+        self.bottom_pane.set_status_line_enabled(true);
 
         let mut segments = Vec::new();
         for item in &selections.status_line_items {

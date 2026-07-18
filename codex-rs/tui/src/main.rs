@@ -2,6 +2,12 @@ use clap::Parser;
 use codex_arg0::Arg0DispatchPaths;
 use codex_arg0::arg0_dispatch_or_else;
 use codex_config::LoaderOverrides;
+use codex_model_provider_info::OPENROUTER_CLAUDE_COMPAT_ALIAS;
+use codex_model_provider_info::OPENROUTER_CLAUDE_COMPAT_MODEL;
+use codex_model_provider_info::OPENROUTER_GEMINI_COMPAT_ALIAS;
+use codex_model_provider_info::OPENROUTER_GEMINI_COMPAT_MODEL;
+use codex_model_provider_info::OPENROUTER_GEMINI_FLASH_COMPAT_ALIAS;
+use codex_model_provider_info::OPENROUTER_GEMINI_FLASH_COMPAT_MODEL;
 use codex_tui::AppExitInfo;
 use codex_tui::Cli;
 use codex_tui::ExitReason;
@@ -10,10 +16,6 @@ use codex_utils_cli::CliConfigOverrides;
 use std::io::Write;
 use std::path::PathBuf;
 use supports_color::Stream;
-
-const OPENROUTER_CLAUDE_MODEL: &str = "~anthropic/claude-sonnet-latest";
-const OPENROUTER_GEMINI_MODEL: &str = "~google/gemini-pro-latest";
-const OPENROUTER_GEMINI_FLASH_MODEL: &str = "~google/gemini-flash-latest";
 
 fn format_exit_messages(exit_info: AppExitInfo, color_enabled: bool) -> Vec<String> {
     let is_fatal = matches!(&exit_info.exit_reason, ExitReason::Fatal(_));
@@ -46,12 +48,14 @@ fn format_exit_messages(exit_info: AppExitInfo, color_enabled: bool) -> Vec<Stri
 #[derive(Parser, Debug)]
 #[command(name = "elpis")]
 struct TopCli {
-    /// Select an Elpis provider or a curated OpenRouter model family without editing configuration.
+    /// Select a native Elpis provider or a curated OpenRouter compatibility route.
     #[arg(
         long,
         value_parser = [
             "openai",
             "openrouter",
+            "anthropic",
+            "google-gemini",
             "claude",
             "gemini",
             "gemini-flash",
@@ -102,17 +106,21 @@ fn append_provider_override(config_overrides: &mut CliConfigOverrides, provider:
     };
 
     match provider {
-        "claude" => {
+        OPENROUTER_CLAUDE_COMPAT_ALIAS => {
             push_string_override(config_overrides, "model_provider", "openrouter");
-            push_string_override(config_overrides, "model", OPENROUTER_CLAUDE_MODEL);
+            push_string_override(config_overrides, "model", OPENROUTER_CLAUDE_COMPAT_MODEL);
         }
-        "gemini" => {
+        OPENROUTER_GEMINI_COMPAT_ALIAS => {
             push_string_override(config_overrides, "model_provider", "openrouter");
-            push_string_override(config_overrides, "model", OPENROUTER_GEMINI_MODEL);
+            push_string_override(config_overrides, "model", OPENROUTER_GEMINI_COMPAT_MODEL);
         }
-        "gemini-flash" => {
+        OPENROUTER_GEMINI_FLASH_COMPAT_ALIAS => {
             push_string_override(config_overrides, "model_provider", "openrouter");
-            push_string_override(config_overrides, "model", OPENROUTER_GEMINI_FLASH_MODEL);
+            push_string_override(
+                config_overrides,
+                "model",
+                OPENROUTER_GEMINI_FLASH_COMPAT_MODEL,
+            );
         }
         provider => push_string_override(config_overrides, "model_provider", provider),
     }
@@ -159,9 +167,18 @@ mod tests {
     #[test]
     fn model_family_aliases_select_openrouter_and_a_model() {
         for (provider, model) in [
-            ("claude", OPENROUTER_CLAUDE_MODEL),
-            ("gemini", OPENROUTER_GEMINI_MODEL),
-            ("gemini-flash", OPENROUTER_GEMINI_FLASH_MODEL),
+            (
+                OPENROUTER_CLAUDE_COMPAT_ALIAS,
+                OPENROUTER_CLAUDE_COMPAT_MODEL,
+            ),
+            (
+                OPENROUTER_GEMINI_COMPAT_ALIAS,
+                OPENROUTER_GEMINI_COMPAT_MODEL,
+            ),
+            (
+                OPENROUTER_GEMINI_FLASH_COMPAT_ALIAS,
+                OPENROUTER_GEMINI_FLASH_COMPAT_MODEL,
+            ),
         ] {
             let parsed = TopCli::try_parse_from(["elpis", "--provider", provider])
                 .expect("curated OpenRouter family flag");
@@ -178,10 +195,32 @@ mod tests {
     }
 
     #[test]
+    fn native_provider_ids_never_select_openrouter() {
+        for provider in ["anthropic", "google-gemini"] {
+            let parsed = TopCli::try_parse_from(["elpis", "--provider", provider])
+                .expect("native provider flag");
+            let mut overrides = parsed.config_overrides;
+            append_provider_override(&mut overrides, parsed.provider.as_deref());
+            assert_eq!(
+                overrides.raw_overrides,
+                vec![format!("model_provider=\"{provider}\"")]
+            );
+            assert!(
+                !overrides
+                    .raw_overrides
+                    .iter()
+                    .any(|value| value.contains("openrouter"))
+            );
+        }
+    }
+
+    #[test]
     fn provider_flag_accepts_all_built_in_provider_ids() {
         for provider in [
             "openai",
             "openrouter",
+            "anthropic",
+            "google-gemini",
             "amazon-bedrock",
             "ollama",
             "lmstudio",

@@ -7,6 +7,7 @@
 
 mod apply_patch;
 mod apps;
+mod chat_completions;
 mod client;
 mod client_common;
 mod realtime_context;
@@ -39,6 +40,7 @@ mod command_canonicalization;
 pub mod config;
 pub mod connectors;
 pub mod context;
+pub mod context_cleaner;
 mod context_manager;
 mod current_time;
 mod elicitation;

@@ -80,6 +80,31 @@ async fn reset_memory_workspace_baseline_archives_deleted_lines() {
 }
 
 #[tokio::test]
+async fn reset_memory_workspace_baseline_propagates_archive_write_failure() {
+    let home = TempDir::new().expect("tempdir");
+    let root = home.path().join("memories");
+    fs::create_dir_all(&root).expect("create memory root");
+    fs::write(root.join("MEMORY.md"), "keep\narchive this fact\n").expect("write memory");
+    prepare_memory_workspace(&root)
+        .await
+        .expect("prepare memory workspace");
+
+    fs::write(root.join("MEMORY.md"), "keep\n").expect("remove memory line");
+    fs::create_dir(root.join("archive.md")).expect("block archive file write");
+
+    let err = reset_memory_workspace_baseline(&root)
+        .await
+        .expect_err("archive failure must stop baseline reset");
+    assert!(err.to_string().contains("memory archive"));
+
+    let diff = memory_workspace_diff(&root)
+        .await
+        .expect("load workspace diff after failed reset");
+    assert!(!diff.changes.is_empty(), "baseline must remain unmodified");
+    assert!(diff.unified_diff.contains("archive this fact"));
+}
+
+#[tokio::test]
 async fn prepare_memory_workspace_recovers_unusable_git_dir() {
     let home = TempDir::new().expect("tempdir");
     let root = home.path().join("memories");

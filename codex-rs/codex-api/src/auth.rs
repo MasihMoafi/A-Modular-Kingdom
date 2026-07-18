@@ -82,9 +82,15 @@ pub struct AuthHeaderTelemetry {
 pub fn auth_header_telemetry(auth: &dyn AuthProvider) -> AuthHeaderTelemetry {
     let mut headers = HeaderMap::new();
     auth.add_auth_headers(&mut headers);
-    let name = headers
-        .contains_key(http::header::AUTHORIZATION)
-        .then_some("authorization");
+    let name = if headers.contains_key(http::header::AUTHORIZATION) {
+        Some("authorization")
+    } else if headers.contains_key("x-api-key") {
+        Some("x-api-key")
+    } else if headers.contains_key("x-goog-api-key") {
+        Some("x-goog-api-key")
+    } else {
+        None
+    };
     AuthHeaderTelemetry {
         attached: name.is_some(),
         name,

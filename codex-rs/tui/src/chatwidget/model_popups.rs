@@ -48,11 +48,48 @@ impl ChatWidget {
     }
 
     fn model_provider_route(&self) -> crate::branding::ProviderRoute {
-        if self.config.model_provider.is_openai() && self.custom_openai_base_url().is_none() {
-            crate::branding::ProviderRoute::Native
-        } else {
-            crate::branding::ProviderRoute::Compatibility
+        crate::branding::ProviderRoute::for_provider(
+            &self.config.model_provider_id,
+            &self.config.model_provider.name,
+            self.config.model_provider.wire_api,
+            self.custom_openai_base_url().is_some(),
+        )
+    }
+
+    fn model_protocol_label(&self) -> String {
+        self.config.model_provider.wire_api.to_string()
+    }
+
+    fn model_credential_label(&self) -> String {
+        if self.config.model_provider.requires_openai_auth {
+            return "OpenAI/ChatGPT credential store".to_string();
         }
+        if let Some(env_key) = self.config.model_provider.env_key.as_deref() {
+            return format!("environment variable {env_key}");
+        }
+        if let Some(headers) = self.config.model_provider.env_http_headers.as_ref()
+            && !headers.is_empty()
+        {
+            let mut env_names = headers.values().cloned().collect::<Vec<_>>();
+            env_names.sort();
+            env_names.dedup();
+            return format!("environment header {}", env_names.join(", "));
+        }
+        if self.config.model_provider.auth.is_some() {
+            return "command-backed bearer token".to_string();
+        }
+        if self.config.model_provider.aws.is_some() {
+            return "AWS SigV4 credential chain".to_string();
+        }
+        if self
+            .config
+            .model_provider
+            .experimental_bearer_token
+            .is_some()
+        {
+            return "configured bearer token".to_string();
+        }
+        "not declared".to_string()
     }
 
     fn model_route_description(&self, description: &str) -> String {
@@ -67,6 +104,8 @@ impl ChatWidget {
     fn model_menu_header(&self, title: &str, subtitle: &str) -> Box<dyn Renderable> {
         let provider = self.model_provider_display_name();
         let route = self.model_provider_route().long_label();
+        let protocol = self.model_protocol_label();
+        let credential = self.model_credential_label();
         let mut header = ColumnRenderable::new();
         header.push(Line::from(Span::styled(
             title.to_string(),
@@ -78,6 +117,14 @@ impl ChatWidget {
         )));
         header.push(Line::from(Span::styled(
             format!("Route: {route}"),
+            crate::style::status_symbol_style(),
+        )));
+        header.push(Line::from(Span::styled(
+            format!("Protocol: {protocol}"),
+            crate::style::status_symbol_style(),
+        )));
+        header.push(Line::from(Span::styled(
+            format!("Credential: {credential}"),
             crate::style::status_symbol_style(),
         )));
         header.push(Line::from(
@@ -211,7 +258,7 @@ impl ChatWidget {
 
         let header = self.model_menu_header(
             "Choose a model",
-            "Provider and route stay fixed; choose a quick model or browse the full catalog.",
+            "Provider, protocol, route, and credential source remain visible while choosing.",
         );
         self.bottom_pane.show_selection_view(SelectionViewParams {
             footer_hint: Some(standard_popup_hint_line()),

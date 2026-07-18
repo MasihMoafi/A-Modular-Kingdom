@@ -39,6 +39,22 @@ pub const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex"
 const OPENROUTER_PROVIDER_NAME: &str = "OpenRouter";
 pub const OPENROUTER_PROVIDER_ID: &str = "openrouter";
 pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
+pub const OPENROUTER_CLAUDE_COMPAT_ALIAS: &str = "claude";
+pub const OPENROUTER_CLAUDE_COMPAT_MODEL: &str = "~anthropic/claude-sonnet-latest";
+pub const OPENROUTER_GEMINI_COMPAT_ALIAS: &str = "gemini";
+pub const OPENROUTER_GEMINI_COMPAT_MODEL: &str = "~google/gemini-pro-latest";
+pub const OPENROUTER_GEMINI_FLASH_COMPAT_ALIAS: &str = "gemini-flash";
+pub const OPENROUTER_GEMINI_FLASH_COMPAT_MODEL: &str = "~google/gemini-flash-latest";
+pub const ANTHROPIC_PROVIDER_ID: &str = "anthropic";
+pub const ANTHROPIC_PROVIDER_NAME: &str = "Anthropic Claude (native)";
+pub const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com/v1";
+pub const ANTHROPIC_API_KEY_ENV: &str = "ANTHROPIC_API_KEY";
+pub const ANTHROPIC_DEFAULT_MODEL: &str = "claude-sonnet-4-6";
+pub const GOOGLE_GEMINI_PROVIDER_ID: &str = "google-gemini";
+pub const GOOGLE_GEMINI_PROVIDER_NAME: &str = "Google Gemini (native)";
+pub const GOOGLE_GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta";
+pub const GOOGLE_GEMINI_API_KEY_ENV: &str = "GEMINI_API_KEY";
+pub const GOOGLE_GEMINI_DEFAULT_MODEL: &str = "gemini-3.5-flash";
 const AMAZON_BEDROCK_PROVIDER_NAME: &str = "Amazon Bedrock";
 pub const AMAZON_BEDROCK_PROVIDER_ID: &str = "amazon-bedrock";
 pub const AMAZON_BEDROCK_GPT_5_5_MODEL_ID: &str = "openai.gpt-5.5";
@@ -56,17 +72,23 @@ pub const OLLAMA_CHAT_PROVIDER_REMOVED_ERROR: &str = "`ollama-chat` is no longer
 
 /// Wire protocol that the provider speaks.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum WireApi {
     /// The Responses API exposed by OpenAI at `/v1/responses`.
     #[default]
     Responses,
+    /// Anthropic's native Messages API at `/v1/messages`.
+    AnthropicMessages,
+    /// Google's native Gemini `streamGenerateContent` API.
+    GeminiGenerateContent,
 }
 
 impl fmt::Display for WireApi {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
             Self::Responses => "responses",
+            Self::AnthropicMessages => "anthropic_messages",
+            Self::GeminiGenerateContent => "gemini_generate_content",
         };
         f.write_str(value)
     }
@@ -80,8 +102,13 @@ impl<'de> Deserialize<'de> for WireApi {
         let value = String::deserialize(deserializer)?;
         match value.as_str() {
             "responses" => Ok(Self::Responses),
+            "anthropic_messages" => Ok(Self::AnthropicMessages),
+            "gemini_generate_content" => Ok(Self::GeminiGenerateContent),
             "chat" => Err(serde::de::Error::custom(CHAT_WIRE_API_REMOVED_ERROR)),
-            _ => Err(serde::de::Error::unknown_variant(&value, &["responses"])),
+            _ => Err(serde::de::Error::unknown_variant(
+                &value,
+                &["responses", "anthropic_messages", "gemini_generate_content"],
+            )),
         }
     }
 }
@@ -93,7 +120,7 @@ pub struct ModelProviderInfo {
     /// Friendly display name.
     #[serde(default)]
     pub name: String,
-    /// Base URL for the provider's OpenAI-compatible API.
+    /// Base URL for the provider API selected by `wire_api`.
     pub base_url: Option<String>,
     /// Environment variable that stores the user's API key for this provider.
     pub env_key: Option<String>,
@@ -151,6 +178,89 @@ pub struct ModelProviderAwsAuthInfo {
     pub profile: Option<String>,
     /// AWS region to use for provider-specific endpoints.
     pub region: Option<String>,
+}
+
+/// Stable metadata for a built-in inference route.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProviderMetadata {
+    pub provider_id: &'static str,
+    pub display_name: &'static str,
+    pub api_base_url: &'static str,
+    pub environment_variable: Option<&'static str>,
+    pub wire_protocol: WireApi,
+    pub default_model: &'static str,
+}
+
+/// Returns truthful metadata for built-in hosted providers.
+pub fn provider_metadata(provider_id: &str) -> Option<ProviderMetadata> {
+    match provider_id {
+        OPENAI_PROVIDER_ID => Some(ProviderMetadata {
+            provider_id: OPENAI_PROVIDER_ID,
+            display_name: OPENAI_PROVIDER_NAME,
+            api_base_url: "https://api.openai.com/v1",
+            environment_variable: Some("OPENAI_API_KEY"),
+            wire_protocol: WireApi::Responses,
+            default_model: "gpt-5.4",
+        }),
+        OPENROUTER_PROVIDER_ID => Some(ProviderMetadata {
+            provider_id: OPENROUTER_PROVIDER_ID,
+            display_name: OPENROUTER_PROVIDER_NAME,
+            api_base_url: OPENROUTER_BASE_URL,
+            environment_variable: Some("OPENROUTER_API_KEY"),
+            wire_protocol: WireApi::Responses,
+            default_model: "openai/gpt-5.4",
+        }),
+        ANTHROPIC_PROVIDER_ID => Some(ProviderMetadata {
+            provider_id: ANTHROPIC_PROVIDER_ID,
+            display_name: ANTHROPIC_PROVIDER_NAME,
+            api_base_url: ANTHROPIC_BASE_URL,
+            environment_variable: Some(ANTHROPIC_API_KEY_ENV),
+            wire_protocol: WireApi::AnthropicMessages,
+            default_model: ANTHROPIC_DEFAULT_MODEL,
+        }),
+        GOOGLE_GEMINI_PROVIDER_ID => Some(ProviderMetadata {
+            provider_id: GOOGLE_GEMINI_PROVIDER_ID,
+            display_name: GOOGLE_GEMINI_PROVIDER_NAME,
+            api_base_url: GOOGLE_GEMINI_BASE_URL,
+            environment_variable: Some(GOOGLE_GEMINI_API_KEY_ENV),
+            wire_protocol: WireApi::GeminiGenerateContent,
+            default_model: GOOGLE_GEMINI_DEFAULT_MODEL,
+        }),
+        _ => None,
+    }
+}
+
+/// Metadata for launcher aliases that deliberately route a vendor model through OpenRouter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompatibilityRouteMetadata {
+    pub alias: &'static str,
+    pub display_name: &'static str,
+    pub provider_id: &'static str,
+    pub model: &'static str,
+}
+
+pub fn compatibility_route_metadata(alias: &str) -> Option<CompatibilityRouteMetadata> {
+    match alias {
+        OPENROUTER_CLAUDE_COMPAT_ALIAS => Some(CompatibilityRouteMetadata {
+            alias: OPENROUTER_CLAUDE_COMPAT_ALIAS,
+            display_name: "Claude via OpenRouter (compatibility)",
+            provider_id: OPENROUTER_PROVIDER_ID,
+            model: OPENROUTER_CLAUDE_COMPAT_MODEL,
+        }),
+        OPENROUTER_GEMINI_COMPAT_ALIAS => Some(CompatibilityRouteMetadata {
+            alias: OPENROUTER_GEMINI_COMPAT_ALIAS,
+            display_name: "Gemini Pro via OpenRouter (compatibility)",
+            provider_id: OPENROUTER_PROVIDER_ID,
+            model: OPENROUTER_GEMINI_COMPAT_MODEL,
+        }),
+        OPENROUTER_GEMINI_FLASH_COMPAT_ALIAS => Some(CompatibilityRouteMetadata {
+            alias: OPENROUTER_GEMINI_FLASH_COMPAT_ALIAS,
+            display_name: "Gemini Flash via OpenRouter (compatibility)",
+            provider_id: OPENROUTER_PROVIDER_ID,
+            model: OPENROUTER_GEMINI_FLASH_COMPAT_MODEL,
+        }),
+        _ => None,
+    }
 }
 
 impl ModelProviderInfo {
@@ -393,6 +503,57 @@ impl ModelProviderInfo {
         }
     }
 
+    pub fn create_anthropic_provider() -> ModelProviderInfo {
+        ModelProviderInfo {
+            name: ANTHROPIC_PROVIDER_NAME.into(),
+            base_url: Some(ANTHROPIC_BASE_URL.into()),
+            env_key: Some(ANTHROPIC_API_KEY_ENV.into()),
+            env_key_instructions: Some(
+                "Set ANTHROPIC_API_KEY to an Anthropic API key before launching Elpis.".into(),
+            ),
+            experimental_bearer_token: None,
+            auth: None,
+            aws: None,
+            wire_api: WireApi::AnthropicMessages,
+            query_params: None,
+            http_headers: Some(HashMap::from([(
+                "anthropic-version".to_string(),
+                "2023-06-01".to_string(),
+            )])),
+            env_http_headers: None,
+            request_max_retries: None,
+            stream_max_retries: None,
+            stream_idle_timeout_ms: None,
+            websocket_connect_timeout_ms: None,
+            requires_openai_auth: false,
+            supports_websockets: false,
+        }
+    }
+
+    pub fn create_google_gemini_provider() -> ModelProviderInfo {
+        ModelProviderInfo {
+            name: GOOGLE_GEMINI_PROVIDER_NAME.into(),
+            base_url: Some(GOOGLE_GEMINI_BASE_URL.into()),
+            env_key: Some(GOOGLE_GEMINI_API_KEY_ENV.into()),
+            env_key_instructions: Some(
+                "Set GEMINI_API_KEY to a Google AI Gemini API key before launching Elpis.".into(),
+            ),
+            experimental_bearer_token: None,
+            auth: None,
+            aws: None,
+            wire_api: WireApi::GeminiGenerateContent,
+            query_params: None,
+            http_headers: None,
+            env_http_headers: None,
+            request_max_retries: None,
+            stream_max_retries: None,
+            stream_idle_timeout_ms: None,
+            websocket_connect_timeout_ms: None,
+            requires_openai_auth: false,
+            supports_websockets: false,
+        }
+    }
+
     pub fn create_amazon_bedrock_provider(
         aws: Option<ModelProviderAwsAuthInfo>,
     ) -> ModelProviderInfo {
@@ -463,6 +624,8 @@ pub fn built_in_model_providers(
     use ModelProviderInfo as P;
     let openai_provider = P::create_openai_provider(openai_base_url);
     let openrouter_provider = P::create_openrouter_provider();
+    let anthropic_provider = P::create_anthropic_provider();
+    let google_gemini_provider = P::create_google_gemini_provider();
     let amazon_bedrock_provider = P::create_amazon_bedrock_provider(/*aws*/ None);
 
     // We do not want to be in the business of adjucating which third-party
@@ -472,6 +635,8 @@ pub fn built_in_model_providers(
     [
         (OPENAI_PROVIDER_ID, openai_provider),
         (OPENROUTER_PROVIDER_ID, openrouter_provider),
+        (ANTHROPIC_PROVIDER_ID, anthropic_provider),
+        (GOOGLE_GEMINI_PROVIDER_ID, google_gemini_provider),
         (AMAZON_BEDROCK_PROVIDER_ID, amazon_bedrock_provider),
         (
             OLLAMA_OSS_PROVIDER_ID,
