@@ -341,6 +341,59 @@ Reasoning tokens count toward usage, but hidden reasoning is not a useful transc
 to carry forward verbatim. Preserve decisions and evidence. Streamed tool events and
 large outputs also should not remain indefinitely in the model-visible working set.
 
+## UI Identity
+
+Elpis should feel unique because the interface exposes what Elpis uniquely owns: runtime
+identity, admitted context, durable memory, continuity, permissions, and evidence.
+
+> The model may change; the work continues.
+
+### Implemented
+
+- Elpis product naming (`PRODUCT_NAME`/`CODEX_RUNTIME_TITLE` = `"Elpis"`,
+  `codex-rs/tui/src/branding.rs`), rendered in the startup session header as
+  `>_ Elpis (v0.1.0)`. Earlier design notes describing a longer
+  `Elpis · continuity runtime` or `Elpis · Codex runtime` title string are not what
+  ships; the actual title is the bare product name and version.
+- A persistent cyan identity header (`render_identity_line`,
+  `codex-rs/tui/src/chatwidget/rendering.rs`) that always renders above the chat
+  surface: `Elpis · model {model} · context {used}% · location {cwd} · Shift+Tab
+  Context Ledger`. The inherited footer status line is deliberately suppressed
+  (`set_status_line_enabled(false)`) so this header is the one context-percent
+  source, per the Context Accounting Contract in `docs/CONTEXT_AND_SESSIONS.md`.
+  This shipped design accents with cyan and shows model/context/location; an earlier
+  design note proposed amber and a `runtime:`/`memory:`/`mode:` layout instead — that
+  earlier layout was not carried into the implementation.
+- The Context Ledger (`Shift+Tab`, `codex-rs/tui/src/chatwidget/context_ledger.rs`):
+  a toggleable side panel (52 columns, hidden below 100-column terminals) listing
+  every admitted portable-context source with its admitted state and byte size, and
+  a total for currently admitted bytes. Selecting a row toggles its admission and
+  writes the workspace `admission.toml` (`codex-rs/core/src/elpis_context.rs`), which
+  governs next-turn admission for `GOAL.md`, `ES.md`, applicable global/project
+  `AGENTS.md` rules, and `skills/dev/*.md` rules. Each `skills/dev/*.md` file is
+  enumerated as its own independently toggleable row, admitted by default.
+- `/status` context-source reporting.
+
+### Not yet implemented
+
+- The provider-aware **Choose a mind** naming for `/model`. The picker currently
+  titles itself `Choose a model` (`codex-rs/tui/src/chatwidget/model_popups.rs`); it
+  already surfaces provider, protocol, route, and credential labels, but not under
+  the intended product name.
+- A signature **continuity event** for resume, compaction, and provider switches. The
+  only implemented notice is a generic context-eviction message (`"Elpis evicted
+  context: {reason}. Evidence: {evidence}. Eviction count: {count}."`,
+  `codex-rs/tui/src/chatwidget/protocol.rs`); it does not yet distinguish resume,
+  compaction, or provider-change events, or state what survived versus expired.
+- An **evidence-first completion hierarchy** that visually separates a generated
+  claim, changed paths, command/test status, and unresolved gaps.
+
+### Acceptance
+
+A new user watches one task cross compaction or provider change and can explain:
+which runtime performed each turn; which goal, context, and memories survived; what
+expired; what changed and was verified; and where exact evidence can be inspected.
+
 ## Current State
 
 Verified foundation:

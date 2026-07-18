@@ -41,7 +41,9 @@ user-visible end-to-end acceptance is still pending. The `claude` and `gemini` l
 shortcuts use OpenRouter compatibility routes, while native Anthropic and Google adapters
 exist as the separate `anthropic` and `google-gemini` providers; live vendor acceptance is
 still pending. The distinctive
-amber continuity interface is specified but only partially implemented. [TASKS.md](TASKS.md)
+cyan continuity interface (identity header and Context Ledger) is partially implemented;
+the `Choose a mind` model picker, signature continuity event, and evidence-first
+completion hierarchy remain. [TASKS.md](TASKS.md)
 is the current-state record.
 
 ## The working model
@@ -242,7 +244,6 @@ badge means that workflow passed. It does not mean unfinished work is finished.
 - `REQUIREMENTS.md` — accepted requirements and unresolved decisions.
 - `TASKS.md` — release work and acceptance state.
 - `docs/CONTEXT_AND_SESSIONS.md` — context and continuation contract.
-- `docs/UI_IDENTITY.md` — distinctive UI contract and implementation status.
 - `docs/BUILD_AND_REDUCTION_AUDIT.md` — build baseline and measured subtraction plan.
 
 ## Development

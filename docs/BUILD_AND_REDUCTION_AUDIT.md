@@ -84,9 +84,11 @@ cleanup are different campaigns.
 Implemented: Elpis naming and the visible `Elpis · continuity runtime` title; the inherited
 Ratatui interaction quality remains intact.
 
-Not yet implemented: the coherent amber theme, persistent runtime/model/context/memory line,
-provider-aware `Choose a mind` model picker, signature continuity event, and evidence-first
-completion hierarchy. `docs/UI_IDENTITY.md` is a design contract, not proof of those surfaces.
+Not yet implemented at the time of this audit: the coherent amber theme, persistent
+runtime/model/context/memory line, provider-aware `Choose a mind` model picker, signature
+continuity event, and evidence-first completion hierarchy. A later change (commit `49cd113`)
+shipped a persistent cyan identity header superseding the amber direction described here; see
+GUIDE.md's UI Identity section for current status.
 
 ### Memory And Context
 

@@ -84,13 +84,13 @@ not claim unfinished behavior is available.
 
 ### F7. Distinctive Elpis UI/UX — design complete; implementation partial
 
-- Implemented: Elpis naming, `Elpis · continuity runtime`, and the mature inherited Ratatui
-  interaction model.
-- Design contract: warm amber identity, persistent runtime/model/context/memory line,
-  provider-aware model selection, context ledger, continuity event, and evidence-first
-  completion hierarchy.
-- Not yet implemented: the coherent amber styling and the five defining product surfaces
-  above. `docs/UI_IDENTITY.md` is a contract, not proof.
+- Implemented: Elpis naming, the mature inherited Ratatui interaction model, a persistent
+  cyan identity header (model, context-used percent, location — commit `49cd113`,
+  superseding the earlier amber design), and the Context Ledger with per-file
+  `skills/dev` rows.
+- Not yet implemented: the `Choose a mind` `/model` naming (still titled `Choose a
+  model`), the signature continuity event, and the evidence-first completion hierarchy.
+  GUIDE.md's UI Identity section is a contract, not proof.
 - Proof required: a new user watches a task cross compaction or provider change and can state
   what survived, what expired, which runtime acted, and where evidence lives.
 - Known bug, fixed 2026-07-18: `continuity_sources()` built the dev-skills path from a
@@ -129,7 +129,7 @@ not claim unfinished behavior is available.
 
 - `/auto` routing with a visible choice, reason, and manual override.
 - Scheduled memory review or dreaming-style reports.
-- Rich themes and animation beyond the first coherent amber identity.
+- Rich themes and animation beyond the first coherent cyan identity.
 
 ## Current Action
 
