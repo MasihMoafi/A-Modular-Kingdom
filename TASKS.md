@@ -129,12 +129,35 @@ not claim unfinished behavior is available.
 - Behavioral enforcement across runtimes.
 - Dictation with visible consent and editable, unsent text.
 - Further Codex subtraction, one measured capability at a time.
+- Workspace RAG enhancements: an interactive path prompt on `/rag` (Enter defaults to the
+  terminal's current working directory with a configurable folder-depth/token guardrail
+  against scanning something like `node_modules`), a natural-language RAG trigger so the
+  agent can invoke retrieval without an explicit `/rag` command, and keeping RAG defaults
+  from mixing active workspace source with the global memory `archive.md`.
+- `/deep-research`: an autonomous mode combining structured RAG, web search, and recursive
+  crawling to build reference context before proposing edits.
+- Provider-grouped `/model` picker: list models grouped by provider (OpenAI, native
+  Anthropic/Gemini, OpenRouter families) instead of a flat list.
+- LSP-backed code intelligence for the active runtime: real language-server queries
+  (go-to-definition, precise references, live diagnostics) instead of grep/text search.
+  No confirmed LSP client exists in any runtime currently bridged into Elpis; scope as its
+  own investigation before committing.
+- A **Dynamic Context Files Panel** was proposed here in an earlier draft of this backlog;
+  it is already implemented as the Context Ledger (see F7) and is not a future item.
 
 ## Nice-to-have
 
-- `/auto` routing with a visible choice, reason, and manual override.
+- `/auto` routing with a visible choice, reason, and manual override. A proposed shape:
+  classify by complexity and route easy edits/summaries to a low-cost fast model, medium
+  work to a mid-tier model, and architectural/multi-file work to a frontier model.
 - Scheduled memory review or dreaming-style reports.
 - Rich themes and animation beyond the first coherent cyan identity.
+- Elpis Family Tree: a hierarchical multi-agent framework where a coordinator runtime
+  delegates scoped sub-tasks to worker runtimes in parallel worktrees/branches, with a
+  code-level token/cost harness to bound runaway loops.
+- Messaging adapters (Telegram/Discord) using OpenClaw/Pi connection patterns, so Elpis can
+  run as a daemon connected to channels.
+- A `/elpis` poetry easter egg: a cyan-themed display of stylized lyrics or poems.
 
 ## Current Action
 
