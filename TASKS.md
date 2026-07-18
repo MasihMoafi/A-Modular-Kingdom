@@ -66,7 +66,10 @@ not claim unfinished behavior is available.
   `core/src/chat_completions.rs`; live vendor acceptance is pending.
 - Remaining first-release acceptance: complete and resume one task through OpenAI and
   OpenRouter, proving Elpis-owned goal, context, memory, permissions, and evidence survive.
-- The provider-aware `Choose a mind` `/model` surface is not implemented.
+- The `/model` surface now uses the Elpis `Choose a mind` naming and shows provider,
+  protocol, route, and credential labels. Live provider switching mid-session remains
+  unimplemented: the app-server settings update carries a model but not a provider, so
+  provider choice still happens at launch (`--provider`).
 
 ### F6. Release readiness and build cycle — in progress
 
@@ -84,13 +87,13 @@ not claim unfinished behavior is available.
 
 ### F7. Distinctive Elpis UI/UX — design complete; implementation partial
 
-- Implemented: Elpis naming, `Elpis · continuity runtime`, and the mature inherited Ratatui
-  interaction model.
-- Design contract: warm amber identity, persistent runtime/model/context/memory line,
-  provider-aware model selection, context ledger, continuity event, and evidence-first
-  completion hierarchy.
-- Not yet implemented: the coherent amber styling and the five defining product surfaces
-  above. `docs/UI_IDENTITY.md` is a contract, not proof.
+- Implemented: Elpis naming, cyan identity accents (the selected design-prototype direction,
+  superseding the earlier amber contract), a persistent identity header with model,
+  context-used percent, and location, the Context Ledger with per-file dev-skills rows, and
+  suppression of the conflicting inherited footer status line.
+- Remaining: the continuity event surface, the evidence-first completion hierarchy, and a
+  render-verified context-accounting consistency check. `docs/UI_IDENTITY.md` still
+  describes amber and needs revision to the cyan direction.
 - Proof required: a new user watches a task cross compaction or provider change and can state
   what survived, what expired, which runtime acted, and where evidence lives.
 - Known bug, fixed 2026-07-18: `continuity_sources()` built the dev-skills path from a
