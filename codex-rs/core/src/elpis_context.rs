@@ -13,10 +13,7 @@ const ADMISSION_FILE: &str = "admission.toml";
 
 const GLOBAL_RULES: &str = "Global AGENTS.md";
 const PROJECT_RULES: &str = "Project AGENTS.md";
-const DEV_AGENTS: &str = "dev/AGENTS.md";
-const DEV_ARTIFACT_RULES: &str = "dev/ARTIFACT_RULES.md";
-const DEV_CODING_GUIDELINES: &str = "dev/CODING_GUIDELINES.md";
-const DEV_TERMINAL_RULES: &str = "dev/TERMINAL_AND_GIT_RULES.md";
+const DEV_SOURCE_PREFIX: &str = "dev/";
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(default)]
@@ -25,10 +22,9 @@ struct ContinuityAdmission {
     project_rules: bool,
     goal: bool,
     checkpoint: bool,
-    dev_agents: bool,
-    dev_artifact_rules: bool,
-    dev_coding_guidelines: bool,
-    dev_terminal_rules: bool,
+    /// Per-file admission for `skills/dev/*.md`, keyed by file name.
+    /// Files absent from the map are admitted by default.
+    dev_sources: BTreeMap<String, bool>,
     custom_sources: BTreeMap<String, bool>,
 }
 
@@ -39,10 +35,7 @@ impl Default for ContinuityAdmission {
             project_rules: true,
             goal: true,
             checkpoint: true,
-            dev_agents: true,
-            dev_artifact_rules: true,
-            dev_coding_guidelines: true,
-            dev_terminal_rules: true,
+            dev_sources: BTreeMap::new(),
             custom_sources: BTreeMap::new(),
         }
     }
@@ -115,89 +108,55 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         .parent()
         .and_then(Path::parent)
         .map(|home| home.join(".codex/AGENTS.md"));
-    let mut sources = [
-        (
-            GLOBAL_RULES,
-            global_rules,
-            "every turn",
+    let mut sources = Vec::new();
+    sources.extend(global_rules.and_then(|path| {
+        existing_file_source(
+            GLOBAL_RULES.to_string(),
+            path,
             "applicable global rules",
             admission.global_rules,
-            true,
-        ),
-        (
-            PROJECT_RULES,
-            Some(cwd.join("AGENTS.md")),
-            "every turn",
-            "applicable project rules",
-            admission.project_rules,
-            true,
-        ),
-        (
-            DEV_AGENTS,
-            dev_dir.as_ref().map(|dir| dir.join("AGENTS.md")),
-            "every turn",
-            "configured development rules",
-            admission.dev_agents,
-            true,
-        ),
-        (
-            DEV_ARTIFACT_RULES,
-            dev_dir.as_ref().map(|dir| dir.join("ARTIFACT_RULES.md")),
-            "every turn",
-            "configured development rules",
-            admission.dev_artifact_rules,
-            true,
-        ),
-        (
-            DEV_CODING_GUIDELINES,
-            dev_dir.as_ref().map(|dir| dir.join("CODING_GUIDELINES.md")),
-            "every turn",
-            "configured development rules",
-            admission.dev_coding_guidelines,
-            true,
-        ),
-        (
-            DEV_TERMINAL_RULES,
-            dev_dir
-                .as_ref()
-                .map(|dir| dir.join("TERMINAL_AND_GIT_RULES.md")),
-            "every turn",
-            "configured development rules",
-            admission.dev_terminal_rules,
-            true,
-        ),
-        (
-            "GOAL.md",
-            Some(workspace_dir.join("GOAL.md")),
-            "every turn",
-            "active workspace goal",
-            admission.goal,
-            true,
-        ),
-        (
-            "ES.md",
-            Some(workspace_dir.join("ES.md")),
-            "every turn",
-            "lean session checkpoint",
-            admission.checkpoint,
-            true,
-        ),
-    ]
-    .into_iter()
-    .filter_map(|(name, path, lifetime, reason, admitted, selectable)| {
-        let path = path?;
-        let metadata = std::fs::metadata(&path).ok()?;
-        (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
-            name: name.to_string(),
-            path,
-            bytes: metadata.len(),
-            lifetime,
-            reason,
-            admitted,
-            selectable,
-        })
-    })
-    .collect::<Vec<_>>();
+        )
+    }));
+    sources.extend(existing_file_source(
+        PROJECT_RULES.to_string(),
+        cwd.join("AGENTS.md"),
+        "applicable project rules",
+        admission.project_rules,
+    ));
+    if let Some(dev_dir) = dev_dir {
+        if let Ok(entries) = std::fs::read_dir(&dev_dir) {
+            let mut file_names = entries
+                .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+                .filter(|file_name| file_name.ends_with(".md"))
+                .collect::<Vec<_>>();
+            file_names.sort();
+            for file_name in file_names {
+                let admitted = admission
+                    .dev_sources
+                    .get(&file_name)
+                    .copied()
+                    .unwrap_or(true);
+                sources.extend(existing_file_source(
+                    format!("{DEV_SOURCE_PREFIX}{file_name}"),
+                    dev_dir.join(&file_name),
+                    "configured development rules",
+                    admitted,
+                ));
+            }
+        }
+    }
+    sources.extend(existing_file_source(
+        "GOAL.md".to_string(),
+        workspace_dir.join("GOAL.md"),
+        "active workspace goal",
+        admission.goal,
+    ));
+    sources.extend(existing_file_source(
+        "ES.md".to_string(),
+        workspace_dir.join("ES.md"),
+        "lean session checkpoint",
+        admission.checkpoint,
+    ));
     sources.extend(
         admission
             .custom_sources
@@ -219,6 +178,24 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
     sources
 }
 
+fn existing_file_source(
+    name: String,
+    path: PathBuf,
+    reason: &'static str,
+    admitted: bool,
+) -> Option<ContinuitySource> {
+    let metadata = std::fs::metadata(&path).ok()?;
+    (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
+        name,
+        path,
+        bytes: metadata.len(),
+        lifetime: "every turn",
+        reason,
+        admitted,
+        selectable: true,
+    })
+}
+
 pub fn set_continuity_source_admitted(
     memories_root: Option<&Path>,
     cwd: &Path,
@@ -234,10 +211,11 @@ pub fn set_continuity_source_admitted(
         PROJECT_RULES => selection.project_rules = admitted,
         "GOAL.md" => selection.goal = admitted,
         "ES.md" => selection.checkpoint = admitted,
-        DEV_AGENTS => selection.dev_agents = admitted,
-        DEV_ARTIFACT_RULES => selection.dev_artifact_rules = admitted,
-        DEV_CODING_GUIDELINES => selection.dev_coding_guidelines = admitted,
-        DEV_TERMINAL_RULES => selection.dev_terminal_rules = admitted,
+        name if name.starts_with(DEV_SOURCE_PREFIX) => {
+            selection
+                .dev_sources
+                .insert(name[DEV_SOURCE_PREFIX.len()..].to_string(), admitted);
+        }
         _ => {
             let source_path = PathBuf::from(source_name);
             let canonical = source_path.canonicalize()?;
@@ -315,10 +293,11 @@ fn read_admission(workspace_dir: &Path) -> ContinuityAdmission {
             PROJECT_RULES => admission.project_rules = admitted,
             "GOAL.md" => admission.goal = admitted,
             "ES.md" => admission.checkpoint = admitted,
-            DEV_AGENTS => admission.dev_agents = admitted,
-            DEV_ARTIFACT_RULES => admission.dev_artifact_rules = admitted,
-            DEV_CODING_GUIDELINES => admission.dev_coding_guidelines = admitted,
-            DEV_TERMINAL_RULES => admission.dev_terminal_rules = admitted,
+            key if key.starts_with(DEV_SOURCE_PREFIX) => {
+                admission
+                    .dev_sources
+                    .insert(key[DEV_SOURCE_PREFIX.len()..].to_string(), admitted);
+            }
             _ => {}
         }
     }
@@ -523,6 +502,8 @@ mod tests {
         tokio::fs::write(home.path().join(".codex/AGENTS.md"), "Global rule").await?;
         tokio::fs::write(cwd.join("AGENTS.md"), "Project rule").await?;
         tokio::fs::write(dev.join("AGENTS.md"), "Dev rule").await?;
+        tokio::fs::write(dev.join("SKILL.md"), "Skill rule").await?;
+        tokio::fs::write(dev.join("notes.txt"), "not a rule file").await?;
 
         let sources = continuity_sources(Some(&memories), &cwd);
         assert!(
@@ -530,13 +511,30 @@ mod tests {
                 .iter()
                 .all(|source| source.selectable && source.admitted)
         );
+        assert!(sources.iter().any(|source| source.name == "dev/AGENTS.md"));
+        assert!(sources.iter().any(|source| source.name == "dev/SKILL.md"));
+        assert!(!sources.iter().any(|source| source.name.contains("notes")));
+
         set_continuity_source_admitted(Some(&memories), &cwd, GLOBAL_RULES, false)?;
+        set_continuity_source_admitted(Some(&memories), &cwd, "dev/SKILL.md", false)?;
         let prompt = build_continuity_prompt(Some(&memories), &cwd)
             .await
             .expect("prompt");
         assert!(!prompt.contains("Global rule"));
         assert!(prompt.contains("Project rule"));
         assert!(prompt.contains("Dev rule"));
+        assert!(!prompt.contains("Skill rule"));
+        let sources = continuity_sources(Some(&memories), &cwd);
+        assert!(
+            sources
+                .iter()
+                .any(|source| source.name == "dev/SKILL.md" && !source.admitted)
+        );
+        assert!(
+            sources
+                .iter()
+                .any(|source| source.name == "dev/AGENTS.md" && source.admitted)
+        );
         Ok(())
     }
 
