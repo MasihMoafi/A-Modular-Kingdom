@@ -11,6 +11,7 @@
 - Obey the global rules in `/home/masih/.codex/AGENTS.md`. The development-harness
   mirror is `/home/masih/Desktop/f/p/harnesses-I-use/skills/dev/`.
 - Verify the repository state before editing; preserve unrelated user changes.
+- **NEVER run cargo build or local release compilation on the user's machine.** Local builds put a severe strain on the CPU and heat up the machine. Always rely on GitHub Actions for compilation checks, runs, and obtaining binary artifacts.
 - Challenge unclear or solution-first requirements with `$challenge-requirements`
   before planning implementation.
 
