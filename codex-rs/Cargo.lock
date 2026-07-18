@@ -2334,6 +2334,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "codex-claude-bridge"
+version = "0.0.0"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "codex-cli"
 version = "0.0.0"
 dependencies = [
