@@ -41,21 +41,131 @@ is the current-state record.
 
 ## The working model
 
-Elpis projects a small, reasoned working set from exact on-disk evidence, then writes verified
-outcomes back to durable state.
+Elpis keeps the surrounding control environment stable while the selected runtime performs the model loop. Exact evidence remains durable; only a small, reasoned working set enters the next request.
 
-<p align="center">
-  <img src="docs/assets/elpis-context-loop.svg" alt="Elpis selects exact evidence into a compact working set, verifies work, writes results back, and recalls bounded memory only when relevant." width="100%">
-</p>
+### Operating model
 
-Elpis separates four things that are usually mixed together:
+Elpis owns context, memory, continuity, permissions, and evidence around an explicitly selected runtime. The runtime may change without silently discarding Elpis-owned state.
 
-1. the current thread;
-2. portable workspace state;
-3. retrieved evidence;
-4. reusable local memory.
+```mermaid
+flowchart LR
+    user([User request]) --> tui["Elpis TUI"]
+    tui --> control["Elpis control layer"]
+    rag["Read-only RAG"] --> control
+    portable["GOAL.md + ES.md"] --> control
+    memory["Bounded local memory"] --> control
+    control --> runtime{"Select runtime"}
+    runtime --> openai["OpenAI / Codex"]
+    runtime --> router["OpenRouter families"]
+    runtime --> other["Bedrock / Ollama / LM Studio"]
+    openai --> execution["Tools · edits · commands"]
+    router --> execution
+    other --> execution
+    execution --> evidence[("Workspace + exact evidence")]
+```
 
-Each source should have a reason for being present and a clear lifetime.
+### Context management
+
+Elpis admits rules, the current request, portable state, and relevant memory into a small working set. `/status` exposes why each source is present while full artifacts stay on disk.
+
+```mermaid
+flowchart LR
+    rules["Rules + current request"] --> working["Small admitted working set"]
+    goal["GOAL.md ≤ 6,000 chars"] --> working
+    checkpoint["ES.md ≤ 8,000 chars"] --> working
+    memory["Relevant memory"] --> working
+    status["/status: source · size · lifetime · reason"] -.-> working
+    working --> runtime["Selected runtime request"]
+    runtime --> results["Tool and function results"]
+    results --> disk[("Full transcript + artifacts on disk")]
+    results --> large{"Model-visible output > 1,000 chars?"}
+    large -->|Yes| marker["Interim eviction marker"]
+    large -->|No| keep["Keep in request context"]
+```
+
+### Session continuity
+
+Elpis resumes the useful native thread exactly or starts a lean thread from `GOAL.md` and `ES.md`. Pre-compaction synchronization fails closed instead of risking a broken handoff.
+
+```mermaid
+flowchart LR
+    boundary(["Exit · compaction · runtime change"]) --> sync["Synchronize GOAL.md + ES.md"]
+    sync --> safe{"Files safely synchronized?"}
+    safe -->|No| stop["Stop compaction + show error"]
+    safe -->|Yes| thread{"Native thread still useful?"}
+    thread -->|Yes| exact["Exact resume"]
+    thread -->|No| lean["Lean continuation"]
+    exact --> next["Continue from preserved next action"]
+    lean --> next
+    next --> evidence["Read exact evidence only when needed"]
+    evidence --> verify["Verify result + refresh checkpoint"]
+```
+
+### Memory management
+
+New evidence stays searchable until repeated useful recall makes it eligible for durable memory. Durable artifacts are bounded, and deleted or faded lines are archived before reset.
+
+```mermaid
+flowchart TB
+    subgraph promotion["Promotion"]
+        direction LR
+        work(["Completed work"]) --> raw["Searchable evidence + provenance"]
+        raw --> recall["Track recalls + distinct contexts"]
+        recall --> gate{"3 recalls across 2 contexts?"}
+        gate -->|No| short["Remain searchable evidence"]
+        gate -->|Yes| durable["Eligible for MEMORY.md"]
+        durable --> bounded["MEMORY.md ≤ 30k · summary ≤ 10k"]
+    end
+
+    subgraph retirement["Retirement"]
+        direction LR
+        changed{"Deleted or faded?"}
+        changed -->|No| reset["Reset memory baseline"]
+        changed -->|Yes| archive["Append removed lines to archive.md"]
+        archive --> written{"Archive write succeeded?"}
+        written -->|Yes| reset
+        written -->|No| block["Block reset to prevent evidence loss"]
+    end
+
+    short --> changed
+    bounded --> changed
+```
+
+### Read-only RAG
+
+The startup path exposes one minimal read-only tool without loading the retrieval stack. Embeddings and indexing load lazily only after an explicit semantic query.
+
+```mermaid
+flowchart LR
+    launch(["Elpis launches"]) --> host["Minimal stdio MCP host"]
+    host --> tool["One tool: query_knowledge_base"]
+    tool --> query{"Explicit RAG query?"}
+    query -->|No| idle["No indexing or model load"]
+    query -->|Yes| search["Lazy-load rag.fetch"]
+    search --> scope{"Workspace or supplied path?"}
+    scope --> workspace["Launch workspace"]
+    scope --> supplied["Normalized supplied path"]
+    workspace --> chunks["Sourced semantic chunks"]
+    supplied --> chunks
+    chunks --> exact["Use exact reads before code changes"]
+```
+
+### Safe execution and evidence
+
+Consequential actions pass through visible permission and sandbox policy before execution. Elpis records outcomes and evidence, then distinguishes verified success from failure or unresolved gaps.
+
+```mermaid
+flowchart LR
+    action(["Consequential action proposed"]) --> policy["Show permission + sandbox policy"]
+    policy --> approval{"Approval required?"}
+    approval -->|Denied| denied["Do not execute"]
+    approval -->|Allowed| execute["Runtime executes tool · edit · command"]
+    execute --> stream["Stream command · patch · tool events"]
+    stream --> record["Record status · changed paths · evidence pointers"]
+    record --> verify{"Verification passed?"}
+    verify -->|Yes| success["Verified outcome"]
+    verify -->|No| gap["Failure · blocker · unresolved gap"]
+```
 
 ## Install
 
