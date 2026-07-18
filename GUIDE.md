@@ -237,6 +237,20 @@ memory. Dreaming is optional scheduled review and promotion on top of that found
 Elpis's concrete context-record and session-checkpoint contract lives in
 `docs/CONTEXT_AND_SESSIONS.md`.
 
+### Other reference sources
+
+Elpis should reuse proven implementations and reserve original work for its
+distinctive context, memory, continuity, assimilation, and supervision layer.
+
+| Source | Proven capability to reuse or study | Elpis boundary |
+| --- | --- | --- |
+| Pi | Small composable TypeScript packages for multi-provider APIs, agent state, TUI, and coding CLI | Study provider-neutral interfaces and extension simplicity; Pi does not supply Codex-level built-in permissions |
+| Hermes Agent | Provider choice, TUI, cross-session search, user modeling, skill learning, scheduled work, multiple execution backends | Study the closed learning loop and user-facing memory controls; verify implementation before adopting claims |
+| OpenCode | Multi-provider coding product, read-only/build agents, subagents, polished installation and desktop/TUI delivery | Study routing, product packaging, agent modes, and release experience |
+
+No capability should enter `TASKS.md` as implemented merely because an upstream project
+has it. It becomes an Elpis feature only after the Elpis acceptance check passes.
+
 ### Codex import provenance
 
 Pinned candidate revision: repository `openai/codex`, revision
