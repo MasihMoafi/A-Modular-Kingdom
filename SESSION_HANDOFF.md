@@ -51,6 +51,10 @@ interface, and a clean release path.
 - Deleted memory lines are archived before baseline reset; archive write failures now stop
   reset rather than silently losing data; a focused regression covers this path.
 - `docs/BUILD_AND_REDUCTION_AUDIT.md` records the measured causes and deletion candidates.
+- WIP, unverified: the selected `design-prototype.png` UI direction now has a persistent
+  cyan identity line and `F6` Context Ledger. Its selectable `GOAL.md` and `ES.md` rows write
+  an inspectable workspace `admission.toml`; the app-server contributor reads that selection
+  before each turn. The focused core regression was added but has not been run locally.
 
 ## Known Gaps
 
@@ -60,7 +64,8 @@ interface, and a clean release path.
 - OpenAI/OpenRouter require authenticated task-and-resume acceptance.
 - Claude/Gemini are OpenRouter aliases, not native adapters.
 - `/model` is not yet the provider-aware `Choose a mind` surface.
-- The distinctive amber continuity UI is not implemented beyond naming/title.
+- The Context Ledger implementation needs a remote or otherwise safe Rust test/render pass;
+  do not call it accepted from static review.
 
 ## Next Action
 
@@ -70,7 +75,8 @@ interface, and a clean release path.
 3. Merge only when the focused branch checks pass.
 4. Install the verified binary and run exact/lean context, related/unrelated memory,
    OpenAI, and OpenRouter acceptance locally.
-5. Begin the UI pass with the persistent identity line and amber styling foundation.
+5. Run the focused Context Ledger regression and a terminal render check, then refine the
+   selected `design-prototype.png` direction from evidence.
 
 ## Boundaries
 

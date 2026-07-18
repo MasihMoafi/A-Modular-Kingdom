@@ -105,6 +105,7 @@ impl ChatWidget {
                 animations_enabled: config.animations,
                 skills: None,
             }),
+            context_ledger: ContextLedgerState::default(),
             transcript: TranscriptState::new(active_cell),
             raw_output_mode: config.tui_raw_output_mode,
             config,

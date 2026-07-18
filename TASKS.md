@@ -119,5 +119,6 @@ not claim unfinished behavior is available.
 2. Inspect the uploaded Cargo timing report and select the highest-cost optional dependency
    surface for one bounded deletion.
 3. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
-4. Implement the persistent identity line and amber UI foundation before claiming unique
-   UI/UX is complete.
+4. Implement the selected [`design-prototype.png`](design-prototype.png) direction: persistent
+   identity line plus the cyan Context Ledger. Its `GOAL.md` and `ES.md` controls must govern
+   next-turn admission before claiming unique UI/UX is complete.

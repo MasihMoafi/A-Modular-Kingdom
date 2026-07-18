@@ -131,19 +131,81 @@ impl TranscriptAreaRenderable<'_> {
 
 impl Renderable for ChatWidget {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        self.as_renderable().render(area, buf);
+        let ledger_width = self.context_ledger_width(area.width);
+        let header_height = if ledger_width == 0 || area.is_empty() {
+            0
+        } else {
+            1
+        };
+        let header_area = Rect::new(area.x, area.y, area.width, header_height);
+        let content_area = Rect::new(
+            area.x,
+            area.y.saturating_add(header_height),
+            area.width,
+            area.height.saturating_sub(header_height),
+        );
+        self.render_identity_line(header_area, buf);
+        let chat_area = Rect::new(
+            content_area.x,
+            content_area.y,
+            content_area.width.saturating_sub(ledger_width),
+            content_area.height,
+        );
+        self.as_renderable().render(chat_area, buf);
+        if ledger_width > 0 {
+            self.render_context_ledger(
+                Rect::new(
+                    chat_area.x.saturating_add(chat_area.width),
+                    content_area.y,
+                    ledger_width,
+                    content_area.height,
+                ),
+                buf,
+            );
+        }
         self.last_rendered_width.set(Some(area.width as usize));
     }
 
     fn desired_height(&self, width: u16) -> u16 {
-        self.as_renderable().desired_height(width)
+        let ledger_width = self.context_ledger_width(width);
+        self.as_renderable()
+            .desired_height(width.saturating_sub(ledger_width))
+            .saturating_add(if ledger_width > 0 { 1 } else { 0 })
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
-        self.as_renderable().cursor_pos(area)
+        let ledger_width = self.context_ledger_width(area.width);
+        let header_height = if ledger_width == 0 || area.is_empty() {
+            0
+        } else {
+            1
+        };
+        let content_area = Rect::new(
+            area.x,
+            area.y.saturating_add(header_height),
+            area.width.saturating_sub(ledger_width),
+            area.height.saturating_sub(header_height),
+        );
+        self.as_renderable().cursor_pos(content_area)
     }
 
     fn cursor_style(&self, area: Rect) -> crossterm::cursor::SetCursorStyle {
         self.as_renderable().cursor_style(area)
+    }
+}
+
+impl ChatWidget {
+    fn render_identity_line(&self, area: Rect, buf: &mut Buffer) {
+        if area.is_empty() {
+            return;
+        }
+        let model = self.config.model.as_deref().unwrap_or("select a model");
+        Line::from(vec![
+            " Elpis ".cyan().bold(),
+            "· provider-neutral coding agent · model ".dim(),
+            model.cyan(),
+            " · F6 Context Ledger".dim(),
+        ])
+        .render(area, buf);
     }
 }
