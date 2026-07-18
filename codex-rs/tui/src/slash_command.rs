@@ -13,6 +13,7 @@ pub enum SlashCommand {
     // DO NOT ALPHA-SORT! Enum order is presentation order in the popup, so
     // more frequently used commands should be listed first.
     Model,
+    ClaudeCode,
     Ide,
     Permissions,
     #[strum(to_string = "hotkeys")]
@@ -116,6 +117,7 @@ impl SlashCommand {
             SlashCommand::MemoryDrop => "DO NOT USE",
             SlashCommand::MemoryUpdate => "DO NOT USE",
             SlashCommand::Model => "choose a provider-aware model and reasoning effort",
+            SlashCommand::ClaudeCode => "switch this session's active runtime to Claude Code",
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
             }

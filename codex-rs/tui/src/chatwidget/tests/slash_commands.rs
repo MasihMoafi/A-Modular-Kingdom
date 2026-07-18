@@ -2923,3 +2923,23 @@ async fn compact_queues_user_messages_snapshot() {
         normalize_snapshot_paths(term.backend().vt100().screen().contents())
     );
 }
+
+#[tokio::test]
+async fn claude_code_slash_command_switches_active_runtime() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    assert_eq!(chat.active_runtime(), ActiveRuntime::Codex);
+
+    chat.handle_slash_command_dispatch(SlashCommand::ClaudeCode);
+
+    assert_eq!(chat.active_runtime(), ActiveRuntime::ClaudeCode);
+    let cells = drain_insert_history(&mut rx);
+    let rendered = cells
+        .iter()
+        .map(|lines| lines_to_single_string(lines))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        rendered.contains("Active runtime switched to Claude Code"),
+        "expected runtime-switch confirmation, got {rendered:?}"
+    );
+}

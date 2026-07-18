@@ -351,6 +351,8 @@ mod keymap_picker;
 mod mcp_startup;
 use self::mcp_startup::McpStartupStatus;
 mod pets;
+mod runtime_selection;
+use self::runtime_selection::ActiveRuntime;
 mod session_flow;
 mod session_header;
 use self::session_header::SessionHeader;
@@ -532,6 +534,7 @@ pub(crate) struct ChatWidget {
     transcript: TranscriptState,
     config: Config,
     raw_output_mode: bool,
+    active_runtime: ActiveRuntime,
     /// Runtime value resolved by core. `config.service_tier` remains the explicit user choice.
     effective_service_tier: Option<String>,
     /// The unmasked collaboration mode settings (always Default mode).
