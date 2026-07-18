@@ -33,9 +33,12 @@ not claim unfinished behavior is available.
   `29534784054`.
 - Remaining acceptance: resume one real task exactly and one leanly without replaying
   irrelevant work; verify `/status` against the actual next model request.
-- Known gap: the current 1,000-character tool-output cleaner is a blunt deterministic filter.
-  It lacks a focused regression test, turn-age distinction, compact conclusion, and source
-  pointer, so the full dynamic context-cleaner contract is not complete.
+- The tool-output cleaner is lifecycle-aware (`core/src/context_cleaner.rs`): older outputs
+  over 4,000 characters are reduced to bounded head/tail excerpts with a durable
+  `rollout://tool-call/<id>` evidence pointer, the two newest outputs stay intact, evictions
+  surface in `/status`, and focused tests cover the behavior.
+- Remaining cleaner gap: the retained excerpt is positional (head/tail), not a semantic
+  conclusion of the output.
 
 ### F4. Durable memory — implemented; end-to-end acceptance pending
 
@@ -56,8 +59,11 @@ not claim unfinished behavior is available.
 - OpenAI subscription authentication remains the default Codex-backed path.
 - OpenRouter is separately keyed through `OPENROUTER_API_KEY`.
 - Launcher/configuration tests cover OpenAI, OpenRouter, Bedrock, Ollama, and LM Studio IDs.
-- `--provider claude`, `gemini`, and `gemini-flash` select OpenRouter family aliases; these
-  are compatibility routes, not native Anthropic or Google adapters.
+- `--provider claude`, `gemini`, and `gemini-flash` select OpenRouter family aliases; the
+  native adapters are the separate `anthropic` and `google-gemini` providers.
+- Native Anthropic Messages and Google Gemini generateContent wire APIs are implemented
+  (PR #46) with request translation, SSE streaming, and mock-server tests in
+  `core/src/chat_completions.rs`; live vendor acceptance is pending.
 - Remaining first-release acceptance: complete and resume one task through OpenAI and
   OpenRouter, proving Elpis-owned goal, context, memory, permissions, and evidence survive.
 - The provider-aware `Choose a mind` `/model` surface is not implemented.
@@ -110,7 +116,7 @@ not claim unfinished behavior is available.
 - Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
   structured selectable prompt (question, options, multi-select) instead of silently
   assuming, and records the chosen answer in the session evidence.
-- Native Anthropic and Google protocol adapters.
+- Live vendor acceptance of the implemented native Anthropic and Google adapters (see F5).
 - Additional provider/runtime adapters using proven Pi/OpenClaw patterns.
 - Behavioral enforcement across runtimes.
 - Dictation with visible consent and editable, unsent text.

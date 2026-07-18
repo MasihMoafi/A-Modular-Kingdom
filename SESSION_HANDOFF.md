@@ -8,8 +8,8 @@ interface, and a clean release path.
 
 ## Current State
 
-- Canonical released work is on `main`; the active engineering branch is
-  `agent/build-cycle-and-reduction-audit-v2`.
+- Canonical released work is on `main`; the build-cycle branch merged as PR #34, and the
+  active engineering branch is `agent/context-ledger-ui`.
 - Repository cleanup and the one-tool internal RAG path are accepted complete.
 - Durable memory is Elpis-owned under `~/.elpis`, bounded, age-aware, diversity-ranked,
   recall-tracked, reviewable, and protected from one-off promotion.
@@ -20,8 +20,10 @@ interface, and a clean release path.
   lifetime, and reason.
 - OpenAI subscription remains the default authentication path. OpenRouter is separately
   keyed and selected explicitly.
-- Claude Sonnet and Gemini Pro/Flash launcher shortcuts currently route through OpenRouter;
-  native Anthropic and Google adapters are not implemented.
+- Claude Sonnet and Gemini Pro/Flash launcher shortcuts route through OpenRouter; native
+  Anthropic (`--provider anthropic`) and Google Gemini (`--provider google-gemini`) adapters
+  are implemented with streaming and mock-server tests (PR #46); live vendor acceptance is
+  pending.
 - The binary is versioned `0.1.0`. Tagged builds publish a checksummed Linux x86_64 release,
   and `scripts/install-elpis.sh` verifies and installs it atomically.
 - UI identity is only partially implemented: Elpis naming and runtime title exist, while the
@@ -60,11 +62,13 @@ interface, and a clean release path.
 
 ## Known Gaps
 
-- The 1,000-character context cleaner is a blunt filter without a focused test, turn-age
-  distinction, compact conclusion, or source pointer. The full cleaner contract is not done.
+- The context cleaner is lifecycle-aware with focused tests, turn-age distinction, and a
+  durable evidence pointer (`core/src/context_cleaner.rs`); its remaining gap is that the
+  retained excerpt is positional (head/tail), not a semantic conclusion.
 - Memory/context require end-to-end local acceptance.
 - OpenAI/OpenRouter require authenticated task-and-resume acceptance.
-- Claude/Gemini are OpenRouter aliases, not native adapters.
+- The native Anthropic/Gemini adapters lack live vendor acceptance; the `claude`/`gemini`
+  launcher shortcuts remain OpenRouter aliases.
 - `/model` is not yet the provider-aware `Choose a mind` surface.
 - The Context Ledger implementation needs a remote or otherwise safe Rust test/render pass;
   do not call it accepted from static review.
