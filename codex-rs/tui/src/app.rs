@@ -539,6 +539,12 @@ pub(crate) struct App {
     // Tracks active skill-load warnings so refreshes do not duplicate history cells.
     skill_load_warnings: SkillLoadWarningState,
 
+    /// Completed thread items buffered per thread id, keyed to their turn id.
+    ///
+    /// `TurnCompleted` notifications arrive with `items: []`, so the Elpis
+    /// checkpoint mirror rebuilds the turn from these streamed items.
+    pub(crate) elpis_turn_items: std::collections::HashMap<String, Vec<(String, ThreadItem)>>,
+
     // Esc-backtracking state grouped
     pub(crate) backtrack: crate::app_backtrack::BacktrackState,
     /// When set, the next draw rebuilds terminal scrollback from the retained transcript cells.
@@ -1047,6 +1053,7 @@ See the Codex keymap documentation for supported actions and examples."
             status_line_invalid_items_warned: status_line_invalid_items_warned.clone(),
             terminal_title_invalid_items_warned: terminal_title_invalid_items_warned.clone(),
             skill_load_warnings: SkillLoadWarningState::default(),
+            elpis_turn_items: std::collections::HashMap::new(),
             backtrack: BacktrackState::default(),
             backtrack_render_pending: false,
             feedback: feedback.clone(),

@@ -24,11 +24,13 @@ Still requiring end-to-end acceptance:
 - related versus unrelated memory admission;
 - memory review, deletion, reset, and compaction behavior.
 
-The current deterministic cleaner replaces function/tool output text longer than 1,000
+The current deterministic cleaner replaces older function/tool output text longer than 4,000
 characters. It is an interim implementation: it does not distinguish current evidence from
-stale exploration, retain a compact conclusion and source pointer, or have a focused
-regression test. Earlier design notes about a lossless context database, background
-summarizer, decoupled compaction model, or global vector session index are not implemented.
+stale exploration, and retains head/tail excerpts plus an evidence pointer rather than a compact
+conclusion. Focused unit coverage exists, but no end-to-end check yet proves the expired material
+is absent from the actual next request. Earlier design notes about a lossless context database,
+background summarizer, decoupled compaction model, or global vector session index are not
+implemented.
 
 ## Context Lifecycle
 
@@ -96,3 +98,92 @@ the entire archive is never injected by default.
 4. The cleaner removes stale raw output while preserving a useful record and evidence pointer.
 5. Related memory appears with provenance; unrelated memory stays absent.
 6. Review, deletion, archive, and reset work without losing exact evidence.
+
+## New — Masih's Ace in the Hole: Agent-Owned Post-Turn Context Pruning
+
+Elpis must not carry an agent's exploratory work forward merely because it happened in the
+same thread. After a turn has delivered its user-visible answer, Elpis prepares that agent's
+next-turn context from what the turn proved, changed, decided, and still requires. The raw
+transcript remains durable evidence; it is not the default working context for the next call.
+
+This is meaning-aware classification, not vectorization, RAG, or character-count truncation.
+It uses the agent's known turn outcome plus deterministic rules to classify material by purpose:
+
+- retain the active question, final answer or decision, changed paths, verification result,
+  active blocker, next action, and exact evidence pointers;
+- retain a successful search, read, or command only as its conclusion and source pointer;
+- retain failed commands and dead ends only when they establish a current constraint or blocker;
+- expire command attempts, shell output, directory listings, repetitive reads, abandoned paths,
+  and other exploratory traces once their useful conclusion has been retained;
+- never preserve hidden reasoning as transcript context; preserve the resulting decision and
+  evidence instead.
+
+The lifecycle is:
+
+1. The agent completes the turn and the user-visible answer is delivered without waiting for an
+   extra cleanup interaction.
+2. Elpis records a compact turn outcome with deterministic fields: objective, conclusion,
+   decisions, changed paths, verification, blockers, next action, and evidence pointers.
+3. Deterministic rules validate the record, retain required evidence, and mark the remaining
+   transient items expired for the next request.
+4. Before the next model call, Elpis assembles context from durable rules, goal, admitted
+   sources, the compact task/turn record, and only still-live recent material. It must not resend
+   expired exploration.
+
+The agent that performed the work is the preferred outcome author because it knows which steps
+answered the question. Deterministic rules remain the authority for required fields, evidence
+retention, expiry, and safety. A smaller distillation model may assist only for dense or ambiguous
+turns; it must never become a required delay before showing the user an answer, and Elpis must
+fall back to the deterministic record when it is unavailable.
+
+### Deterministic First Pass
+
+Before any model-assisted classification, Elpis should remove obvious context waste in a
+hard-coded, reversible way from material that is eligible to expire:
+
+- collapse runs of blank lines and remove trailing whitespace in prose-like terminal output;
+- replace raw command input/output with a compact action receipt after its conclusion and
+  evidence pointer are retained;
+- preserve whitespace exactly for source code, patches, structured data, and user-provided text
+  where it can change meaning;
+- keep raw terminal input/output on disk, not in the default next-turn prompt;
+- never delete current-turn evidence before it has produced a valid outcome record.
+
+The intended default is not “delete everything.” It is “exclude most completed exploration from
+the next prompt, while retaining enough structured outcome and retrieval handles to recover any
+needed detail.” Full conversations and raw tool events may remain durable and searchable. When a
+later task needs old detail, Elpis should use an exact evidence pointer when known, or retrieve it
+on demand; it must not reattach the whole transcript by default.
+
+### Context Accounting Contract
+
+Elpis must expose one auditable context measure. Every displayed percentage must state whether it
+means **used** or **remaining**, identify the context-window limit and runtime source, and refer to
+the same next-request scope. A persistent Elpis context label and an inherited sporadic indicator
+must not present conflicting numbers. The inherited, intermittent top-left context display should
+be removed or suppressed until Elpis can replace it with this verified measure.
+
+Acceptance requires a controlled turn where the rendered value, `/status`, and the runtime's next
+request accounting agree on used tokens, remaining tokens, and the context-window limit.
+
+### Captured Design Inputs
+
+- Keep conversations in full as durable evidence, but not as default working context; use RAG or
+  exact retrieval only when old detail is needed.
+- Prune terminal input/output and exploratory traces most of the time, not blindly in every case.
+- The agent must retain a reliable way to recover anything it later needs.
+- A million-token context may defer the problem but increases cost and clutter; Elpis exists to
+  make a smaller context window sufficient without losing evidence.
+- The feature must preserve user intent and exact evidence even when design details are still
+  unresolved.
+
+### Acceptance
+
+For a turn containing many searches, file reads, failed commands, and one decisive result:
+
+1. the next request contains the conclusion, changed paths or answer, next action, and exact
+   evidence pointer;
+2. it excludes raw exploratory output and irrelevant failed attempts;
+3. the durable transcript still permits exact inspection of every omitted action; and
+4. if pruning cannot produce a valid record, Elpis preserves the existing context rather than
+   silently discarding evidence.

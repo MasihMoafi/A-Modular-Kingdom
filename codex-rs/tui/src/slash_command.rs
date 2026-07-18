@@ -27,6 +27,7 @@ pub enum SlashCommand {
     #[strum(to_string = "approve")]
     AutoReview,
     Memories,
+    Add,
     Skills,
     Rag,
     Import,
@@ -72,11 +73,6 @@ pub enum SlashCommand {
     Personality,
     #[strum(serialize = "subagents")]
     MultiAgents,
-    // Debugging commands.
-    #[strum(serialize = "debug-m-drop")]
-    MemoryDrop,
-    #[strum(serialize = "debug-m-update")]
-    MemoryUpdate,
 }
 
 impl SlashCommand {
@@ -113,8 +109,6 @@ impl SlashCommand {
             SlashCommand::Pets => "choose or hide the terminal pet",
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Stop => "kill all background terminals",
-            SlashCommand::MemoryDrop => "DO NOT USE",
-            SlashCommand::MemoryUpdate => "DO NOT USE",
             SlashCommand::Model => "choose a provider-aware model and reasoning effort",
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
@@ -136,6 +130,7 @@ impl SlashCommand {
             SlashCommand::Experimental => "configure Elpis settings",
             SlashCommand::AutoReview => "approve one retry of a recent auto-review denial",
             SlashCommand::Memories => "inspect durable memory and generation settings",
+            SlashCommand::Add => "add a file to the Context Ledger: /add <path>",
             SlashCommand::Mcp => "list configured MCP tools; use /mcp verbose for details",
             SlashCommand::Apps => "manage apps",
             SlashCommand::Plugins => "browse plugins",
@@ -154,6 +149,7 @@ impl SlashCommand {
         matches!(
             self,
             SlashCommand::Review
+                | SlashCommand::Add
                 | SlashCommand::Rag
                 | SlashCommand::Rename
                 | SlashCommand::Plan
@@ -201,13 +197,12 @@ impl SlashCommand {
             | SlashCommand::SandboxReadRoot
             | SlashCommand::Experimental
             | SlashCommand::Memories
+            | SlashCommand::Add
             | SlashCommand::Import
             | SlashCommand::Review
             | SlashCommand::Plan
             | SlashCommand::Clear
-            | SlashCommand::Logout
-            | SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate => false,
+            | SlashCommand::Logout => false,
             SlashCommand::Diff
             | SlashCommand::Resume
             | SlashCommand::Model
@@ -245,20 +240,61 @@ impl SlashCommand {
 
     fn is_visible(self) -> bool {
         match self {
-            SlashCommand::Archive
-            | SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate
-            | SlashCommand::Mention
-            | SlashCommand::Personality
+            // Elpis owns the continuity, context, memory, permissions, and runtime
+            // surfaces below. The remaining inherited commands are intentionally not
+            // part of the public Elpis command contract.
+            SlashCommand::Model
+            | SlashCommand::Permissions
+            | SlashCommand::Memories
+            | SlashCommand::Add
+            | SlashCommand::Skills
+            | SlashCommand::Rag
+            | SlashCommand::Review
+            | SlashCommand::New
+            | SlashCommand::Resume
+            | SlashCommand::Init
+            | SlashCommand::Compact
+            | SlashCommand::Diff
+            | SlashCommand::Status
+            | SlashCommand::Mcp
+            | SlashCommand::Quit
+            | SlashCommand::Clear => true,
+            SlashCommand::Keymap
+            | SlashCommand::Hooks
+            | SlashCommand::Rename
+            | SlashCommand::Delete
+            | SlashCommand::Fork
+            | SlashCommand::Goal
+            | SlashCommand::Agent
+            | SlashCommand::Side
+            | SlashCommand::Btw
+            | SlashCommand::Copy
+            | SlashCommand::Logout
+            | SlashCommand::Feedback
+            | SlashCommand::Ide
+            | SlashCommand::ElevateSandbox
+            | SlashCommand::SandboxReadRoot
+            | SlashCommand::Experimental
+            | SlashCommand::AutoReview
+            | SlashCommand::Import
+            | SlashCommand::Archive
+            | SlashCommand::App
             | SlashCommand::Plan
-            | SlashCommand::Pets
+            | SlashCommand::Mention
             | SlashCommand::Raw
             | SlashCommand::Usage
-            | SlashCommand::Vim => false,
-            SlashCommand::SandboxReadRoot => cfg!(target_os = "windows"),
-            SlashCommand::Copy => !cfg!(target_os = "android"),
-            SlashCommand::App => cfg!(any(target_os = "macos", target_os = "windows")),
-            _ => true,
+            | SlashCommand::DebugConfig
+            | SlashCommand::Title
+            | SlashCommand::Statusline
+            | SlashCommand::Theme
+            | SlashCommand::Pets
+            | SlashCommand::Apps
+            | SlashCommand::Plugins
+            | SlashCommand::Ps
+            | SlashCommand::Stop
+            | SlashCommand::Personality
+            | SlashCommand::Vim
+            | SlashCommand::MultiAgents => false,
         }
     }
 }
@@ -300,25 +336,49 @@ mod tests {
     }
 
     #[test]
-    fn removed_commands_are_not_visible() {
+    fn removed_commands_are_not_visible_or_parseable() {
         let visible = super::built_in_slash_commands()
             .into_iter()
             .map(|(name, _)| name)
             .collect::<Vec<_>>();
         for removed in [
             "archive",
+            "agent",
+            "btw",
+            "copy",
+            "del",
+            "debug-m-drop",
+            "debug-m-update",
             "exit",
+            "feedback",
+            "fork",
+            "goal",
+            "hooks",
+            "hotkeys",
+            "apps",
+            "app",
+            "debug-config",
+            "experimental",
+            "import",
             "mention",
             "personality",
             "plan",
             "pets",
+            "plugins",
             "raw",
+            "rename",
+            "settings",
+            "statusline",
+            "title",
             "usage",
             "vim",
         ] {
             assert!(!visible.contains(&removed), "{removed} should be removed");
         }
         assert!(visible.contains(&"memories"));
+        assert!(visible.contains(&"add"));
+        assert!(SlashCommand::from_str("debug-m-drop").is_err());
+        assert!(SlashCommand::from_str("debug-m-update").is_err());
     }
 
     #[test]

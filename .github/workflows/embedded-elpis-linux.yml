@@ -198,6 +198,7 @@ jobs:
       - name: Verify context lifecycle and archive failure safety
         run: |
           cargo test -p codex-core --lib --locked context_cleaner::tests
+          cargo test -p codex-core --lib --locked elpis_context::tests
           cargo test -p codex-memories-write --locked reset_memory_workspace_baseline_
 
       - name: Verify memory promotion, bounds, and retrieval
@@ -215,7 +216,9 @@ jobs:
           cargo test -p codex-core --lib --locked chat_completions
 
       - name: Verify runtime identity surfaces
-        run: cargo test -p codex-tui --lib --locked branding::tests
+        run: |
+          cargo test -p codex-tui --lib --locked branding::tests
+          cargo test -p codex-tui --lib --locked slash_command::tests
 
       - name: Run exhaustive continuity regression
         if: ${{ github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.full_regression) }}

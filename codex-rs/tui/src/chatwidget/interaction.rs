@@ -37,6 +37,10 @@ impl ChatWidget {
             return;
         }
 
+        if self.handle_context_ledger_key_event(key_event) {
+            return;
+        }
+
         if key_event.kind == KeyEventKind::Press
             && self.copy_last_response_binding.is_pressed(key_event)
         {

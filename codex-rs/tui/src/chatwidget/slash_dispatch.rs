@@ -36,6 +36,7 @@ const SIDE_SLASH_COMMAND_UNAVAILABLE_HINT: &str =
     "Press Ctrl+C to return to the main thread first.";
 const GOAL_USAGE_HINT: &str = "Example: /goal improve benchmark coverage";
 const RAG_USAGE: &str = "Usage: /rag <query> or /rag <path> -- <query>";
+const ADD_CONTEXT_USAGE: &str = "Usage: /add <file-path>";
 const RAW_USAGE: &str = "Usage: /raw [on|off]";
 const USAGE_CHATGPT_LOGIN_REQUIRED: &str = "Sign in with ChatGPT to use /usage.";
 
@@ -377,6 +378,9 @@ impl ChatWidget {
             SlashCommand::Memories => {
                 self.open_memories_popup();
             }
+            SlashCommand::Add => {
+                self.add_error_message(ADD_CONTEXT_USAGE.to_string());
+            }
             SlashCommand::Quit => {
                 self.request_quit_without_confirmation();
             }
@@ -475,12 +479,6 @@ impl ChatWidget {
             }
             SlashCommand::Stop => {
                 self.clean_background_terminals();
-            }
-            SlashCommand::MemoryDrop => {
-                self.add_app_server_stub_message("Memory maintenance");
-            }
-            SlashCommand::MemoryUpdate => {
-                self.add_app_server_stub_message("Memory maintenance");
             }
             SlashCommand::Mcp => {
                 self.add_mcp_output(McpServerStatusDetail::ToolsAndAuthOnly);
@@ -627,6 +625,29 @@ impl ChatWidget {
         } = prepared;
         let trimmed = args.trim();
         match cmd {
+            SlashCommand::Add => {
+                let requested_path = std::path::Path::new(trimmed);
+                match crate::legacy_core::elpis_context::add_continuity_source(
+                    self.config
+                        .memories
+                        .root
+                        .as_ref()
+                        .map(|root| root.as_path()),
+                    self.config.cwd.as_path(),
+                    requested_path,
+                ) {
+                    Ok(path) => self.add_info_message(
+                        format!("Added {} to the Context Ledger.", path.display()),
+                        Some(
+                            "It is enabled for the next turn. Use Shift+Tab to disable it."
+                                .to_string(),
+                        ),
+                    ),
+                    Err(error) => {
+                        self.add_error_message(format!("Could not add context file: {error}"))
+                    }
+                }
+            }
             SlashCommand::Usage => {
                 if self.ensure_usage_command_available() {
                     match tokens::TokenActivityView::parse(trimmed) {
@@ -1027,8 +1048,6 @@ impl ChatWidget {
             | SlashCommand::DebugConfig
             | SlashCommand::Ps
             | SlashCommand::Stop
-            | SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate
             | SlashCommand::Mcp
             | SlashCommand::Apps
             | SlashCommand::Plugins
@@ -1063,6 +1082,7 @@ impl ChatWidget {
             | SlashCommand::Experimental
             | SlashCommand::AutoReview
             | SlashCommand::Memories
+            | SlashCommand::Add
             | SlashCommand::Quit
             | SlashCommand::Logout
             | SlashCommand::Mention

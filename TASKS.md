@@ -33,9 +33,12 @@ not claim unfinished behavior is available.
   `29534784054`.
 - Remaining acceptance: resume one real task exactly and one leanly without replaying
   irrelevant work; verify `/status` against the actual next model request.
-- Known gap: the current 1,000-character tool-output cleaner is a blunt deterministic filter.
-  It lacks a focused regression test, turn-age distinction, compact conclusion, and source
-  pointer, so the full dynamic context-cleaner contract is not complete.
+- The tool-output cleaner is lifecycle-aware (`core/src/context_cleaner.rs`): older outputs
+  over 4,000 characters are reduced to bounded head/tail excerpts with a durable
+  `rollout://tool-call/<id>` evidence pointer, the two newest outputs stay intact, evictions
+  surface in `/status`, and focused tests cover the behavior.
+- Remaining cleaner gap: the retained excerpt is positional (head/tail), not a semantic
+  conclusion of the output.
 
 ### F4. Durable memory — implemented; end-to-end acceptance pending
 
@@ -56,8 +59,11 @@ not claim unfinished behavior is available.
 - OpenAI subscription authentication remains the default Codex-backed path.
 - OpenRouter is separately keyed through `OPENROUTER_API_KEY`.
 - Launcher/configuration tests cover OpenAI, OpenRouter, Bedrock, Ollama, and LM Studio IDs.
-- `--provider claude`, `gemini`, and `gemini-flash` select OpenRouter family aliases; these
-  are compatibility routes, not native Anthropic or Google adapters.
+- `--provider claude`, `gemini`, and `gemini-flash` select OpenRouter family aliases; the
+  native adapters are the separate `anthropic` and `google-gemini` providers.
+- Native Anthropic Messages and Google Gemini generateContent wire APIs are implemented
+  (PR #46) with request translation, SSE streaming, and mock-server tests in
+  `core/src/chat_completions.rs`; live vendor acceptance is pending.
 - Remaining first-release acceptance: complete and resume one task through OpenAI and
   OpenRouter, proving Elpis-owned goal, context, memory, permissions, and evidence survive.
 - The provider-aware `Choose a mind` `/model` surface is not implemented.
@@ -87,20 +93,33 @@ not claim unfinished behavior is available.
   above. `docs/UI_IDENTITY.md` is a contract, not proof.
 - Proof required: a new user watches a task cross compaction or provider change and can state
   what survived, what expired, which runtime acted, and where evidence lives.
+- Known bug, fixed 2026-07-18: `continuity_sources()` built the dev-skills path from a
+  directory name (`skills-i-use`) that no longer existed on disk, so `/skills` fell back to
+  built-in skills instead of Masih's own, and the Context Ledger showed only global sources.
+  Root cause was a stale path string, not a ledger rendering bug.
+- Ledger dev-skills rows: `skills/dev/*.md` files are now enumerated dynamically as
+  individual, independently toggleable rows admitted by default (commit `2f85ce3`, with a
+  focused regression in `core/src/elpis_context.rs`). Remote verification is in progress;
+  not accepted until the CI run passes and a terminal render check confirms the rows.
 
 ## Reduction campaign
 
 - Completed process subtraction: remove broad inherited regression from every ordinary push,
   remove CI auto-formatting, and remove the self-mutating build-status commit.
-- Bounded code subtraction selected next: issue #32 removes the inert `debug-m-drop` and
-  `debug-m-update` placeholders.
+- Bounded code subtraction: the issue #32 removal of the inert `debug-m-drop` and
+  `debug-m-update` placeholders was recovered from the unmerged `agent/product-integration`
+  branch and cherry-picked onto `agent/context-ledger-ui` (PR #49 closed as superseded);
+  lands with that branch after CI passes.
 - Measured candidates are recorded in `docs/BUILD_AND_REDUCTION_AUDIT.md`.
 - Do not delete arbitrary workspace crates: first prove they are reachable from the Elpis
   binary and optional under the product requirements.
 
 ## Important — after the first-release foundation
 
-- Native Anthropic and Google protocol adapters.
+- Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
+  structured selectable prompt (question, options, multi-select) instead of silently
+  assuming, and records the chosen answer in the session evidence.
+- Live vendor acceptance of the implemented native Anthropic and Google adapters (see F5).
 - Additional provider/runtime adapters using proven Pi/OpenClaw patterns.
 - Behavioral enforcement across runtimes.
 - Dictation with visible consent and editable, unsent text.
@@ -119,5 +138,6 @@ not claim unfinished behavior is available.
 2. Inspect the uploaded Cargo timing report and select the highest-cost optional dependency
    surface for one bounded deletion.
 3. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
-4. Implement the persistent identity line and amber UI foundation before claiming unique
-   UI/UX is complete.
+4. Implement the selected [`design-prototype.png`](design-prototype.png) direction: persistent
+   identity line plus the cyan Context Ledger. Its `GOAL.md` and `ES.md` controls must govern
+   next-turn admission before claiming unique UI/UX is complete.

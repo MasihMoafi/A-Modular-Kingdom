@@ -71,7 +71,7 @@ impl StatusLineAccent {
 
     fn fallback_style(self) -> Style {
         let _ = self;
-        Style::default().yellow()
+        Style::default().cyan()
     }
 }
 
@@ -165,7 +165,7 @@ fn soften_status_line_color(color: Color) -> Color {
         }
         Color::LightRed => Color::Red,
         Color::LightGreen => Color::Green,
-        Color::LightYellow => Color::Yellow,
+        Color::LightYellow | Color::Yellow => Color::Cyan,
         Color::LightBlue => Color::Blue,
         Color::LightMagenta => Color::Magenta,
         Color::LightCyan => Color::Cyan,
@@ -174,7 +174,6 @@ fn soften_status_line_color(color: Color) -> Color {
         | Color::Black
         | Color::Red
         | Color::Green
-        | Color::Yellow
         | Color::Blue
         | Color::Magenta
         | Color::Cyan
@@ -225,11 +224,11 @@ mod tests {
         .expect("status line");
 
         assert_eq!(line_text(&line), "gpt-5 · /repo · main");
-        assert_eq!(line.spans[0].style.fg, Some(Color::Yellow));
+        assert_eq!(line.spans[0].style.fg, Some(Color::Cyan));
         assert!(!line.spans[0].style.add_modifier.contains(Modifier::DIM));
-        assert_eq!(line.spans[2].style.fg, Some(Color::Yellow));
+        assert_eq!(line.spans[2].style.fg, Some(Color::Cyan));
         assert!(!line.spans[2].style.add_modifier.contains(Modifier::DIM));
-        assert_eq!(line.spans[4].style.fg, Some(Color::Yellow));
+        assert_eq!(line.spans[4].style.fg, Some(Color::Cyan));
         assert!(!line.spans[4].style.add_modifier.contains(Modifier::DIM));
     }
 
@@ -251,7 +250,7 @@ mod tests {
         assert_eq!(line.spans[0].style.fg, Some(Color::Red));
         assert!(!line.spans[0].style.add_modifier.contains(Modifier::DIM));
         assert!(line.spans[1].style.add_modifier.contains(Modifier::DIM));
-        assert_eq!(line.spans[2].style.fg, Some(Color::Yellow));
+        assert_eq!(line.spans[2].style.fg, Some(Color::Cyan));
         assert!(!line.spans[2].style.add_modifier.contains(Modifier::DIM));
     }
 

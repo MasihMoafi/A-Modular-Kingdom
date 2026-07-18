@@ -37,10 +37,10 @@ impl FieldFormatter {
 
     pub(crate) fn line(
         &self,
-        label: &'static str,
+        label: impl AsRef<str>,
         value_spans: Vec<Span<'static>>,
     ) -> Line<'static> {
-        Line::from(self.full_spans(label, value_spans))
+        Line::from(self.full_spans(label.as_ref(), value_spans))
     }
 
     pub(crate) fn continuation(&self, mut spans: Vec<Span<'static>>) -> Line<'static> {

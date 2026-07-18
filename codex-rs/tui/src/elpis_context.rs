@@ -82,6 +82,21 @@ pub(crate) async fn clear_goal(
     Ok(Some(goal_path))
 }
 
+/// Rebuild a completed turn from streamed `ItemCompleted` items.
+///
+/// `TurnCompleted` notifications arrive with `items: []`, so the checkpoint
+/// uses the buffered items whose turn id matches the completed turn.
+pub(crate) fn turn_with_buffered_items(turn: &Turn, buffered: Vec<(String, ThreadItem)>) -> Turn {
+    let mut turn = turn.clone();
+    if turn.items.is_empty() {
+        turn.items = buffered
+            .into_iter()
+            .filter_map(|(turn_id, item)| (turn_id == turn.id).then_some(item))
+            .collect();
+    }
+    turn
+}
+
 pub(crate) async fn write_session_checkpoint(
     memories_root: Option<&Path>,
     cwd: &Path,
@@ -314,5 +329,37 @@ mod tests {
         assert!(!content.contains("large exact diff stays in transcript"));
         assert!(content.contains("Full turn remains in the provider transcript."));
         Ok(())
+    }
+
+    #[test]
+    fn empty_turn_completed_notification_uses_buffered_items_for_its_turn_only() {
+        let empty_turn = Turn {
+            id: "turn-two".to_string(),
+            items: vec![],
+            items_view: TurnItemsView::NotLoaded,
+            status: TurnStatus::Completed,
+            error: None,
+            started_at: Some(40),
+            completed_at: Some(42),
+            duration_ms: Some(2_000),
+        };
+        let message = |id: &str, text: &str| ThreadItem::AgentMessage {
+            id: id.to_string(),
+            text: text.to_string(),
+            phase: None,
+            memory_citation: None,
+        };
+        let buffered = vec![
+            ("turn-one".to_string(), message("stale", "Old turn result.")),
+            ("turn-two".to_string(), message("fresh", "New turn result.")),
+        ];
+
+        let turn = turn_with_buffered_items(&empty_turn, buffered);
+
+        assert_eq!(turn.items.len(), 1);
+        assert!(matches!(
+            &turn.items[0],
+            ThreadItem::AgentMessage { text, .. } if text == "New turn result."
+        ));
     }
 }

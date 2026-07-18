@@ -48,7 +48,7 @@ fn format_exit_messages(exit_info: AppExitInfo, color_enabled: bool) -> Vec<Stri
 #[derive(Parser, Debug)]
 #[command(name = "elpis")]
 struct TopCli {
-    /// Select a native Elpis provider or a curated OpenRouter compatibility route.
+    /// Select a direct Elpis provider or a curated OpenRouter compatibility route.
     #[arg(
         long,
         value_parser = [

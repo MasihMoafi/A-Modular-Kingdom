@@ -193,6 +193,13 @@ impl App {
     }
 
     async fn mirror_elpis_context_notification(&mut self, notification: &ServerNotification) {
+        if let ServerNotification::ItemCompleted(notification) = notification {
+            self.elpis_turn_items
+                .entry(notification.thread_id.clone())
+                .or_default()
+                .push((notification.turn_id.clone(), notification.item.clone()));
+            return;
+        }
         if let ServerNotification::TurnCompleted(notification) = notification {
             let cwd = match ThreadId::from_string(&notification.thread_id) {
                 Ok(thread_id) => self
@@ -201,6 +208,11 @@ impl App {
                     .unwrap_or_else(|| self.config.cwd.clone()),
                 Err(_) => self.config.cwd.clone(),
             };
+            let buffered = self
+                .elpis_turn_items
+                .remove(&notification.thread_id)
+                .unwrap_or_default();
+            let turn = crate::elpis_context::turn_with_buffered_items(&notification.turn, buffered);
             let result = crate::elpis_context::write_session_checkpoint(
                 self.config
                     .memories
@@ -209,7 +221,7 @@ impl App {
                     .map(|root| root.as_path()),
                 cwd.as_path(),
                 &notification.thread_id,
-                &notification.turn,
+                &turn,
             )
             .await;
             if let Err(err) = result {
