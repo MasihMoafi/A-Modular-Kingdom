@@ -209,7 +209,8 @@ impl SlashCommand {
             | SlashCommand::Clear
             | SlashCommand::Logout
             | SlashCommand::MemoryDrop
-            | SlashCommand::MemoryUpdate => false,
+            | SlashCommand::MemoryUpdate
+            | SlashCommand::ClaudeCode => false,
             SlashCommand::Diff
             | SlashCommand::Resume
             | SlashCommand::Model

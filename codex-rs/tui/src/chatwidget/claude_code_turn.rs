@@ -37,7 +37,7 @@ impl super::ChatWidget {
         let options = ClaudePrintOptions {
             prompt: text,
             resume_session_id: self.claude_code_session_id.clone(),
-            cwd: Some(self.config.cwd.clone()),
+            cwd: Some(self.config.cwd.to_path_buf()),
         };
         let tx = self.app_event_tx.clone();
         tokio::spawn(async move {

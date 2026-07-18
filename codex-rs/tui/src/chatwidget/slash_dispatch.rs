@@ -1032,6 +1032,7 @@ impl ChatWidget {
             | SlashCommand::Stop
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate
+            | SlashCommand::ClaudeCode
             | SlashCommand::Mcp
             | SlashCommand::Apps
             | SlashCommand::Plugins
