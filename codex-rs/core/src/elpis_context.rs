@@ -110,7 +110,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
     let admission = read_admission(&workspace_dir);
     let dev_dir = cwd
         .parent()
-        .map(|parent| parent.join("skills-i-use/skills/dev"));
+        .map(|parent| parent.join("skills/dev"));
     let global_rules = memories_root
         .parent()
         .and_then(Path::parent)
@@ -516,7 +516,7 @@ mod tests {
         let home = tempdir()?;
         let memories = home.path().join(".elpis/memories");
         let cwd = home.path().join("projects/Elpis");
-        let dev = home.path().join("projects/skills-i-use/skills/dev");
+        let dev = home.path().join("projects/skills/dev");
         tokio::fs::create_dir_all(home.path().join(".codex")).await?;
         tokio::fs::create_dir_all(&cwd).await?;
         tokio::fs::create_dir_all(&dev).await?;
