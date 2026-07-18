@@ -671,8 +671,12 @@ Verified foundation:
 Current foundation work is memory plus context acceptance. Elpis-owned memory storage,
 promotion, bounded retrieval, portable `GOAL.md`/`ES.md`, lean fresh-thread admission,
 pre-compaction protection, and the visible admitted-context list are implemented pending
-remote verification. Visual identity, provider expansion, pruning, and `/auto` routing
-follow the foundational memory/context acceptance checks.
+remote verification. Visual identity (cyan identity header, Context Ledger — see
+[UI Identity](#ui-identity)), provider expansion (native Anthropic/Gemini adapters —
+see [Providers](#providers)), and deterministic tool-output pruning (see
+`docs/CONTEXT_AND_SESSIONS.md`) have each already shipped a first slice ahead of full
+memory/context acceptance; `/auto` routing has not started. None of these are complete
+acceptance until their own acceptance checks pass — see `TASKS.md`.
 
 The currently installed build includes the command-surface changes from `b135e7a` and
 the startup-tip/test-command changes from `419384d`. Most unwanted commands were made
