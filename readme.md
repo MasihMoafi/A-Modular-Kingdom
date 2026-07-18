@@ -240,9 +240,9 @@ badge means that workflow passed. It does not mean unfinished work is finished.
 
 - `codex-rs/` — Rust application and TUI.
 - `src/` — the single-tool Python retrieval service.
-- `GUIDE.md` — product and architecture source of truth.
-- `REQUIREMENTS.md` — accepted requirements and unresolved decisions.
-- `TASKS.md` — release work and acceptance state.
+- `AGENTS.md` — agent entry point: dispatch, worktree workflow, and definition of done.
+- `GUIDE.md` — product vision, requirements, and architecture source of truth.
+- `TASKS.md` — release work, acceptance state, and backlog.
 - `docs/CONTEXT_AND_SESSIONS.md` — context and continuation contract.
 - `docs/BUILD_AND_REDUCTION_AUDIT.md` — build baseline and measured subtraction plan.
 
