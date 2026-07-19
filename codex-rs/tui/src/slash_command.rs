@@ -31,6 +31,7 @@ pub enum SlashCommand {
     Add,
     Skills,
     Rag,
+    Elpis,
     Import,
     Hooks,
     Review,
@@ -98,7 +99,8 @@ impl SlashCommand {
             SlashCommand::Diff => "show git diff (including untracked files)",
             SlashCommand::Mention => "mention a file",
             SlashCommand::Skills => "use skills to improve how Elpis performs specific tasks",
-            SlashCommand::Rag => "search files: /rag <path> <query>",
+            SlashCommand::Rag => "search files: /rag <query> or /rag <path> -- <query>",
+            SlashCommand::Elpis => "a small cyan moment",
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Status => "inspect current context, continuity, and token usage",
@@ -153,6 +155,7 @@ impl SlashCommand {
             SlashCommand::Review
                 | SlashCommand::Add
                 | SlashCommand::Rag
+                | SlashCommand::Elpis
                 | SlashCommand::Rename
                 | SlashCommand::Plan
                 | SlashCommand::Goal
@@ -175,6 +178,7 @@ impl SlashCommand {
             self,
             SlashCommand::Copy
                 | SlashCommand::Rag
+                | SlashCommand::Elpis
                 | SlashCommand::Raw
                 | SlashCommand::Diff
                 | SlashCommand::Mention
@@ -217,6 +221,7 @@ impl SlashCommand {
             | SlashCommand::Mention
             | SlashCommand::Skills
             | SlashCommand::Rag
+            | SlashCommand::Elpis
             | SlashCommand::Hooks
             | SlashCommand::Status
             | SlashCommand::Usage
@@ -252,6 +257,7 @@ impl SlashCommand {
             | SlashCommand::Add
             | SlashCommand::Skills
             | SlashCommand::Rag
+            | SlashCommand::Elpis
             | SlashCommand::Review
             | SlashCommand::New
             | SlashCommand::Resume
