@@ -195,6 +195,7 @@ pub(crate) fn new_status_output_with_rate_limits(
         collaboration_mode,
         reasoning_effort_override,
         "<none>".to_string(),
+        /*instruction_source_paths*/ &[],
         refreshing_rate_limits,
     )
     .0
@@ -218,6 +219,7 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
     collaboration_mode: Option<&str>,
     reasoning_effort_override: Option<Option<ReasoningEffort>>,
     agents_summary: String,
+    instruction_source_paths: &[std::path::PathBuf],
     refreshing_rate_limits: bool,
 ) -> (CompositeHistoryCell, StatusHistoryHandle) {
     let command = PlainHistoryCell::new(vec!["/status".magenta().into()]);
@@ -238,6 +240,7 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
         collaboration_mode,
         reasoning_effort_override,
         agents_summary,
+        instruction_source_paths,
         refreshing_rate_limits,
     );
 
@@ -266,6 +269,7 @@ impl StatusHistoryCell {
         collaboration_mode: Option<&str>,
         reasoning_effort_override: Option<Option<ReasoningEffort>>,
         agents_summary: String,
+        instruction_source_paths: &[std::path::PathBuf],
         refreshing_rate_limits: bool,
     ) -> (Self, StatusHistoryHandle) {
         let approval_policy = AskForApproval::from(config.permissions.approval_policy.value());
@@ -356,6 +360,7 @@ impl StatusHistoryCell {
         let continuity_sources = crate::legacy_core::elpis_context::continuity_sources(
             config.memories.root.as_ref().map(|root| root.as_path()),
             config.cwd.as_path(),
+            instruction_source_paths,
         );
 
         (
