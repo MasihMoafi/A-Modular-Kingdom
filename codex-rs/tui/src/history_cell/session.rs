@@ -6,6 +6,13 @@ use crate::style::brand_style;
 
 pub(crate) const SESSION_HEADER_MAX_INNER_WIDTH: usize = 56; // Just an eyeballed value
 
+/// This release's headline changes, shown in the welcome card so Elpis opens as
+/// itself — not as a Codex look-alike. Update alongside each release.
+const WHATS_NEW_LINES: [&str; 2] = [
+    "context saved per turn — watch it go down",
+    "/add dirs · Tab ledger · Shift+Tab modes",
+];
+
 pub(crate) fn card_inner_width(width: u16, max_inner_width: usize) -> Option<usize> {
     if width < 4 {
         return None;
@@ -339,12 +346,26 @@ impl HistoryCell for SessionHeaderHistoryCell {
         let dir = self.format_directory(Some(dir_max_width));
         let dir_spans = vec![Span::from(dir_prefix).dim(), Span::from(dir)];
 
-        let mut lines = vec![
-            make_row(title_spans),
+        let whats_new_rows: Vec<Line<'static>> = WHATS_NEW_LINES
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| {
+                let label = if index == 0 {
+                    "what's new: "
+                } else {
+                    "            "
+                };
+                make_row(vec![Span::from(label).dim(), Span::from(*entry).cyan()])
+            })
+            .collect();
+
+        let mut lines = vec![make_row(title_spans)];
+        lines.extend(whats_new_rows);
+        lines.extend([
             make_row(Vec::new()),
             make_row(model_spans),
             make_row(dir_spans),
-        ];
+        ]);
 
         if self.yolo_mode {
             let permissions_label = format!("{PERMISSIONS_LABEL:<label_width$}");
@@ -360,6 +381,7 @@ impl HistoryCell for SessionHeaderHistoryCell {
     fn raw_lines(&self) -> Vec<Line<'static>> {
         let mut lines = vec![
             Line::from(format!("{CODEX_RUNTIME_TITLE} (v{})", self.version)),
+            Line::from(format!("what's new: {}", WHATS_NEW_LINES.join(" · "))),
             Line::from(format!(
                 "model: {}{}",
                 self.model,

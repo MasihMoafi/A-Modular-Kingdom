@@ -43,7 +43,24 @@ fn rag_request(doc_path: &str, query: &str) -> String {
         "Use the Elpis `elpis-rag` MCP server's `query_knowledge_base` tool with doc_path `{doc_path}` and query `{query}`. Base the answer on the retrieved chunks and cite their source paths."
     )
 }
-const ADD_CONTEXT_USAGE: &str = "Usage: /add <file-path>";
+const ADD_CONTEXT_USAGE: &str = "Usage: /add <file-or-directory-path> (drag & drop works too)";
+
+/// Terminals drop paths quoted and/or with backslash-escaped spaces, sometimes as
+/// file:// URIs. Normalize all of that to a plain filesystem path.
+fn clean_dropped_path(raw: &str) -> String {
+    let trimmed = raw.trim();
+    let unquoted = trimmed
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+        .or_else(|| {
+            trimmed
+                .strip_prefix('\'')
+                .and_then(|rest| rest.strip_suffix('\''))
+        })
+        .unwrap_or(trimmed);
+    let without_scheme = unquoted.strip_prefix("file://").unwrap_or(unquoted);
+    without_scheme.replace("\\ ", " ")
+}
 const RAW_USAGE: &str = "Usage: /raw [on|off]";
 const USAGE_CHATGPT_LOGIN_REQUIRED: &str = "Sign in with ChatGPT to use /usage.";
 
@@ -637,25 +654,35 @@ impl ChatWidget {
         let trimmed = args.trim();
         match cmd {
             SlashCommand::Add => {
-                let requested_path = std::path::Path::new(trimmed);
-                match crate::legacy_core::elpis_context::add_continuity_source(
+                let cleaned = clean_dropped_path(trimmed);
+                match crate::legacy_core::elpis_context::add_continuity_sources(
                     self.config
                         .memories
                         .root
                         .as_ref()
                         .map(|root| root.as_path()),
                     self.config.cwd.as_path(),
-                    requested_path,
+                    std::path::Path::new(&cleaned),
                 ) {
-                    Ok(path) => self.add_info_message(
-                        format!("Added {} to the Context Ledger.", path.display()),
+                    Ok(paths) if paths.len() == 1 => self.add_info_message(
+                        format!("Added {} to the Context Ledger.", paths[0].display()),
                         Some(
-                            "It is enabled for the next turn. Use Shift+Tab to disable it."
+                            "It is enabled for the next turn. Open the ledger with Tab to toggle it."
+                                .to_string(),
+                        ),
+                    ),
+                    Ok(paths) => self.add_info_message(
+                        format!(
+                            "Added {} files from {cleaned} to the Context Ledger.",
+                            paths.len()
+                        ),
+                        Some(
+                            "They are enabled for the next turn. Open the ledger with Tab to toggle them."
                                 .to_string(),
                         ),
                     ),
                     Err(error) => {
-                        self.add_error_message(format!("Could not add context file: {error}"))
+                        self.add_error_message(format!("Could not add context source: {error}"))
                     }
                 }
             }
