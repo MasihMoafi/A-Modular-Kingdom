@@ -146,6 +146,7 @@ impl FileSystemSandboxRunner {
                     windows_sandbox_level: sandbox_context.windows_sandbox_level,
                     windows_sandbox_private_desktop: sandbox_context
                         .windows_sandbox_private_desktop,
+                    arg0: None,
                 },
             })
             .map_err(|err| invalid_request(format!("failed to prepare fs sandbox: {err}")))

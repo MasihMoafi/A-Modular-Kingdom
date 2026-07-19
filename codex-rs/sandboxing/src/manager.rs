@@ -142,6 +142,7 @@ pub struct SandboxTransformRequest<'a> {
     pub use_legacy_landlock: bool,
     pub windows_sandbox_level: WindowsSandboxLevel,
     pub windows_sandbox_private_desktop: bool,
+    pub arg0: Option<String>,
 }
 
 /// Bundled arguments for a sandbox transformation whose result will be spawned
@@ -334,6 +335,7 @@ impl SandboxManager {
             use_legacy_landlock,
             windows_sandbox_level,
             windows_sandbox_private_desktop,
+            arg0,
         } = request;
         #[cfg(target_os = "macos")]
         let managed_network = command.managed_network.as_ref();
@@ -354,7 +356,7 @@ impl SandboxManager {
         argv.push(command.program);
         argv.extend(command.args.into_iter().map(OsString::from));
 
-        let (argv, arg0_override, pending_sandboxed_request) = match sandbox {
+        let (argv, mut arg0_override, pending_sandboxed_request) = match sandbox {
             SandboxType::None => (os_argv_to_strings(argv), None, None),
             #[cfg(target_os = "macos")]
             SandboxType::MacosSeatbelt => {
@@ -443,6 +445,10 @@ impl SandboxManager {
                     )
                 },
             );
+
+        if arg0_override.is_none() {
+            arg0_override = arg0;
+        }
 
         Ok(SandboxExecRequest {
             command: argv,

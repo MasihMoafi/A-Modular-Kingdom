@@ -338,8 +338,7 @@ pub fn build_exec_request(
         windows_sandbox_level,
         windows_sandbox_private_desktop,
 
-        // TODO: Should arg0 be set on the ExecRequest that is returned?
-        arg0: _,
+        arg0,
         // These fields are related to approvals, so can be ignored here.
         justification: _,
         sandbox_permissions: _,
@@ -398,6 +397,7 @@ pub fn build_exec_request(
             use_legacy_landlock,
             windows_sandbox_level,
             windows_sandbox_private_desktop,
+            arg0: arg0.clone(),
         })
         .map(|request| {
             let windows_sandbox_workspace_roots = if windows_sandbox_workspace_roots.is_empty() {

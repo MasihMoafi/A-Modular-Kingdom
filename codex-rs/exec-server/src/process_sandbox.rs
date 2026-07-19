@@ -142,6 +142,7 @@ pub(crate) fn prepare_exec_request(
                 use_legacy_landlock: sandbox_context.use_legacy_landlock,
                 windows_sandbox_level: sandbox_context.windows_sandbox_level,
                 windows_sandbox_private_desktop: sandbox_context.windows_sandbox_private_desktop,
+                arg0: params.arg0.clone(),
             },
         })
         .map_err(|err| invalid_params(format!("failed to prepare process sandbox: {err}")))?;
