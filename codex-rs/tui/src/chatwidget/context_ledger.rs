@@ -259,8 +259,8 @@ impl ChatWidget {
         let instruction_paths = self
             .instruction_source_paths
             .iter()
-            .filter_map(|uri| uri.to_abs_path().ok())
-            .collect::<Vec<_>>();
+            .filter_map(|uri| uri.to_abs_path().ok().map(|p| p.into()))
+            .collect::<Vec<std::path::PathBuf>>();
         crate::legacy_core::elpis_context::continuity_sources(
             self.config
                 .memories
