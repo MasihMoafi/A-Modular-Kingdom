@@ -16,3 +16,14 @@ def test_rag_tool_is_advertised_as_read_only() -> None:
         "idempotentHint": True,
         "openWorldHint": False,
     }
+
+
+def test_normalize_path_prevents_traversal() -> None:
+    from agent.host import _normalize_path
+    import pytest
+
+    with pytest.raises(ValueError, match="Path is outside the workspace"):
+        _normalize_path("../../etc/passwd")
+
+    with pytest.raises(ValueError, match="Path is outside the workspace"):
+        _normalize_path("/etc/passwd")
