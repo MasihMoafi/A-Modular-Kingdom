@@ -124,10 +124,10 @@ impl ChatWidget {
             let sequence_hint = if self.context_ledger.pending_g {
                 "g … then i include all / e exclude all"
             } else {
-                "Space/Enter toggle · g i all in · g e all out"
+                "Space/Enter toggle · w why · ↑↓ select · Shift+Tab close"
             };
             lines.push(Line::from(sequence_hint.dim()));
-            lines.push(Line::from("w why · ↑↓ select · Shift+Tab close".dim()));
+            lines.push(Line::from("use /add to add a file or directory".dim()));
         }
         lines.push(Line::from(""));
 
@@ -256,6 +256,11 @@ impl ChatWidget {
     }
 
     fn continuity_sources(&self) -> Vec<crate::legacy_core::elpis_context::ContinuitySource> {
+        let instruction_paths = self
+            .instruction_source_paths
+            .iter()
+            .filter_map(|uri| uri.to_abs_path().ok())
+            .collect::<Vec<_>>();
         crate::legacy_core::elpis_context::continuity_sources(
             self.config
                 .memories
@@ -263,6 +268,7 @@ impl ChatWidget {
                 .as_ref()
                 .map(|root| root.as_path()),
             self.config.cwd.as_path(),
+            &instruction_paths,
         )
     }
 

@@ -222,6 +222,11 @@ impl ChatWidget {
             .collect();
         let agents_summary =
             crate::status::compose_agents_summary(&self.config, &self.instruction_source_paths);
+        let instruction_paths = self
+            .instruction_source_paths
+            .iter()
+            .filter_map(|uri| uri.to_abs_path().ok())
+            .collect::<Vec<_>>();
         let (cell, handle) = crate::status::new_status_output_with_rate_limits_handle(
             &self.config,
             self.runtime_model_provider_base_url.as_deref(),
@@ -239,6 +244,7 @@ impl ChatWidget {
             collaboration_mode,
             reasoning_effort_override,
             agents_summary,
+            &instruction_paths,
             refreshing_rate_limits,
         );
         if let Some(request_id) = request_id {
