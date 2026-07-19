@@ -1,5 +1,15 @@
 # Elpis Technical Guide
 
+## Product Thesis
+
+> You put an agent into an Elpis, and it becomes Elpis. Be Elpis, my friend.
+
+Elpis is the environment an agent enters and assimilates into. The selected model or
+agent runtime may change, but the user's goals, working style, durable knowledge,
+context policy, evidence, and behavioral boundaries continue coherently. Elpis is both
+a state and a direction: it is never fully complete, and each verified change should
+make the environment clearer, more capable, and easier for its creator to control.
+
 ## Purpose
 
 Elpis is a provider-neutral coding-agent TUI. It does not try to make a new foundation
@@ -18,20 +28,160 @@ under them.
 
 ## Product Value
 
-Elpis should create value in four ways:
+Elpis should create value in five ways:
 
-1. **Context sovereignty:** the user can see and control what enters the agent's
+1. **Assimilation:** a selected runtime adopts the creator's applicable instructions,
+   goals, context, memory, and behavioral rules, rather than the user adapting to it.
+2. **Context sovereignty:** the user can see and control what enters the agent's
    working set. Selecting a file is an intentional context operation, not decoration.
-2. **Reliable continuity:** sessions preserve goals, decisions, changes, and evidence,
-   while disposable logs and stale file bodies fall away.
-3. **Safe agency:** edits and commands use explicit sandbox and approval contracts.
-   The UI shows what is proposed and records what happened.
-4. **Runtime choice:** Elpis keeps one surrounding control environment while allowing
-   the model provider and low-level agent runtime to change explicitly.
+3. **Reliable continuity:** sessions preserve goals, decisions, changes, and evidence
+   across model changes, compaction, and restarts, while disposable logs and stale
+   file bodies fall away instead of replaying an ever-growing transcript.
+4. **Safe, transparent agency:** edits and commands use explicit sandbox and approval
+   contracts. The UI shows what is proposed and records what happened; Elpis does not
+   claim success when it has only hidden or documented a gap.
+5. **Runtime choice and user ownership:** Elpis keeps one surrounding control
+   environment while allowing the model provider and low-level agent runtime to
+   change explicitly. Durable state is inspectable, editable, exportable, and not
+   tied to one model provider or agent runtime.
 
 Elpis is not primarily a provider switcher, a transcript viewer, or a collection of
 slash commands. A command belongs in the product only when the user deliberately
 selects it and its behavior has a stable contract.
+
+Elpis is not distinguished by having another terminal chat interface — existing
+projects already provide excellent model access, tools, permissions, terminal
+rendering, and agent loops, and Elpis reuses those implementations. It is
+distinguished by the five values above.
+
+## Desired Output: First Public Release
+
+Ship an installable terminal product, not a repository demo, in which a user can:
+
+1. authenticate and deliberately select a supported model and runtime;
+2. see which runtime owns the turn and which capabilities Elpis retains;
+3. give the agent a task under Read Only, Default, or Full Access permissions;
+4. watch readable commands, output, file changes, diffs, failures, and verification;
+5. inspect and control the exact working context admitted by Elpis;
+6. resume later from the same goal, decisions, changes, and relevant memory without
+   replaying irrelevant history;
+7. switch to at least one non-Codex runtime while retaining Elpis-owned continuity;
+8. install and complete a first real coding task from a clean environment.
+
+The release is successful only when these behaviors pass their acceptance checks from
+a clean checkout and the distinctive context/continuity behavior is visibly better than
+using the selected runtime alone.
+
+Not required for the first release: messaging channels, scheduled automation, voice,
+or desktop applications; dream narratives or autonomous skill creation; support for
+every provider or every upstream Codex/OpenClaw feature; a new implementation where a
+proven upstream component can satisfy the contract.
+
+## Proof Standard
+
+A feature is real only when its user-visible acceptance check passes and the evidence
+is recorded. Documentation, hidden code, or a plausible architecture is not proof. The
+defining evaluation: can a fresh supported runtime enter Elpis, receive the right
+current goal and relevant history, obey the creator's rules, perform visible work under
+the chosen permission mode, and resume later without irrelevant context? `TASKS.md` is
+the current-state record against this standard.
+
+## Requirements
+
+This section preserves confirmed product requirements. A feature is not implemented
+until its user-visible behavior is verified; current implementation state lives in
+`TASKS.md`, not here, so the two documents do not drift against each other.
+
+### Working Agreement
+
+- Keep required work ahead of speculative features.
+- Challenge unnecessary complexity and solution-first requests.
+- Record evidence rather than confidence.
+- Prefer small, reversible changes and the smallest useful verification.
+
+### Confirmed Requirements
+
+**R1. Provider-neutral Elpis environment** — Elpis owns the TUI, provider/runtime
+selection, context projection, durable memory, provider-neutral continuity, behavioral
+policy, permissions bridge, and evidence. A selected runtime may own its low-level
+model loop and native tools, but authentication must never silently transfer
+Elpis-owned state or product identity to that runtime.
+
+**R2. Visible and controlled agency** — Commands and file changes follow explicit
+permission and sandbox policies. The interface must preserve changed paths, diffs,
+command status, failures, and verification evidence.
+
+**R3. Deliberate context lifecycle** — Elpis must know what the model receives. Rules,
+goal, selected files, conversation, tool output, and memory have visible sources,
+sizes, reasons, and lifetimes. Stale exploration leaves the next request only after
+its conclusion and exact evidence pointer are retained. A length threshold alone is not
+a complete context policy.
+
+**R4. Exact and lean continuity** — The active goal, decisions, constraints, changed
+files, verification, blockers, and next action survive restarts. Elpis supports exact
+native-thread resume and lean continuation from a compact portable checkpoint.
+
+**R5. Curated memory** — Memory stores reusable facts and proven procedures, not
+transcripts. Promotion requires repeated useful recall across distinct contexts.
+Memory remains searchable, attributable, reviewable, deletable, and bounded. Deleted
+or faded facts enter a searchable archive before baseline reset; archive failure must
+stop the reset.
+
+**R6. Enforceable creator and project rules** — Applicable `AGENTS.md`, project
+requirements, and behavioral rules reach the model and action layer. Hard safety rules
+are enforced by code where prompts are insufficient.
+
+**R7. Claims require proof** — Documentation separates implemented behavior, remote
+tests, and outstanding user acceptance. Design documents and hidden code are not proof.
+
+**R8. Internal read-only RAG** — `/rag <query>` searches the workspace and
+`/rag <path> -- <query>` targets a folder. The runtime may call the same read-only tool
+autonomously for broad discovery. Exact current-file evidence remains required before
+editing.
+
+**R9. Proportionate, measured development cycle** — Ordinary changes receive focused
+first-release checks. Exhaustive inherited TUI/app-server regression runs nightly,
+manually, and for releases unless the change directly touches that surface. CI must not
+edit source or create status-only commits. Dependency deletion follows Cargo timing
+evidence and product optionality, not crate names.
+
+**R10. Distinctive continuity-first identity** — Elpis uses a cyan visual identity
+(superseding an earlier amber design) and visibly separates runtime, model, context,
+memory, permissions, and evidence. The [UI Identity](#ui-identity) section below is the
+acceptance contract, not proof that every surface it describes already ships.
+
+**R11. Claude Code as a selectable runtime** — Confirmed by Masih 2026-07-18. Claude
+Code, authenticated via its own subscription login (not an extracted/reused
+credential), is a second selectable runtime alongside Codex, not merely another model
+under the existing runtime: it appears in the `/model` picker as its own provider
+group with its model shown beneath it, and a dedicated `/claude-code` command switches
+the active session to it directly. See `TASKS.md` F8 for implementation status.
+
+### First-Release Order
+
+1. Keep the canonical repository and verification cycle clean.
+2. Preserve accepted internal RAG behavior.
+3. Finish memory acceptance, including archive, review, deletion, and reset.
+4. Finish exact/lean context and session acceptance; replace the length-only cleaner.
+5. Verify authenticated OpenAI and OpenRouter task/resume paths.
+6. Implement the persistent identity line and coherent cyan foundation.
+7. Install and complete a real task from a clean environment, then tag `v0.1.0`.
+
+### State Layout
+
+- `~/.elpis/context/workspaces/<workspace>/GOAL.md` — active goal.
+- `~/.elpis/context/workspaces/<workspace>/ES.md` — compact latest checkpoint.
+- `~/.elpis/memories/MEMORY.md` — curated durable memory.
+- `~/.elpis/memories/archive.md` — append-only faded/deleted evidence.
+- `~/.elpis/state/memories_1.sqlite` — recall, promotion, and consolidation state.
+- Provider transcripts and workspace artifacts remain the exact evidence sources.
+
+### Deferred Decisions
+
+- Whether goal changes require explicit confirmation.
+- Default threshold for switching from exact to lean continuation.
+- Native Anthropic and Google adapter order.
+- `/auto`, dreaming reports, voice, rich animation, and scheduled work.
 
 ## Source Map
 
@@ -94,6 +244,101 @@ memory. Dreaming is optional scheduled review and promotion on top of that found
 Elpis's concrete context-record and session-checkpoint contract lives in
 `docs/CONTEXT_AND_SESSIONS.md`.
 
+### Other reference sources
+
+Elpis should reuse proven implementations and reserve original work for its
+distinctive context, memory, continuity, assimilation, and supervision layer.
+
+| Source | Proven capability to reuse or study | Elpis boundary |
+| --- | --- | --- |
+| Pi | Small composable TypeScript packages for multi-provider APIs, agent state, TUI, and coding CLI | Study provider-neutral interfaces and extension simplicity; Pi does not supply Codex-level built-in permissions |
+| Hermes Agent | Provider choice, TUI, cross-session search, user modeling, skill learning, scheduled work, multiple execution backends | Study the closed learning loop and user-facing memory controls; verify implementation before adopting claims |
+| OpenCode | Multi-provider coding product, read-only/build agents, subagents, polished installation and desktop/TUI delivery | Study routing, product packaging, agent modes, and release experience |
+
+No capability should enter `TASKS.md` as implemented merely because an upstream project
+has it. It becomes an Elpis feature only after the Elpis acceptance check passes.
+
+### Codex import provenance
+
+Pinned candidate revision: repository `openai/codex`, revision
+`2e1607ee2fa8099a233df7437adee5f16a741905`, license Apache-2.0 (`LICENSE` and `NOTICE`
+retained under `codex-rs/`). The donor working tree at
+`/home/masih/Desktop/f/p/others/codex` has unrelated local edits; only committed content
+from the pinned revision was imported, never the donor's working-tree state.
+`codex-rs/ELPIS_UPSTREAM.md` records this provenance. After the imported foundation
+passed its authenticated milestone, the superseded root `tui/` prototype was archived on
+the `archive/pre-cleanup-20260716` branch and removed from canonical `main`. Crate and
+module boundaries remain upstream-shaped so later action-rendering, permission, and
+mouse-selection work can stay isolated and keep upstream tests.
+
+### Preserve-first behaviors
+
+Import these proven behaviors with their existing tests before subtracting features:
+
+| Behavior | Principal Codex source |
+| --- | --- |
+| Permission types and profiles | `protocol/src/protocol.rs`, `protocol/src/models.rs`, `utils/approval-presets/` |
+| Patch safety and writable-root checks | `core/src/safety.rs`, `core/src/tools/handlers/apply_patch.rs`, `apply-patch/` |
+| Shell lifecycle and running processes | `core/src/tools/handlers/shell.rs`, `core/src/tools/runtimes/shell/`, `exec/` |
+| Sandbox enforcement | `core/src/tools/sandboxing.rs`, `sandboxing/`, `linux-sandbox/`, `execpolicy/` |
+| Command event rendering | `tui/src/chatwidget/command_lifecycle.rs`, `exec_cell/`, `exec_state.rs` |
+| File/patch event rendering | `tui/src/chatwidget/tool_lifecycle.rs`, `history_cell/patches.rs`, `diff_render.rs` |
+| Approval interface | `tui/src/chatwidget/permissions_menu.rs`, `permission_popups.rs`, `bottom_pane/approval_overlay.rs` |
+| Event routing and replay | `tui/src/chatwidget/protocol.rs`, `replay.rs`, app-server protocol item types |
+| Session/thread storage | `rollout/`, `thread-store/`, `state/` |
+| OpenAI login and refresh | `login/` and its narrow auth dependencies |
+| Provider definitions | `model-provider/`, `model-provider-info/`, `core/src/client.rs` |
+
+All paths above are relative to `codex-rs/`. Codex's provider definition supports the
+OpenAI Responses wire format; it is not by itself a native Gemini/Claude abstraction —
+see [Providers](#providers) for the adapter layer Elpis adds on top.
+
+### Stable task boundaries
+
+Keep these ownership seams intact when changing shared rendering/permission code:
+
+| Task | Primary files | Preserved contract and tests |
+| --- | --- | --- |
+| Action rendering | `tui/src/chatwidget/command_lifecycle.rs`, `tool_lifecycle.rs`, `exec_state.rs`, `exec_cell/`, `history_cell/patches.rs`, `diff_render.rs` | Own command/file lifecycle projection and rendered cells. Keep colocated unit tests and `snapshots/` fixtures with any change. Treat `chatwidget/protocol.rs` as the shared event-routing seam. |
+| Permissions | `protocol/src/protocol.rs`, `protocol/src/models.rs`, `utils/approval-presets/`, `core/src/safety.rs`, `core/src/tools/sandboxing.rs`, `sandboxing/`, `linux-sandbox/`, `execpolicy/`, `tui/src/app_server_session.rs`, `tui/src/chatwidget/permissions_menu.rs`, `permission_popups.rs`, `bottom_pane/approval_overlay.rs` | Own permission types, preset selection, enforcement, and approval UI. Preserve crate tests plus approval snapshots; do not alter rendering lifecycle files while changing policy. |
+| Mouse selection and copy | `tui/src/tui.rs`, `tui/event_stream.rs`, `app/input.rs`, `app/event_dispatch.rs`, `app_event.rs`, `chatwidget.rs` raw-output methods, `history_cell/mod.rs` raw lines, `insert_history.rs` | Codex deliberately skips mouse events and does not enable mouse capture, leaving selection to the terminal. Raw scrollback supplies copy-faithful lines. Preserve `history_cell/tests.rs`, raw-mode chatwidget tests/snapshots, and terminal-mode tests. |
+
+`chatwidget.rs` and `chatwidget/protocol.rs` are shared seams, not general cleanup areas:
+rendering owns lifecycle routing, and mouse-selection work owns only raw-output state and
+copy-friendly transcript projection. Coordinate before changing either seam. All paths
+above are relative to `codex-rs/`.
+
+### Exact permission baseline
+
+Copy Codex's semantics before adding Elpis-specific policy:
+
+- **Read Only:** may read workspace files; edits or internet require approval.
+- **Default:** may read/edit within the workspace and run commands; internet or work
+  outside the workspace requires approval.
+- **Full Access:** no approval prompts; filesystem and internet restrictions are off.
+
+### Migration status
+
+The migration sequence (preserve prototype checkpoint → import pinned workspace →
+rename/package as Elpis → subtract cloud/product surfaces → replace branding → introduce
+the runtime contract → move Elpis product rules onto the new foundation → add Gemini/
+Claude adapters → add the OpenClaw-derived context/session/memory pipeline) is complete
+through native provider adapters; the OpenClaw-derived context/session/memory pipeline is
+the current foundation work — see [Current State](#current-state).
+
+Open questions not yet approved as requirements:
+
+- which Codex cloud, apps, realtime, and experimental surfaces remain (tracked as
+  reduction-campaign candidates in `docs/BUILD_AND_REDUCTION_AUDIT.md`);
+- the final visual redesign beyond the shipped cyan identity line and Context Ledger
+  (see [UI Identity](#ui-identity)).
+
+Two questions this document previously left open are now answered: Claude/Gemini use
+direct native APIs as well as OpenRouter compatibility aliases (see
+[Providers](#providers)), and live mid-session provider switching is not yet
+implemented — `ThreadSettingsUpdateParams` carries a model override but no provider
+field (see `TASKS.md` F5).
+
 ## Runtime Architecture
 
 ```text
@@ -118,9 +363,174 @@ owns the surrounding product: runtime selection, context projection, durable mem
 provider-neutral session mirror, behavioral policy, approvals bridge, and visible TUI.
 Selecting another runtime must not silently route through Codex.
 
-The Codex account and runtime boundaries are specified in
-`docs/AUTHENTICATION_BOUNDARY.md`. Authentication alone must never silently select a
-runtime; the active model and runtime owner must be visible.
+Authentication alone must never silently select a runtime; the active model and
+runtime owner must be visible.
+
+## Authentication Boundary
+
+Elpis retains Codex/ChatGPT login and may deliberately select the Codex agent runtime.
+Authentication and runtime selection are separate decisions. The supported boundary has
+three parts:
+
+1. For a status-only authentication check, Elpis uses only the Codex app-server v2
+   account RPCs: `account/read`, `account/login/start`, `account/login/cancel`, and the
+   `account/login/completed` and `account/updated` notifications. It must not send
+   `thread/*`, `turn/*`, file, command, approval, or tool requests through this
+   authentication connection.
+2. An Elpis-owned direct OpenAI runtime may port the required Rust authentication
+   component from the local `codex-login` crate. That component owns browser/device
+   login, Codex credential storage compatibility, token refresh, and transient
+   bearer-token access for the Elpis-owned model adapter. The token must not be
+   rendered, logged, returned to the TUI, or persisted in a second Elpis credential
+   store.
+3. When the user selects the Codex runtime, Codex app-server may own that low-level
+   model loop, native tools, native thread, and native compaction. Elpis retains
+   runtime selection, context projection, durable memory, session mirroring,
+   behavioral policy, approval bridging, and presentation. The UI must show that Codex
+   owns the turn.
+
+The stable app-server `account/read` response intentionally reports account state
+without returning a token. The legacy `getAuthStatus` request can return a token with
+`includeToken`, but Codex marks that API deprecated in favor of `account/read`; Elpis
+therefore must not build its native model adapter on that RPC.
+
+A direct path dependency on the separate Codex clone is never a finished boundary.
+Elpis may vendor/adapt Codex source or manage a compatible app-server binary, but it
+must not load source from the donor directory. Selecting Gemini, Claude, or another
+runtime must not implicitly delegate its turn to Codex.
+
+Upstream evidence for this boundary (paths relative to `/home/masih/Desktop/f/p/`):
+
+- Account protocol: `others/codex/codex-rs/app-server-protocol/src/protocol/v2/account.rs`
+- Account processor:
+  `others/codex/codex-rs/app-server/src/request_processors/account_processor.rs`
+- Reusable auth component: `others/codex/codex-rs/login/`
+- Deprecation marker: `others/codex/codex-rs/app-server-protocol/src/protocol/common.rs`
+
+Run `scripts/codex-auth-status-smoke.sh` from the Elpis repository to check this
+boundary: it initializes app-server and sends exactly one `account/read` request,
+printing only the account type and whether OpenAI authentication is required — no
+email, tokens, account IDs, or raw response payloads — and does not start a thread or
+model turn.
+
+## Providers
+
+Elpis owns context admission, durable memory, continuity, permissions, evidence, and the
+terminal interface. The selected provider owns inference. Provider changes must not
+discard the Elpis state around them, and a native-provider selection must never be
+redirected through another provider.
+
+### Built-in hosted routes
+
+| Provider ID | API base URL | Credential environment variable | Wire protocol | Default model |
+| --- | --- | --- | --- | --- |
+| `openai` | `https://api.openai.com/v1` (or the existing configured OpenAI/Codex base) | `OPENAI_API_KEY` when API-key auth is used | OpenAI Responses | `gpt-5.4` |
+| `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | OpenAI Responses compatibility | `openai/gpt-5.4` |
+| `anthropic` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | Anthropic Messages | `claude-sonnet-4-6` |
+| `google-gemini` | `https://generativelanguage.googleapis.com/v1beta` | `GEMINI_API_KEY` | Gemini GenerateContent | `gemini-3.5-flash` |
+
+Verified against `codex-rs/model-provider-info/src/lib.rs`. The OpenAI Responses
+implementation is unchanged; OpenRouter also continues to use its existing
+Responses-compatible path.
+
+### Compatibility aliases
+
+These launcher aliases are intentionally **not native routes**:
+
+| Alias | Actual provider | Model alias | Label |
+| --- | --- | --- | --- |
+| `--provider claude` | OpenRouter | `~anthropic/claude-sonnet-latest` | Claude via OpenRouter (compatibility) |
+| `--provider gemini` | OpenRouter | `~google/gemini-pro-latest` | Gemini Pro via OpenRouter (compatibility) |
+| `--provider gemini-flash` | OpenRouter | `~google/gemini-flash-latest` | Gemini Flash via OpenRouter (compatibility) |
+
+Use `--provider anthropic` or `--provider google-gemini` for direct vendor routing.
+Those native IDs never install an OpenRouter model override.
+
+### Native authentication boundaries
+
+- Anthropic sends `ANTHROPIC_API_KEY` only as `x-api-key` and sends
+  `anthropic-version: 2023-06-01`.
+- Gemini sends `GEMINI_API_KEY` only as `x-goog-api-key`.
+- OpenAI and OpenRouter API keys retain their existing `Authorization: Bearer ...`
+  behavior.
+- Provider credentials are read from the provider's configured environment variable.
+  They are not copied between providers and are never translated into an OpenRouter
+  credential.
+
+### Native request and stream translation
+
+Implemented in `codex-rs/core/src/chat_completions.rs` with mock-server tests. The
+native adapters translate the canonical Elpis turn representation as follows:
+
+- system and developer text becomes Anthropic `system` blocks or Gemini
+  `systemInstruction`;
+- user and assistant text becomes vendor-native message/content blocks;
+- function definitions become Anthropic `tools` or Gemini `functionDeclarations`;
+- function calls and text-only function results round-trip through native
+  tool-use/function-call blocks;
+- streamed text, tool calls, vendor errors, token usage, model/version identifiers, and
+  completion state are translated back into the existing `ResponseEvent` stream;
+- dropping the response stream cancels the parser task and drops the upstream response
+  body;
+- provider stream-idle timeouts are surfaced as stream errors.
+
+The static native catalogs are supplied to the model manager, so `/model` consumes the
+native provider's default model instead of attempting an OpenAI `/models` request.
+
+### Honest protocol limitations
+
+The current native boundary intentionally rejects rather than silently approximates
+unsupported history or tool shapes.
+
+- Text and function tools are supported. Image inputs and image-bearing tool results
+  are currently rejected even though both vendors have image-capable APIs.
+- OpenAI Responses-only items (encrypted reasoning state, remote compaction controls,
+  custom/freeform tools, tool-search items, built-in web search, image generation, and
+  namespace tools) are not translated.
+- Vendor-native thinking/reasoning signatures, citations, prompt-cache controls,
+  structured-output strictness, Anthropic server tools, and Gemini built-in
+  tools/code execution are not preserved.
+- Anthropic requests currently use an explicit `max_tokens` value of 8192 because the
+  canonical request has no provider-neutral output-token limit.
+- Gemini emits only the first candidate. Repeated full function-call chunks are
+  de-duplicated.
+- The canonical completion event exposes `end_turn`, not a raw vendor finish-reason
+  field. Known finish reasons are mapped explicitly; unknown reasons remain unknown. A
+  parsed tool call always maps to `end_turn = false`.
+- Native stream reconnection is not attempted after partial output. HTTP and SSE
+  failures are surfaced to the existing provider error path.
+- Live vendor acceptance of both native adapters is still pending (see `TASKS.md` F5).
+
+### Manual smoke tests
+
+Anthropic:
+
+```sh
+export ANTHROPIC_API_KEY='...'
+cargo run -p codex-tui --bin elpis -- --provider anthropic
+# In the TUI: run /model and confirm Claude Sonnet 4.6 is listed, then ask for a simple
+# answer and a task that invokes a local function tool.
+```
+
+Gemini:
+
+```sh
+export GEMINI_API_KEY='...'
+cargo run -p codex-tui --bin elpis -- --provider google-gemini
+# In the TUI: run /model and confirm Gemini 3.5 Flash is listed, then exercise text and a
+# function-tool turn.
+```
+
+Compatibility-route check:
+
+```sh
+export OPENROUTER_API_KEY='...'
+cargo run -p codex-tui --bin elpis -- --provider claude
+# Confirm logs/config show model_provider=openrouter and the compatibility model alias.
+```
+
+Do not run these `cargo run` smoke tests on the maintainer's workstation; use the remote
+Rust workflow instead (see Verification below).
 
 ## Context Contract
 
@@ -198,6 +608,59 @@ Reasoning tokens count toward usage, but hidden reasoning is not a useful transc
 to carry forward verbatim. Preserve decisions and evidence. Streamed tool events and
 large outputs also should not remain indefinitely in the model-visible working set.
 
+## UI Identity
+
+Elpis should feel unique because the interface exposes what Elpis uniquely owns: runtime
+identity, admitted context, durable memory, continuity, permissions, and evidence.
+
+> The model may change; the work continues.
+
+### Implemented
+
+- Elpis product naming (`PRODUCT_NAME`/`CODEX_RUNTIME_TITLE` = `"Elpis"`,
+  `codex-rs/tui/src/branding.rs`), rendered in the startup session header as
+  `>_ Elpis (v0.1.0)`. Earlier design notes describing a longer
+  `Elpis · continuity runtime` or `Elpis · Codex runtime` title string are not what
+  ships; the actual title is the bare product name and version.
+- A persistent cyan identity header (`render_identity_line`,
+  `codex-rs/tui/src/chatwidget/rendering.rs`) that always renders above the chat
+  surface: `Elpis · model {model} · context {used}% · location {cwd} · Shift+Tab
+  Context Ledger`. The inherited footer status line is deliberately suppressed
+  (`set_status_line_enabled(false)`) so this header is the one context-percent
+  source, per the Context Accounting Contract in `docs/CONTEXT_AND_SESSIONS.md`.
+  This shipped design accents with cyan and shows model/context/location; an earlier
+  design note proposed amber and a `runtime:`/`memory:`/`mode:` layout instead — that
+  earlier layout was not carried into the implementation.
+- The Context Ledger (`Shift+Tab`, `codex-rs/tui/src/chatwidget/context_ledger.rs`):
+  a toggleable side panel (52 columns, hidden below 100-column terminals) listing
+  every admitted portable-context source with its admitted state and byte size, and
+  a total for currently admitted bytes. Selecting a row toggles its admission and
+  writes the workspace `admission.toml` (`codex-rs/core/src/elpis_context.rs`), which
+  governs next-turn admission for `GOAL.md`, `ES.md`, applicable global/project
+  `AGENTS.md` rules, and `skills/dev/*.md` rules. Each `skills/dev/*.md` file is
+  enumerated as its own independently toggleable row, admitted by default.
+- The provider-aware **Choose a mind** naming for `/model`
+  (`codex-rs/tui/src/chatwidget/model_popups.rs`, commit `bae7108`), surfacing
+  provider, protocol, route, and credential labels.
+- `/status` context-source reporting.
+
+### Not yet implemented
+
+- A signature **continuity event** for resume, compaction, and provider switches. The
+  only implemented notice is a context-eviction message that now also names what
+  persisted (`"Elpis evicted context: {reason}. Evidence: {evidence}. Eviction count:
+  {count}. Survived: goal, checkpoint, and admitted rules (see /status)."`,
+  `codex-rs/tui/src/chatwidget/protocol.rs`, commit `de4ed6f`); it still does not
+  distinguish resume, compaction, or provider-change events from each other.
+- An **evidence-first completion hierarchy** that visually separates a generated
+  claim, changed paths, command/test status, and unresolved gaps.
+
+### Acceptance
+
+A new user watches one task cross compaction or provider change and can explain:
+which runtime performed each turn; which goal, context, and memories survived; what
+expired; what changed and was verified; and where exact evidence can be inspected.
+
 ## Current State
 
 Verified foundation:
@@ -215,8 +678,12 @@ Verified foundation:
 Current foundation work is memory plus context acceptance. Elpis-owned memory storage,
 promotion, bounded retrieval, portable `GOAL.md`/`ES.md`, lean fresh-thread admission,
 pre-compaction protection, and the visible admitted-context list are implemented pending
-remote verification. Visual identity, provider expansion, pruning, and `/auto` routing
-follow the foundational memory/context acceptance checks.
+remote verification. Visual identity (cyan identity header, Context Ledger — see
+[UI Identity](#ui-identity)), provider expansion (native Anthropic/Gemini adapters —
+see [Providers](#providers)), and deterministic tool-output pruning (see
+`docs/CONTEXT_AND_SESSIONS.md`) have each already shipped a first slice ahead of full
+memory/context acceptance; `/auto` routing has not started. None of these are complete
+acceptance until their own acceptance checks pass — see `TASKS.md`.
 
 The currently installed build includes the command-surface changes from `b135e7a` and
 the startup-tip/test-command changes from `419384d`. Most unwanted commands were made
@@ -258,6 +725,16 @@ The superseded Python memory, shell, web, speech, document, parser, and tool-exe
 modules are deleted; Codex owns those general agent capabilities. Future Elpis memory
 and dictation work must be designed at the Elpis product layer, not restored inside the
 RAG MCP.
+
+RAG's vector storage (`src/rag/qdrant_backend.py`, `QdrantVectorDB`) supports both a
+local on-disk Qdrant client and Qdrant Cloud via a `mode: "local" | "cloud"`
+constructor argument plus a `url`/`api_key` pair for cloud mode; cloud mode avoids the
+local client's single-writer locking, at the cost of a separate, non-syncing
+collection — the first cloud query re-indexes rather than reusing a local index.
+`src/rag/core.py`'s `RAGPipelineV2` currently always constructs `QdrantVectorDB` in
+local mode (`persist_path` only, no `mode`/`url`/`api_key` passed); using cloud mode
+requires extending that call site to pass those parameters from environment
+variables, not hardcoding a key.
 
 ### Memory ownership
 

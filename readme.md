@@ -41,7 +41,9 @@ user-visible end-to-end acceptance is still pending. The `claude` and `gemini` l
 shortcuts use OpenRouter compatibility routes, while native Anthropic and Google adapters
 exist as the separate `anthropic` and `google-gemini` providers; live vendor acceptance is
 still pending. The distinctive
-amber continuity interface is specified but only partially implemented. [TASKS.md](TASKS.md)
+cyan continuity interface (identity header and Context Ledger) is partially implemented;
+the `Choose a mind` model picker, signature continuity event, and evidence-first
+completion hierarchy remain. [TASKS.md](TASKS.md)
 is the current-state record.
 
 ## The working model
@@ -89,7 +91,7 @@ flowchart LR
     working --> runtime["Selected runtime request"]
     runtime --> results["Tool and function results"]
     results --> disk[("Full transcript + artifacts on disk")]
-    results --> large{"Old tool output > 4,000 chars?"}
+    results --> large{"Old tool output > 1,200 chars?"}
     large -->|Yes| marker["Temporary output cleaner"]
     large -->|No| keep["Keep in request context"]
 ```
@@ -238,11 +240,10 @@ badge means that workflow passed. It does not mean unfinished work is finished.
 
 - `codex-rs/` — Rust application and TUI.
 - `src/` — the single-tool Python retrieval service.
-- `GUIDE.md` — product and architecture source of truth.
-- `REQUIREMENTS.md` — accepted requirements and unresolved decisions.
-- `TASKS.md` — release work and acceptance state.
+- `AGENTS.md` — agent entry point: dispatch, worktree workflow, and definition of done.
+- `GUIDE.md` — product vision, requirements, and architecture source of truth.
+- `TASKS.md` — release work, acceptance state, and backlog.
 - `docs/CONTEXT_AND_SESSIONS.md` — context and continuation contract.
-- `docs/UI_IDENTITY.md` — distinctive UI contract and implementation status.
 - `docs/BUILD_AND_REDUCTION_AUDIT.md` — build baseline and measured subtraction plan.
 
 ## Development

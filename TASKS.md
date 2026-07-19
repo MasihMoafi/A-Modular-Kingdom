@@ -34,7 +34,7 @@ not claim unfinished behavior is available.
 - Remaining acceptance: resume one real task exactly and one leanly without replaying
   irrelevant work; verify `/status` against the actual next model request.
 - The tool-output cleaner is lifecycle-aware (`core/src/context_cleaner.rs`): older outputs
-  over 4,000 characters are reduced to bounded head/tail excerpts with a durable
+  over 1,200 characters are reduced to bounded head/tail excerpts with a durable
   `rollout://tool-call/<id>` evidence pointer, the two newest outputs stay intact, evictions
   surface in `/status`, and focused tests cover the behavior.
 - Remaining cleaner gap: the retained excerpt is positional (head/tail), not a semantic
@@ -67,9 +67,12 @@ not claim unfinished behavior is available.
 - Remaining first-release acceptance: complete and resume one task through OpenAI and
   OpenRouter, proving Elpis-owned goal, context, memory, permissions, and evidence survive.
 - The `/model` surface now uses the Elpis `Choose a mind` naming and shows provider,
-  protocol, route, and credential labels. Live provider switching mid-session remains
-  unimplemented: the app-server settings update carries a model but not a provider, so
-  provider choice still happens at launch (`--provider`).
+  protocol, route, and credential labels.
+- Live provider switching mid-session is unimplemented at the protocol layer:
+  `ThreadSettingsUpdateParams` (`app-server-protocol/src/protocol/v2/thread.rs`) carries
+  `model` but no provider field, while the paired `ThreadSettings` read/notification struct
+  does carry `model_provider`. Provider choice still happens only at launch (`--provider`);
+  a live switch needs an explicit protocol/runtime slice, not a cosmetic selector.
 
 ### F6. Release readiness and build cycle — in progress
 
@@ -87,13 +90,17 @@ not claim unfinished behavior is available.
 
 ### F7. Distinctive Elpis UI/UX — design complete; implementation partial
 
-- Implemented: Elpis naming, cyan identity accents (the selected design-prototype direction,
-  superseding the earlier amber contract), a persistent identity header with model,
-  context-used percent, and location, the Context Ledger with per-file dev-skills rows, and
-  suppression of the conflicting inherited footer status line.
-- Remaining: the continuity event surface, the evidence-first completion hierarchy, and a
-  render-verified context-accounting consistency check. `docs/UI_IDENTITY.md` still
-  describes amber and needs revision to the cyan direction.
+- Implemented: Elpis naming, the mature inherited Ratatui interaction model, a persistent
+  cyan identity header (model, context-used percent, location — commit `49cd113`,
+  superseding the earlier amber design), suppression of the conflicting inherited footer
+  status line, the Context Ledger with per-file `skills/dev` rows, and the `Choose a mind`
+  `/model` naming (commit `bae7108`).
+- Not yet implemented: the signature continuity event (only a generic eviction notice
+  exists, now naming what survived — commit `de4ed6f`, `"Survived: goal, checkpoint, and
+  admitted rules (see /status)."` — but not distinguishing resume/compaction/provider-change
+  events), the evidence-first completion hierarchy, and a render-verified
+  context-accounting consistency check. GUIDE.md's UI Identity section is a contract, not
+  proof.
 - Proof required: a new user watches a task cross compaction or provider change and can state
   what survived, what expired, which runtime acted, and where evidence lives.
 - Known bug, fixed 2026-07-18: `continuity_sources()` built the dev-skills path from a
@@ -104,6 +111,28 @@ not claim unfinished behavior is available.
   individual, independently toggleable rows admitted by default (commit `2f85ce3`, with a
   focused regression in `core/src/elpis_context.rs`). Remote verification is in progress;
   not accepted until the CI run passes and a terminal render check confirms the rows.
+
+### F8. Claude Code as a selectable runtime (R11) — first slice landed
+
+- `codex-rs/claude-bridge`: a subprocess bridge to the Claude Code CLI's `--print`
+  non-interactive mode (`claude -p --output-format stream-json`), with a typed event
+  parser built from an empirical capture (Claude Code 2.1.214), tested, CI-green.
+- `/claude-code` command and an `ActiveRuntime` (`Codex` | `ClaudeCode`) session enum
+  exist (`codex-rs/tui/src/chatwidget/runtime_selection.rs`) and switching prints a
+  confirmation in the transcript.
+- Turn submission is actually routed through `claude-bridge` when the active runtime is
+  Claude Code (`codex-rs/tui/src/chatwidget/claude_code_turn.rs`), not just recorded:
+  whole-message text-in/text-out only — no incremental streaming render (unlike Codex's
+  `StreamController`), and `tool_use`/`tool_result` content blocks are not inspected or
+  bridged to Elpis's approval/diff/permission surfaces. A Claude Code turn that calls a
+  tool shows nothing in the TUI until the process exits, then only its final text (if
+  any). `codex-rs/claude-bridge`'s own parser doesn't decode those block shapes yet
+  either, so this is a source-level limitation, not just an integration gap.
+- Not yet implemented: Claude Code does not appear in the `/model` picker as its own
+  provider group (`codex-rs/tui/src/chatwidget/model_popups.rs` has no Claude Code
+  entries) — `/claude-code` is currently the only way to select it.
+- Claude Code authenticates via its own subscription login, separate from Codex/ChatGPT
+  and from the native/OpenRouter provider credentials in F5.
 
 ## Reduction campaign
 
@@ -127,12 +156,35 @@ not claim unfinished behavior is available.
 - Behavioral enforcement across runtimes.
 - Dictation with visible consent and editable, unsent text.
 - Further Codex subtraction, one measured capability at a time.
+- Workspace RAG enhancements: an interactive path prompt on `/rag` (Enter defaults to the
+  terminal's current working directory with a configurable folder-depth/token guardrail
+  against scanning something like `node_modules`), a natural-language RAG trigger so the
+  agent can invoke retrieval without an explicit `/rag` command, and keeping RAG defaults
+  from mixing active workspace source with the global memory `archive.md`.
+- `/deep-research`: an autonomous mode combining structured RAG, web search, and recursive
+  crawling to build reference context before proposing edits.
+- Provider-grouped `/model` picker: list models grouped by provider (OpenAI, native
+  Anthropic/Gemini, OpenRouter families) instead of a flat list.
+- LSP-backed code intelligence for the active runtime: real language-server queries
+  (go-to-definition, precise references, live diagnostics) instead of grep/text search.
+  No confirmed LSP client exists in any runtime currently bridged into Elpis; scope as its
+  own investigation before committing.
+- A **Dynamic Context Files Panel** was proposed here in an earlier draft of this backlog;
+  it is already implemented as the Context Ledger (see F7) and is not a future item.
 
 ## Nice-to-have
 
-- `/auto` routing with a visible choice, reason, and manual override.
+- `/auto` routing with a visible choice, reason, and manual override. A proposed shape:
+  classify by complexity and route easy edits/summaries to a low-cost fast model, medium
+  work to a mid-tier model, and architectural/multi-file work to a frontier model.
 - Scheduled memory review or dreaming-style reports.
-- Rich themes and animation beyond the first coherent amber identity.
+- Rich themes and animation beyond the first coherent cyan identity.
+- Elpis Family Tree: a hierarchical multi-agent framework where a coordinator runtime
+  delegates scoped sub-tasks to worker runtimes in parallel worktrees/branches, with a
+  code-level token/cost harness to bound runaway loops.
+- Messaging adapters (Telegram/Discord) using OpenClaw/Pi connection patterns, so Elpis can
+  run as a daemon connected to channels.
+- A `/elpis` poetry easter egg: a cyan-themed display of stylized lyrics or poems.
 
 ## Current Action
 
@@ -141,6 +193,7 @@ not claim unfinished behavior is available.
 2. Inspect the uploaded Cargo timing report and select the highest-cost optional dependency
    surface for one bounded deletion.
 3. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
-4. Implement the selected [`design-prototype.png`](design-prototype.png) direction: persistent
-   identity line plus the cyan Context Ledger. Its `GOAL.md` and `ES.md` controls must govern
-   next-turn admission before claiming unique UI/UX is complete.
+4. The persistent cyan identity line, Context Ledger, and `Choose a mind` `/model` naming
+   are implemented; its `GOAL.md`/`ES.md`/`AGENTS.md`/`skills/dev` controls already govern
+   next-turn admission (`core/src/elpis_context.rs`). Remaining before UI/UX is complete:
+   the signature continuity event and the evidence-first completion hierarchy (see F7).

@@ -2,12 +2,10 @@
 
 ## Start
 
-- Read `VISION.md`; it is the stable product intent.
-- Read `GUIDE.md`; it is the architecture source of truth.
-- Read `REQUIREMENTS.md`; it separates confirmed requirements from open product choices.
+- Read `GUIDE.md`; it is the product, architecture, and requirements source of truth.
 - Read `TASKS.md`; work only on its Current Action unless Masih changes priority.
-- Read `docs/AGENT_DISPATCH.md` before delegating work or creating a worktree.
-- Read `SESSION_HANDOFF.md` when it exists, then verify its claims before continuing.
+- Read `docs/CONTEXT_AND_SESSIONS.md` before touching context, session, or pruning
+  behavior; read `docs/BUILD_AND_REDUCTION_AUDIT.md` before build or dependency work.
 - Obey the global rules in `/home/masih/.codex/AGENTS.md`. The development-harness
   mirror is `/home/masih/Desktop/f/p/skills/dev/`.
 - Verify the repository state before editing; preserve unrelated user changes.
@@ -22,8 +20,7 @@
 - Summarize terminal output; do not carry raw logs once their result is known.
 - After edits, retain the diff and verification result; reread file bodies on demand.
 - Do not add slash commands unless Masih explicitly selects them.
-- Worker agents must not edit `VISION.md`, `REQUIREMENTS.md`, `TASKS.md`, or
-  `SESSION_HANDOFF.md`; the coordinator owns those files.
+- Worker agents must not edit `GUIDE.md` or `TASKS.md`; the coordinator owns those files.
 - Do not delegate to Jules. The coordinator selects and manages any other worker model
   and its worktree; Masih does not need to manage them.
 
@@ -35,3 +32,71 @@
 - Rust changes pass `cargo test`; Python changes pass the narrowest relevant test and
   `.venv/bin/python -m compileall -q src`.
 - Known gaps and skipped checks are stated plainly.
+
+## Agent Dispatch
+
+Use one coordinator and one worktree per implementation task. The coordinator owns
+`GUIDE.md`, `TASKS.md`, architecture decisions, task ordering, integration, and the
+final acceptance decision. Worker agents implement bounded tasks; they do not redefine
+the product.
+
+Do not run two agents against the same files or an unresolved shared interface. More
+agents increase speed only when tasks are genuinely independent.
+
+### Difficulty routing
+
+| Difficulty | Characteristics | Preferred worker |
+| --- | --- | --- |
+| Easy | One localized behavior, known solution, low-risk change, narrow test | Fast low-cost worker (Luna-class) |
+| Medium | Several files, bounded design choice, adaptation of an existing pattern | Balanced worker (Terra/Flash-class) |
+| Hard | Architecture, runtime ownership, security, permissions, context/memory semantics, migration, cross-cutting interfaces | Main high-reasoning model |
+
+Escalate a task when investigation reveals a broader interface or product decision.
+Do not let a worker quietly expand scope.
+
+Do not use Jules. The coordinator chooses the worker model, creates and removes its
+worktree, reviews its result, and integrates it. Masih only decides product behavior.
+
+### Worktree workflow
+
+1. Start only from the shared committed control baseline.
+2. Select the Current Action from `TASKS.md` after verifying its dependencies.
+3. Create one branch and worktree named for that task.
+4. Give the worker the task fields, exact file scope, non-goals, and acceptance test.
+5. Require the worker to return changed files, checks run, evidence, risks, and commit.
+6. Review and integrate one branch at a time. Run the acceptance check after integration.
+7. The coordinator alone updates feature status to `verified`.
+
+Example after the control baseline is committed:
+
+```bash
+git worktree add ../Elpis-wt-terminal-selection -b agent/terminal-selection main
+```
+
+Remove a worktree only after its branch is integrated or intentionally abandoned.
+
+### Worker prompt contract
+
+Every delegated prompt must contain:
+
+```text
+Task ID:
+Desired user-visible behavior:
+Why it is needed:
+Allowed files:
+Forbidden scope:
+Dependencies already verified:
+Acceptance test:
+Required checks:
+Return: summary, changed files, verification, risks, commit hash.
+```
+
+If any field is missing or contradictory, challenge the requirement before coding.
+
+### Current parallelism gate
+
+The Codex-derived foundation establishes shared runtime, event, permission, and TUI
+interfaces. Until that baseline is fully subtracted to Elpis's approved scope, do not
+delegate changes that would target those same interfaces. Safe parallel work is limited
+to isolated research, tests that do not assume an interface, and small corrections in
+files explicitly excluded from the foundation migration.
