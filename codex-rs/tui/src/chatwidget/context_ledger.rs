@@ -7,6 +7,7 @@ use ratatui::widgets::Borders;
 
 const LEDGER_MIN_TERMINAL_WIDTH: u16 = 100;
 const LEDGER_WIDTH: u16 = 52;
+const LEDGER_SOURCE_LINES: u16 = 4;
 
 #[derive(Default)]
 pub(super) struct ContextLedgerState {
@@ -167,6 +168,24 @@ impl ChatWidget {
             lines.push(Line::from("Esc returns to the command composer.".dim()));
         }
 
+        let header_lines = if self.context_ledger.focused { 3 } else { 2 };
+        let visible_rows = area
+            .height
+            .saturating_sub(2)
+            .saturating_sub(header_lines);
+        let first_source = self
+            .context_ledger
+            .focused
+            .then(|| {
+                first_visible_source(
+                    self.context_ledger.selected,
+                    sources.len(),
+                    visible_rows,
+                )
+            })
+            .unwrap_or(0);
+        let scroll_lines = header_lines.saturating_add(first_source as u16 * LEDGER_SOURCE_LINES);
+
         Paragraph::new(lines)
             .block(
                 Block::default()
@@ -175,6 +194,7 @@ impl ChatWidget {
                     .title(" CONTEXT "),
             )
             .wrap(Wrap { trim: true })
+            .scroll((scroll_lines, 0))
             .render(area, buf);
     }
 
@@ -199,10 +219,36 @@ impl ChatWidget {
     }
 }
 
+fn first_visible_source(selected: usize, source_count: usize, visible_rows: u16) -> usize {
+    let visible_sources = usize::from((visible_rows / LEDGER_SOURCE_LINES).max(1));
+    selected
+        .saturating_add(1)
+        .saturating_sub(visible_sources)
+        .min(source_count.saturating_sub(visible_sources))
+}
+
 fn format_bytes(bytes: u64) -> String {
     if bytes < 1_024 {
         format!("{bytes} B")
     } else {
         format!("{:.1}k", bytes as f64 / 1_024.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selected_source_scrolls_into_a_short_ledger() {
+        assert_eq!(first_visible_source(0, 7, 8), 0);
+        assert_eq!(first_visible_source(2, 7, 8), 1);
+        assert_eq!(first_visible_source(6, 7, 8), 5);
+    }
+
+    #[test]
+    fn ledger_scroll_stays_within_the_source_list() {
+        assert_eq!(first_visible_source(8, 3, 8), 1);
+        assert_eq!(first_visible_source(0, 0, 8), 0);
     }
 }
