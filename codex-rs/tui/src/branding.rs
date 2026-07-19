@@ -65,6 +65,10 @@ struct RuntimeIdentity {
     memory_citations: usize,
     eviction_count: u64,
     cleaner_eviction_count: usize,
+    /// Total chars removed from working context this session (the ace's headline metric).
+    context_saved_chars: u64,
+    /// Last synced cumulative total from `context_cleaner::saved_chars()`, for delta tracking.
+    cleaner_saved_chars: u64,
     latest_eviction: Option<EvictionNotice>,
     latest_continuity: Option<String>,
     resume_announced: bool,
@@ -83,6 +87,8 @@ impl Default for RuntimeIdentity {
             memory_citations: 0,
             eviction_count: 0,
             cleaner_eviction_count: 0,
+            context_saved_chars: 0,
+            cleaner_saved_chars: 0,
             latest_eviction: None,
             latest_continuity: None,
             resume_announced: false,
@@ -195,6 +201,29 @@ pub(crate) fn sync_context_eviction(count: usize, event: Option<&str>) -> bool {
     })
 }
 
+/// Adds chars removed from working context (e.g. a Claude turn distilled to an
+/// outcome record) to the session's visible "saved" total.
+pub(crate) fn record_context_saved(chars: u64) {
+    if chars == 0 {
+        return;
+    }
+    mutate_runtime_identity(|state| {
+        state.context_saved_chars = state.context_saved_chars.saturating_add(chars);
+    });
+}
+
+/// Folds the context cleaner's cumulative saved-chars counter into the visible
+/// total, delta-style (mirrors `sync_context_eviction`).
+pub(crate) fn sync_context_saved(cleaner_total: u64) {
+    mutate_runtime_identity(|state| {
+        if cleaner_total > state.cleaner_saved_chars {
+            let delta = cleaner_total - state.cleaner_saved_chars;
+            state.cleaner_saved_chars = cleaner_total;
+            state.context_saved_chars = state.context_saved_chars.saturating_add(delta);
+        }
+    });
+}
+
 pub(crate) fn record_model_reroute(from_model: &str, to_model: &str) {
     mutate_runtime_identity(|state| {
         state.model = normalized_value(to_model, "starting");
@@ -275,6 +304,19 @@ fn identity_spans(state: &RuntimeIdentity, model_hint: Option<&str>) -> Vec<Span
         &context,
         crate::style::status_symbol_style(),
     );
+    if state.context_saved_chars > 0 {
+        let saved = if state.context_saved_chars >= 1000 {
+            format!("{:.1}k", state.context_saved_chars as f64 / 1000.0)
+        } else {
+            state.context_saved_chars.to_string()
+        };
+        push_field(
+            &mut spans,
+            "saved",
+            &saved,
+            crate::style::status_symbol_style(),
+        );
+    }
     if let Some(latest) = state.latest_eviction.as_ref() {
         push_field(
             &mut spans,
@@ -346,6 +388,22 @@ mod tests {
             "ELPIS · provider OpenAI · model gpt-5.6 · context 41% · evidence thread:t/turn:u"
         );
         assert!(text.starts_with("ELPIS · provider"));
+    }
+
+    #[test]
+    fn identity_line_shows_saved_field_once_context_was_saved() {
+        let state = RuntimeIdentity {
+            context_saved_chars: 12_345,
+            ..RuntimeIdentity::default()
+        };
+        let text = line_text(&Line::from(identity_spans(&state, None)));
+        assert!(text.contains("saved 12.3k"), "{text}");
+
+        let untouched = line_text(&Line::from(identity_spans(
+            &RuntimeIdentity::default(),
+            None,
+        )));
+        assert!(!untouched.contains("saved"), "{untouched}");
     }
 
     #[test]

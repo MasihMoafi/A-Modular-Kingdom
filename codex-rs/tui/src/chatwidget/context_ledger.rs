@@ -159,8 +159,7 @@ impl ChatWidget {
             }
             for (index, source) in category_sources {
                 let source_line_start = lines.len();
-                let selected =
-                    self.context_ledger.focused && index == self.context_ledger.selected;
+                let selected = self.context_ledger.focused && index == self.context_ledger.selected;
                 let marker = if source.selectable {
                     if source.admitted { "[x]" } else { "[ ]" }
                 } else {

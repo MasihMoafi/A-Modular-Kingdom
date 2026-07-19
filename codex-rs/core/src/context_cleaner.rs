@@ -8,11 +8,18 @@ const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 1_200;
 const RETAINED_EDGE_CHARS: usize = 400;
 const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 2;
 static EVICTED_TOOL_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
+static SAVED_CHARS: AtomicUsize = AtomicUsize::new(0);
 static LAST_EVICTION_EVENT: Mutex<Option<String>> = Mutex::new(None);
 
 /// Number of transient tool outputs compacted during this Elpis process.
 pub fn eviction_count() -> usize {
     EVICTED_TOOL_OUTPUTS.load(Ordering::Relaxed)
+}
+
+/// Cumulative chars removed from request context by compaction during this
+/// Elpis process — the "context saved" metric for the Codex runtime.
+pub fn saved_chars() -> usize {
+    SAVED_CHARS.load(Ordering::Relaxed)
 }
 
 /// Most recent visible context-update event, including its durable evidence pointer.
@@ -42,6 +49,7 @@ pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize 
         .len()
         .saturating_sub(RECENT_TOOL_OUTPUTS_TO_KEEP);
     let mut evicted = 0;
+    let mut saved = 0usize;
     let mut latest_event = None;
 
     for index in tool_indices.into_iter().take(keep_from) {
@@ -77,10 +85,12 @@ pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize 
         latest_event = Some(format!(
             "ELPIS continuity: compacted older {name} output ({original_chars} chars); exact evidence: {evidence}"
         ));
+        saved += original_chars.saturating_sub(text.chars().count());
         evicted += 1;
     }
     if evicted > 0 {
         EVICTED_TOOL_OUTPUTS.fetch_add(evicted, Ordering::Relaxed);
+        SAVED_CHARS.fetch_add(saved, Ordering::Relaxed);
         if let Ok(mut event) = LAST_EVICTION_EVENT.lock() {
             *event = latest_event;
         }

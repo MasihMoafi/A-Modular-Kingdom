@@ -539,9 +539,12 @@ pub(crate) struct ChatWidget {
     config: Config,
     raw_output_mode: bool,
     active_runtime: ActiveRuntime,
-    /// Prior `claude` CLI session id, passed as `--resume` on the next Claude Code turn.
-    claude_code_session_id: Option<String>,
     claude_code_turn_running: bool,
+    /// The ace: distilled outcome records of prior Claude Code turns. These — not the
+    /// raw transcript — are what gets re-sent, so context shrinks instead of growing.
+    claude_outcome_records: Vec<String>,
+    /// Session-total chars NOT re-sent thanks to distillation (raw turn − record).
+    claude_context_saved_chars: usize,
     /// Runtime value resolved by core. `config.service_tier` remains the explicit user choice.
     effective_service_tier: Option<String>,
     /// The unmasked collaboration mode settings (always Default mode).

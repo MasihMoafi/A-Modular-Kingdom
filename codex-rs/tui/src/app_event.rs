@@ -976,7 +976,10 @@ pub(crate) enum AppEvent {
     },
 
     /// Submit a scoped, read-only RAG request chosen from the local path prompt.
-    SubmitRagSearch { query: String, doc_path: String },
+    SubmitRagSearch {
+        query: String,
+        doc_path: String,
+    },
 
     /// Open the approval popup.
     FullScreenApprovalRequest(ApprovalRequest),
@@ -1017,6 +1020,12 @@ pub(crate) enum AppEvent {
         text: Option<String>,
         session_id: Option<String>,
         error: Option<String>,
+        /// Haiku-distilled record of this turn — the ONLY part re-sent on future turns
+        /// (the ace: deletion by composition; the raw transcript stays on disk).
+        outcome_record: Option<String>,
+        /// Size of the raw turn (user prompt + assistant text) in chars, for the
+        /// "context saved" metric.
+        raw_chars: usize,
     },
 
     /// Async update of the current git branch for status line rendering.
