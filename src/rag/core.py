@@ -15,7 +15,7 @@ import ollama
 from collections import Counter
 from typing import List, Dict, Any, Tuple, Callable, Optional
 from sentence_transformers import SentenceTransformer, CrossEncoder
-from .qdrant_backend import QdrantVectorDB
+from .qdrant_backend import QdrantVectorDB, QdrantConfig
 
 
 def chunk_text(text: str, chunk_size: int = 700, chunk_overlap: int = 100) -> List[str]:
@@ -232,12 +232,15 @@ class RAGPipelineV2:
         persist_dir_name = os.path.basename(self.config.get("persist_dir"))
         collection_name = f"rag_v2_{persist_dir_name}" if persist_dir_name != "rag_db_v2" else "rag_v2_default"
 
-        self.vector_db = QdrantVectorDB(
+        qdrant_config = QdrantConfig(
             collection_name=collection_name,
-            embedding_fn=self.embedding_fn,
             vector_size=vector_size,
             distance=self.config.get("distance_metric", "cosine"),
             persist_path=qdrant_path
+        )
+        self.vector_db = QdrantVectorDB(
+            config=qdrant_config,
+            embedding_fn=self.embedding_fn
         )
 
         # Keep BM25 (still valuable for lexical search)

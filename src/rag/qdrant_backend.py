@@ -15,36 +15,41 @@ import sys
 from utils.proxy import strip_socks as _strip_socks
 _strip_socks()
 
-from typing import List, Dict, Any, Callable
+from dataclasses import dataclass
+from typing import List, Dict, Any, Callable, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
+@dataclass
+class QdrantConfig:
+    """Configuration for QdrantVectorDB."""
+    collection_name: str
+    vector_size: int = 768
+    distance: str = "cosine"
+    persist_path: str = "./qdrant_db"
+    mode: str = "local"
+    url: Optional[str] = None
+    api_key: Optional[str] = None
 
 class QdrantVectorDB:
     """Qdrant-based vector database with batch embedding support."""
 
     def __init__(
         self,
-        collection_name: str,
-        embedding_fn: Callable,
-        vector_size: int = 768,
-        distance: str = "cosine",
-        persist_path: str = "./qdrant_db",
-        mode: str = "local",
-        url: str = None,
-        api_key: str = None
+        config: QdrantConfig,
+        embedding_fn: Callable
     ):
-        self.collection_name = collection_name
+        self.collection_name = config.collection_name
         self.embedding_fn = embedding_fn
-        self.vector_size = vector_size
+        self.vector_size = config.vector_size
 
         # Initialize Qdrant client (local or cloud)
-        if mode == "cloud" and url:
-            sys.stderr.write(f"[Qdrant] Connecting to cloud: {url}" + "\n")
-            self.client = QdrantClient(url=url, api_key=api_key, timeout=30)
+        if config.mode == "cloud" and config.url:
+            sys.stderr.write(f"[Qdrant] Connecting to cloud: {config.url}" + "\n")
+            self.client = QdrantClient(url=config.url, api_key=config.api_key, timeout=30)
         else:
-            sys.stderr.write(f"[Qdrant] Using local storage: {persist_path}" + "\n")
-            self.client = QdrantClient(path=persist_path)
+            sys.stderr.write(f"[Qdrant] Using local storage: {config.persist_path}" + "\n")
+            self.client = QdrantClient(path=config.persist_path)
 
         # Map distance metric
         distance_map = {
@@ -52,7 +57,7 @@ class QdrantVectorDB:
             "euclidean": Distance.EUCLID,
             "dot": Distance.DOT
         }
-        self.distance = distance_map.get(distance, Distance.COSINE)
+        self.distance = distance_map.get(config.distance, Distance.COSINE)
 
         # Create or get collection
         self._init_collection()
