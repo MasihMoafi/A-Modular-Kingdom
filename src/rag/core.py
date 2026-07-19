@@ -310,10 +310,12 @@ class RAGPipelineV2:
     def _index_documents(self):
         """Index all documents using V2 techniques"""
         import sys
+        import concurrent.futures
         all_docs = []
         document_contents = {}
 
-        # First pass: extract all document content
+        # Collect all file paths first
+        files_to_process = []
         for path in self.config.get("document_paths"):
             if not os.path.exists(path):
                 continue
@@ -322,13 +324,23 @@ class RAGPipelineV2:
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
                     if file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json', '.ipynb')):
-                        content = self._extract_content(file_path)
-                        if content:
-                            document_contents[file_path] = content
+                        files_to_process.append(file_path)
             else:
-                content = self._extract_content(path)
-                if content:
-                    document_contents[path] = content
+                files_to_process.append(path)
+
+        def process_file(file_path):
+            content = self._extract_content(file_path)
+            if content:
+                return file_path, content
+            return None
+
+        # First pass: extract all document content using ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = executor.map(process_file, files_to_process)
+            for result in results:
+                if result:
+                    file_path, content = result
+                    document_contents[file_path] = content
 
         # Second pass: chunk and optionally add context
         for file_path, full_content in document_contents.items():
