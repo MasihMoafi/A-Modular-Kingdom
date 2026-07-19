@@ -2,6 +2,7 @@ use std::io;
 use std::os::fd::AsFd;
 use std::os::fd::AsRawFd;
 use std::os::fd::OwnedFd;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Context as _;
 use codex_utils_absolute_path::AbsolutePathBuf;
@@ -17,7 +18,13 @@ use crate::unix::socket::AsyncDatagramSocket;
 use crate::unix::socket::AsyncSocket;
 
 fn get_escalate_client() -> anyhow::Result<AsyncDatagramSocket> {
-    // TODO: we should defensively require only calling this once, since AsyncSocket will take ownership of the fd.
+    static CALLED: AtomicBool = AtomicBool::new(false);
+    if CALLED.swap(true, Ordering::SeqCst) {
+        return Err(anyhow::anyhow!(
+            "get_escalate_client can only be called once because AsyncSocket takes ownership of the fd"
+        ));
+    }
+
     let client_fd = std::env::var(ESCALATE_SOCKET_ENV_VAR)?.parse::<i32>()?;
     if client_fd < 0 {
         return Err(anyhow::anyhow!(
