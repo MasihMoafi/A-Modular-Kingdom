@@ -212,3 +212,20 @@ not claim unfinished behavior is available.
 3. Cargo-timing first pass (2026-07-19): top costs are first-party crates (codex-core
    39.7s, tui 22.1s, config 19.7s, app-server 17.8s); no dominant third-party dependency.
    Select one bounded deletion from `docs/BUILD_AND_REDUCTION_AUDIT.md` candidates only.
+4. R11 (Claude Code as a selectable runtime) — foundation merged to `main`, not complete.
+   Done and CI-verified: `codex-rs/claude-bridge` crate (spawns
+   `claude -p --output-format stream-json`, parses real captured event schema);
+   `/claude-code` command switches `ActiveRuntime`; submitting a message while active
+   routes through the bridge and renders plain-text replies
+   (`tui/src/chatwidget/claude_code_turn.rs`). Never run live by a human, only CI with a
+   fake `claude` binary (`CLAUDE_BRIDGE_BINARY_OVERRIDE_ENV`-style override — check the
+   crate for the exact env var name). Remaining, not started: (a) `/model` picker must
+   show Claude Code as its own provider group with its model listed beneath, matching
+   the pattern already used for other providers; (b) tool-call/permission event
+   rendering — `claude-bridge`'s own doc comments say `tool_use`/`tool_result` JSON
+   shapes were never empirically captured, only plain-text `assistant`/`result` events
+   were; a turn where Claude uses a tool currently shows "used tools, not rendered yet"
+   instead of the tool call. Next step for (b): capture a real `claude -p --verbose
+   --output-format stream-json` run that actually uses a tool, add typed variants for
+   the observed shape, then bridge to Elpis's existing approval/diff UI reused from the
+   Codex path — don't invent a parallel one.
