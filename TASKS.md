@@ -303,29 +303,34 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   Code's left-arrow agent panel), mid-turn message queuing, mobile remote control of a
   session, and opt-in telemetry. Large, multi-slice work; explicitly not v0.1/v0.2.
 
-## Current Action
+## Current Action — the v1 gate list (2026-07-19, evening)
 
-1. Priority 1 — make Claude Code usable and believable inside Elpis (F8). Verified
-   2026-07-19 by a live tmux-driven run of the installed binary: text routing works
-   (`/claude-code` + prompt returned the exact requested reply in the TUI), but the
-   installed 11:54 binary predates commit `0084fcf` and still prints the false "full
-   routing is not implemented yet" notice, the header keeps showing the Codex model
-   while Claude Code is active, and `/model` offers no Claude Code entry — so to a user
-   the feature reads as absent. Actions: install the fresh post-fix build (run
-   `29681801846`, triggered); make the header show the active runtime; merge the CI-green
-   picker entry (PR #55, `agent/ledger-parity-model-picker`); then the Fable-owned core work —
-   bridge `tool_use`/`tool_result` events onto the existing approval/diff UI, starting
-   from an empirical capture of a tool-using `claude -p --verbose
-   --output-format stream-json` run.
-2. Masih approves or rejects the fresh installed build; release tagging happens only
-   after his approval. Everything accepted on 2026-07-19 remains accepted: continuity
-   (`ES.md`/`GOAL.md`, lean continuation, exact resume), memory
-   teach/recall/omission, `/status`, dev-skills ledger rows, OpenAI end-to-end task,
-   header/footer accounting agreement. OpenRouter leg deferred.
-3. Worker branches in flight: `agent/rag-ux-easter-egg` (terra, PR #54) and
-   `agent/ledger-parity-model-picker` (sol, PR #55, CI run `29682921080` green). Integrate
-   one at a time; the coordinator merges, workers do not.
-4. Cargo-timing first pass (2026-07-19): top costs are first-party crates (codex-core
-   39.7s, tui 22.1s, config 19.7s, app-server 17.8s); no dominant third-party dependency.
-   Also investigate the 3.5× installed-binary size regression (see Reduction campaign)
-   before selecting one bounded deletion from `docs/BUILD_AND_REDUCTION_AUDIT.md`.
+Done today: takeover mode merged and tmux-verified (PR #56, main `e01e2a3`); terra PR #54
+and sol's grouped-ledger/picker branch merged; fresh binary from run `29689905487`
+installed. Masih's live review of that build produced the list below. **v0.1 does not tag
+until every item here passes his test.**
+
+1. **The ace — per-turn context deletion, visible (Fable-owned).** The deterministic
+   cleaner is wired but invisible and positional. Required for v1: the agent-authored
+   per-turn prune of the next request, plus the "context saved" metric and bar so the
+   user watches context go *down*. This is the flagship; nothing ships without it.
+2. **Context Ledger tells the whole truth (delegable).** The ledger pane must list every
+   admitted source exactly as `/status` does (global/project AGENTS.md, each dev/ file,
+   ES.md, manual adds) as individual toggleable rows — today it hides the dev group and
+   shows an empty FILES section under a non-zero total. Dedupe: a manually `/add`-ed file
+   that is already admitted as a rule must appear once (Masih's paste shows
+   `dev/AGENTS.md` twice). Theme/layout must match `design-prototype.png` (groups,
+   per-row tokens, INCLUDED/EXCLUDED, why-panel).
+3. **`/add` accepts directories and drag-and-drop (delegable).** `/add <dir>` admits each
+   contained file as its own row (`elpis_context.rs` currently rejects non-files).
+   Dropping a file onto the terminal pastes its path — accept that pasted path. Ledger
+   shows the "use /add to add a file or directory" hint.
+4. **Keybindings (delegable):** Tab opens the Context Ledger; Shift+Tab cycles the four
+   permission modes Claude-style, including auto mode.
+5. **Welcome screen identity (delegable):** the `/elpis` startup window must not look
+   like Codex. Until a real Elpis design exists, show the version and a few "what's new
+   in this version" lines at the top, Claude-Code-style.
+6. Masih tests the rebuilt binary against 1–5; on his explicit okay, tag `v0.1.0` with
+   checksummed release assets. Then v0.2: Elpis data janitor (`/clean-up` for compounded
+   rollouts/archives/evidence), size regression (3.5×), startup speed, distribution
+   (plugin/marketplaces), Claude-parity UX phase 1.
