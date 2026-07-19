@@ -31,6 +31,21 @@ _SERVER_NAME = "elpis-rag"
 _SERVER_VERSION = "0.1.0"
 _use_content_length_framing = False
 _initialized = False
+_INDEXABLE_EXTENSIONS = {
+    ".pdf",
+    ".txt",
+    ".py",
+    ".md",
+    ".ipynb",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".json",
+}
+_UNSAFE_PATH_COMPONENTS = {"node_modules", ".git", ".venv", "venv", "dist", "build"}
+_DEFAULT_MAX_DEPTH = 5
+_DEFAULT_MAX_TOKENS = 120_000
 
 _TOOL = {
     "name": "query_knowledge_base",
@@ -50,7 +65,7 @@ _TOOL = {
             "doc_path": {
                 "type": "string",
                 "default": "",
-                "description": "Optional documents directory",
+                "description": "Optional documents directory. Empty uses the terminal workspace.",
             },
         },
         "required": ["query"],
@@ -130,6 +145,58 @@ def _normalize_path(path: str) -> str:
     return str(candidate.resolve())
 
 
+def _configured_limit(name: str, default: int) -> int:
+    """Read a positive RAG scan limit, falling back to its safe default."""
+    try:
+        value = int(os.environ.get(name, default))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def _validate_rag_scope(path: Path) -> None:
+    """Reject expensive RAG scopes before importing or indexing their contents."""
+    if not path.exists():
+        raise ValueError(f"Path does not exist: {path}")
+    if any(part in _UNSAFE_PATH_COMPONENTS for part in path.parts):
+        raise ValueError(
+            "RAG will not scan dependency or build folders such as node_modules. "
+            "Choose the project source folder instead."
+        )
+    if path.is_file():
+        return
+
+    max_depth = _configured_limit("ELPIS_RAG_MAX_DEPTH", _DEFAULT_MAX_DEPTH)
+    max_tokens = _configured_limit("ELPIS_RAG_MAX_TOKENS", _DEFAULT_MAX_TOKENS)
+    estimated_tokens = 0
+    for current, dirs, files in os.walk(path):
+        current_path = Path(current)
+        depth = len(current_path.relative_to(path).parts)
+        dirs[:] = [
+            directory
+            for directory in dirs
+            if directory not in _UNSAFE_PATH_COMPONENTS and not directory.startswith(".")
+        ]
+        if depth >= max_depth and dirs:
+            raise ValueError(
+                f"RAG scan exceeds the configured {max_depth}-folder depth limit. "
+                "Choose a narrower folder or raise ELPIS_RAG_MAX_DEPTH deliberately."
+            )
+        for name in files:
+            candidate = current_path / name
+            if candidate.suffix.lower() not in _INDEXABLE_EXTENSIONS:
+                continue
+            try:
+                estimated_tokens += candidate.stat().st_size // 4 + 1
+            except OSError:
+                continue
+            if estimated_tokens > max_tokens:
+                raise ValueError(
+                    f"RAG scan exceeds the configured {max_tokens:,}-token limit. "
+                    "Choose a narrower folder or raise ELPIS_RAG_MAX_TOKENS deliberately."
+                )
+
+
 def query_knowledge_base(
     query: str,
     doc_path: str = "",
@@ -139,20 +206,23 @@ def query_knowledge_base(
     if not query:
         return json.dumps({"error": "query must be a non-empty string"})
 
-    normalized_doc_path = _normalize_path(doc_path) if doc_path.strip() else ""
-    if not normalized_doc_path:
-        normalized_doc_path = str(workspace_root)
+    is_default_workspace = not doc_path.strip()
+    normalized_doc_path = (
+        _normalize_path(doc_path) if not is_default_workspace else str(workspace_root)
+    )
 
     try:
+        _validate_rag_scope(Path(normalized_doc_path))
         module = importlib.import_module("rag.fetch")
         fetch = getattr(module, "fetchExternalKnowledge", None)
         if not callable(fetch):
             return json.dumps({"error": "rag.fetch has no fetchExternalKnowledge function"})
 
-        if normalized_doc_path:
-            value = fetch(query=query, doc_path=normalized_doc_path)
-        else:
-            value = fetch(query=query)
+        value = fetch(
+            query=query,
+            doc_path=normalized_doc_path,
+            exclude_global_archive=is_default_workspace,
+        )
         return json.dumps({"result": value})
     except Exception as exc:
         return json.dumps({"error": f"RAG query failed: {exc}"})

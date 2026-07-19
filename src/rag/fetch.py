@@ -59,16 +59,21 @@ def _safe_dir_name(path: str) -> str:
     base = os.path.basename(abs_path.rstrip(os.sep)) or "root"
     return f"{base}_{h}"
 
-def get_rag_pipeline_v2(doc_path: Optional[str] = None):
+def get_rag_pipeline_v2(doc_path: Optional[str | list[str]] = None):
     import sys
     
     # Resolve path
-    if doc_path:
+    if isinstance(doc_path, list):
+        doc_paths = [resolve_path(path) for path in doc_path]
+        if not doc_paths:
+            raise ValueError("No indexable files in selected scope")
+        doc_path = doc_paths
+    elif doc_path:
         doc_path = resolve_path(doc_path)
         if not os.path.exists(doc_path):
             raise ValueError(f"Path does not exist: {doc_path}")
     
-    key = doc_path if doc_path else "__DEFAULT__"
+    key = "\n".join(doc_path) if isinstance(doc_path, list) else (doc_path if doc_path else "__DEFAULT__")
     if key in _rag_system_v2_instances:
         sys.stderr.write(f"[RAG V2] Using cached instance for {key}\n")
         sys.stderr.flush()
@@ -78,7 +83,12 @@ def get_rag_pipeline_v2(doc_path: Optional[str] = None):
     try:
         config = RAG_CONFIG_V2.copy()
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        if doc_path:
+        if isinstance(doc_path, list):
+            config["document_paths"] = doc_path
+            scope_dir = os.path.join(current_dir, "rag_db_v2", _safe_dir_name(key))
+            os.makedirs(scope_dir, exist_ok=True)
+            config["persist_dir"] = scope_dir
+        elif doc_path:
             # Scope documents to the provided directory
             config["document_paths"] = [doc_path]
             # Create a unique persist dir per doc scope
@@ -136,7 +146,8 @@ def find_all_indexable_files(
     max_depth: int = 5,
     include_patterns: Optional[list] = None,
     exclude_patterns: Optional[list] = None,
-    max_files: Optional[int] = None
+    max_files: Optional[int] = None,
+    excluded_paths: Optional[set[str]] = None,
 ) -> list:
     """Recursively find indexable files with selective filtering"""
     if not os.path.isdir(directory):
@@ -174,6 +185,8 @@ def find_all_indexable_files(
                     continue
 
                 if os.path.isfile(entry_path):
+                    if excluded_paths and os.path.realpath(entry_path) in excluded_paths:
+                        continue
                     if entry.lower().endswith(indexable_extensions):
                         # Apply include patterns
                         if include_patterns:
@@ -242,7 +255,11 @@ def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
     scored_files.sort(reverse=True, key=lambda x: x[0])
     return [path for score, path in scored_files[:max_files]]
 
-def fetchExternalKnowledgeV2(query: str, doc_path: Optional[str] = None) -> str:
+def fetchExternalKnowledgeV2(
+    query: str,
+    doc_path: Optional[str] = None,
+    exclude_global_archive: bool = False,
+) -> str:
     try:
         if not isinstance(query, str) or not query:
             return "Error: Invalid or empty query provided."
@@ -255,10 +272,14 @@ def fetchExternalKnowledgeV2(query: str, doc_path: Optional[str] = None) -> str:
 
             if os.path.isdir(resolved_path):
                 # Find ALL indexable files recursively (limit to 100 like v1)
+                excluded_paths = set()
+                if exclude_global_archive:
+                    excluded_paths.add(os.path.realpath(os.path.expanduser("~/.elpis/memories/archive.md")))
                 all_files = find_all_indexable_files(
                     resolved_path,
                     max_files=100,
-                    exclude_patterns=['test_*.py', '*_test.py', '*__pycache__*', '*.pyc']
+                    exclude_patterns=['test_*.py', '*_test.py', '*__pycache__*', '*.pyc'],
+                    excluded_paths=excluded_paths,
                 )
 
                 if not all_files:
@@ -266,8 +287,8 @@ def fetchExternalKnowledgeV2(query: str, doc_path: Optional[str] = None) -> str:
 
                 print(f"[RAG V2] Indexing {len(all_files)} files from {resolved_path}")
 
-                # Pass directory path - v2 will handle multiple files
-                doc_path = resolved_path
+                # Pass the vetted files so RAG cannot silently add global memory artifacts.
+                doc_path = all_files
 
         pipeline = get_rag_pipeline_v2(doc_path=doc_path)
         return pipeline.search(query)
@@ -277,5 +298,9 @@ def fetchExternalKnowledgeV2(query: str, doc_path: Optional[str] = None) -> str:
         return f"Sorry, an error occurred while searching: {e}"
 
 # For compatibility with a unified interface
-def fetchExternalKnowledge(query: str, doc_path: Optional[str] = None) -> str:
-    return fetchExternalKnowledgeV2(query, doc_path=doc_path)
+def fetchExternalKnowledge(
+    query: str,
+    doc_path: Optional[str] = None,
+    exclude_global_archive: bool = False,
+) -> str:
+    return fetchExternalKnowledgeV2(query, doc_path=doc_path, exclude_global_archive=exclude_global_archive)

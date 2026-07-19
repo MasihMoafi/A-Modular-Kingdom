@@ -36,6 +36,14 @@ const SIDE_SLASH_COMMAND_UNAVAILABLE_HINT: &str =
     "Press Ctrl+C to return to the main thread first.";
 const GOAL_USAGE_HINT: &str = "Example: /goal improve benchmark coverage";
 const RAG_USAGE: &str = "Usage: /rag <query> or /rag <path> -- <query>";
+const ELPIS_POEM: &str =
+    "Elpis\n\nA cyan thread through changing minds—\nwhat matters stays,\nand hope keeps the way home.";
+
+fn rag_request(doc_path: &str, query: &str) -> String {
+    format!(
+        "Use the Elpis `elpis-rag` MCP server's `query_knowledge_base` tool with doc_path `{doc_path}` and query `{query}`. Base the answer on the retrieved chunks and cite their source paths."
+    )
+}
 const ADD_CONTEXT_USAGE: &str = "Usage: /add <file-path>";
 const RAW_USAGE: &str = "Usage: /raw [on|off]";
 const USAGE_CHATGPT_LOGIN_REQUIRED: &str = "Sign in with ChatGPT to use /usage.";
@@ -432,6 +440,7 @@ impl ChatWidget {
             SlashCommand::Rag => {
                 self.add_error_message(RAG_USAGE.to_string());
             }
+            SlashCommand::Elpis => self.add_info_message(ELPIS_POEM.to_string(), None),
             SlashCommand::Import => {
                 self.app_event_tx
                     .send(AppEvent::OpenExternalAgentConfigMigration);
@@ -685,13 +694,15 @@ impl ChatWidget {
             SlashCommand::Rag => {
                 let request = match trimmed.split_once(" -- ") {
                     Some((doc_path, query))
+                        if doc_path.trim().is_empty() && !query.trim().is_empty() =>
+                    {
+                        self.show_rag_path_prompt(query.trim().to_string());
+                        return;
+                    }
+                    Some((doc_path, query))
                         if !doc_path.trim().is_empty() && !query.trim().is_empty() =>
                     {
-                        format!(
-                            "Use the Elpis `elpis-rag` MCP server's `query_knowledge_base` tool with doc_path `{}` and query `{}`. Base the answer on the retrieved chunks and cite their source paths.",
-                            doc_path.trim(),
-                            query.trim(),
-                        )
+                        rag_request(doc_path.trim(), query.trim())
                     }
                     Some(_) => {
                         self.add_error_message(RAG_USAGE.to_string());
@@ -702,6 +713,13 @@ impl ChatWidget {
                     ),
                 };
                 self.submit_user_message(UserMessage::from(request));
+            }
+            SlashCommand::Elpis => {
+                if trimmed.is_empty() {
+                    self.add_info_message(ELPIS_POEM.to_string(), None);
+                } else {
+                    self.add_error_message("Usage: /elpis".to_string());
+                }
             }
             SlashCommand::Raw => match trimmed.to_ascii_lowercase().as_str() {
                 "on" => {
@@ -902,6 +920,34 @@ impl ChatWidget {
         }
     }
 
+    pub(crate) fn submit_rag_search(&mut self, query: String, doc_path: String) {
+        self.submit_user_message(UserMessage::from(rag_request(&doc_path, &query)));
+    }
+
+    fn show_rag_path_prompt(&mut self, query: String) {
+        let current_cwd = self
+            .current_cwd
+            .clone()
+            .unwrap_or_else(|| self.config.cwd.to_path_buf());
+        let tx = self.app_event_tx.clone();
+        let view = CustomPromptView::new(
+            "Search path".to_string(),
+            "Folder path; Enter uses the current workspace".to_string(),
+            current_cwd.display().to_string(),
+            Some(
+                "Edit the path or press Enter to search the terminal working directory."
+                    .to_string(),
+            ),
+            Box::new(move |doc_path: String| {
+                tx.send(AppEvent::SubmitRagSearch {
+                    query: query.clone(),
+                    doc_path,
+                });
+            }),
+        );
+        self.bottom_pane.show_view(Box::new(view));
+    }
+
     pub(super) fn submit_queued_slash_prompt(
         &mut self,
         queued_message: QueuedUserMessage,
@@ -1052,6 +1098,7 @@ impl ChatWidget {
             | SlashCommand::Ps
             | SlashCommand::Stop
             | SlashCommand::ClaudeCode
+            | SlashCommand::Elpis
             | SlashCommand::Mcp
             | SlashCommand::Apps
             | SlashCommand::Plugins

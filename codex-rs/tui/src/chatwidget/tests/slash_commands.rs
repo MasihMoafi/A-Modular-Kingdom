@@ -158,6 +158,47 @@ async fn rag_command_routes_explicit_path_to_elpis_rag_tool() {
 }
 
 #[tokio::test]
+async fn rag_path_prompt_enters_current_working_directory_by_default() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    let current_cwd = chat
+        .current_cwd
+        .clone()
+        .expect("chat has a current working directory");
+
+    chat.dispatch_command_with_args(
+        SlashCommand::Rag,
+        " -- find continuity".to_string(),
+        Vec::new(),
+    );
+
+    let popup = render_bottom_popup(&chat, /*width*/ 120);
+    assert!(popup.contains(&current_cwd.display().to_string()));
+    chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    match rx.try_recv() {
+        Ok(AppEvent::SubmitRagSearch { query, doc_path }) => {
+            assert_eq!(query, "find continuity");
+            assert_eq!(doc_path, current_cwd.display().to_string());
+        }
+        other => panic!("expected a scoped RAG submission, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn elpis_command_renders_poetry() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+
+    chat.dispatch_command(SlashCommand::Elpis);
+
+    let rendered = drain_insert_history(&mut rx)
+        .iter()
+        .map(|cell| lines_to_single_string(cell))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(rendered.contains("A cyan thread through changing minds"));
+}
+
+#[tokio::test]
 async fn service_tier_commands_lowercase_catalog_names() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.4")).await;
     let mut preset = get_available_model(&chat, "gpt-5.4");
