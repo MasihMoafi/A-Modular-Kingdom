@@ -13,11 +13,18 @@ use crate::unix::escalate_protocol::EscalateRequest;
 use crate::unix::escalate_protocol::EscalateResponse;
 use crate::unix::escalate_protocol::SuperExecMessage;
 use crate::unix::escalate_protocol::SuperExecResult;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::unix::socket::AsyncDatagramSocket;
 use crate::unix::socket::AsyncSocket;
 
+static ESCALATE_CLIENT_CALLED: AtomicBool = AtomicBool::new(false);
+
 fn get_escalate_client() -> anyhow::Result<AsyncDatagramSocket> {
-    // TODO: we should defensively require only calling this once, since AsyncSocket will take ownership of the fd.
+    if ESCALATE_CLIENT_CALLED.swap(true, Ordering::Relaxed) {
+        return Err(anyhow::anyhow!("get_escalate_client can only be called once"));
+    }
+
     let client_fd = std::env::var(ESCALATE_SOCKET_ENV_VAR)?.parse::<i32>()?;
     if client_fd < 0 {
         return Err(anyhow::anyhow!(
