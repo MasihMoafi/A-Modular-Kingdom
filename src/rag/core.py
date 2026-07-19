@@ -559,29 +559,54 @@ class RAGPipelineV2:
                 instruction = 'Given a web search query, retrieve relevant passages that answer the query'
                 
                 scores = []
+                if not docs:
+                    return []
+
+                if self.reranker_tokenizer.pad_token_id is None:
+                    self.reranker_tokenizer.pad_token_id = self.reranker_tokenizer.eos_token_id
+
+                input_ids_list = []
+                max_len = 0
                 for doc in docs:
                     text = f"<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc['content'][:1000]}"
                     inputs = self.reranker_tokenizer(text, return_attention_mask=False, add_special_tokens=False)
                     input_ids = prefix_tokens + inputs['input_ids'] + suffix_tokens
-                    inputs_tensor = torch.tensor([input_ids]).to(self.device)
+                    input_ids_list.append(input_ids)
+                    if len(input_ids) > max_len:
+                        max_len = len(input_ids)
+
+                pad_token_id = self.reranker_tokenizer.pad_token_id
+                padded_input_ids = []
+                attention_masks = []
+
+                for ids in input_ids_list:
+                    pad_len = max_len - len(ids)
+                    # Left padding for decoder-only models
+                    padded_input_ids.append([pad_token_id] * pad_len + ids)
+                    attention_masks.append([0] * pad_len + [1] * len(ids))
+
+                inputs_tensor = torch.tensor(padded_input_ids).to(self.device)
+                attention_mask_tensor = torch.tensor(attention_masks).to(self.device)
+
+                with torch.no_grad():
+                    outputs = self.reranker_model(inputs_tensor, attention_mask=attention_mask_tensor)
+                    batch_scores = outputs.logits[:, -1, :]
+                    true_vector = batch_scores[:, token_true_id]
+                    false_vector = batch_scores[:, token_false_id]
+                    batch_scores_stack = torch.stack([false_vector, true_vector], dim=1)
+                    batch_scores_log = torch.nn.functional.log_softmax(batch_scores_stack, dim=1)
+                    scores = batch_scores_log[:, 1].exp().tolist()
                     
-                    with torch.no_grad():
-                        batch_scores = self.reranker_model(inputs_tensor).logits[:, -1, :]
-                        true_vector = batch_scores[:, token_true_id]
-                        false_vector = batch_scores[:, token_false_id]
-                        batch_scores_stack = torch.stack([false_vector, true_vector], dim=1)
-                        batch_scores_log = torch.nn.functional.log_softmax(batch_scores_stack, dim=1)
-                        score = batch_scores_log[:, 1].exp().item()
-                        scores.append(score)
-                        
-                    # Aggressively free memory
-                    del inputs_tensor
-                    del batch_scores
-                    del true_vector
-                    del false_vector
-                    del batch_scores_stack
-                    del batch_scores_log
-                    torch.cuda.empty_cache()
+                # Aggressively free memory
+                del inputs_tensor
+                del attention_mask_tensor
+                del outputs
+                del batch_scores
+                del true_vector
+                del false_vector
+                del batch_scores_stack
+                del batch_scores_log
+                torch.cuda.empty_cache()
             elif hasattr(self, 'reranker') and self.reranker:
                 pairs = [[query, doc['content'][:512]] for doc in docs]  # Limit to 512 chars for speed
                 scores = self.reranker.predict(pairs)
