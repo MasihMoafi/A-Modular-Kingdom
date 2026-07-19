@@ -38,8 +38,19 @@ fn configure_ledger_sources(
 
     chat.config.memories.root = Some(memories.clone().abs());
     chat.config.cwd = cwd.clone().abs();
+    // The ledger reads instruction rows from the server-reported list, exactly as
+    // /status does. Mirror a real session by reporting the same files created above.
+    chat.instruction_source_paths = vec![
+        codex_utils_path_uri::PathUri::from_abs_path(&root.join(".codex/AGENTS.md").abs()),
+        codex_utils_path_uri::PathUri::from_abs_path(&cwd.join("AGENTS.md").abs()),
+        codex_utils_path_uri::PathUri::from_abs_path(&dev.join("SKILL.md").abs()),
+    ];
     chat.last_rendered_width.set(Some(120));
     Ok((memories, cwd))
+}
+
+fn instruction_paths(chat: &ChatWidget) -> Vec<PathBuf> {
+    chat.instruction_source_paths_as_path_bufs()
 }
 
 #[tokio::test]
@@ -52,12 +63,25 @@ async fn ledger_groups_real_sources_and_exposes_selected_reason() -> anyhow::Res
     assert!(chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('w'))));
     let rendered = render_ledger(&chat, 80);
 
-    for heading in ["FILES", "MEMORY", "INSTRUCTIONS", "EVIDENCE"] {
+    for heading in [
+        "ACTIVE FILES",
+        "DURABLE MEMORY",
+        "INSTRUCTIONS",
+        "TOOL EVIDENCE",
+    ] {
         assert!(rendered.contains(heading), "missing {heading}:\n{rendered}");
     }
     assert!(rendered.contains("≈"), "token estimates must be labeled");
     assert!(rendered.contains("WHY INCLUDED"));
     assert!(rendered.contains("applicable global rules"));
+    assert!(
+        rendered.contains("use /add to add a file or directory"),
+        "missing /add hint:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("dev/SKILL.md"),
+        "server-reported dev rule must render as its own row:\n{rendered}"
+    );
 
     let short = render_ledger(&chat, 16);
     assert!(short.contains("Global AGENTS.md"));
@@ -76,19 +100,86 @@ async fn ledger_g_sequences_exclude_and_include_all_selectable_sources() -> anyh
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('g')));
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('e')));
     assert!(
-        crate::legacy_core::elpis_context::continuity_sources(Some(&memories), &cwd)
-            .iter()
-            .filter(|source| source.selectable)
-            .all(|source| !source.admitted)
+        crate::legacy_core::elpis_context::continuity_sources(
+            Some(&memories),
+            &cwd,
+            &instruction_paths(&chat),
+        )
+        .iter()
+        .filter(|source| source.selectable)
+        .all(|source| !source.admitted)
     );
 
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('g')));
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('i')));
     assert!(
-        crate::legacy_core::elpis_context::continuity_sources(Some(&memories), &cwd)
-            .iter()
-            .filter(|source| source.selectable)
-            .all(|source| source.admitted)
+        crate::legacy_core::elpis_context::continuity_sources(
+            Some(&memories),
+            &cwd,
+            &instruction_paths(&chat),
+        )
+        .iter()
+        .filter(|source| source.selectable)
+        .all(|source| source.admitted)
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn ledger_dedupes_manually_added_file_that_is_already_a_rule() -> anyhow::Result<()> {
+    let root = tempdir()?;
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
+    let (memories, cwd) = configure_ledger_sources(&mut chat, root.path())?;
+
+    let dev_rule = root.path().join("projects/skills/dev/SKILL.md");
+    crate::legacy_core::elpis_context::add_continuity_source(Some(&memories), &cwd, &dev_rule)?;
+
+    let sources = crate::legacy_core::elpis_context::continuity_sources(
+        Some(&memories),
+        &cwd,
+        &instruction_paths(&chat),
+    );
+    let rows = sources
+        .iter()
+        .filter(|source| {
+            source
+                .path
+                .canonicalize()
+                .ok()
+                .zip(dev_rule.canonicalize().ok())
+                .is_some_and(|(a, b)| a == b)
+        })
+        .count();
+    assert_eq!(
+        rows, 1,
+        "a /add-ed file already admitted as a rule must appear exactly once"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn ledger_and_status_read_the_same_source_list() -> anyhow::Result<()> {
+    let root = tempdir()?;
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
+    let (memories, cwd) = configure_ledger_sources(&mut chat, root.path())?;
+
+    let sources = crate::legacy_core::elpis_context::continuity_sources(
+        Some(&memories),
+        &cwd,
+        &instruction_paths(&chat),
+    );
+    // Every server-reported instruction file must appear as a row; nothing hidden.
+    for name in ["Global AGENTS.md", "Project AGENTS.md", "dev/SKILL.md"] {
+        assert!(
+            sources.iter().any(|source| source.name == name),
+            "missing row {name}"
+        );
+    }
+    // And the rendered panel shows them all too.
+    chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Tab));
+    let rendered = render_ledger(&chat, 80);
+    for name in ["Global AGENTS.md", "Project AGENTS.md", "dev/SKILL.md"] {
+        assert!(rendered.contains(name), "panel hides {name}:\n{rendered}");
+    }
     Ok(())
 }

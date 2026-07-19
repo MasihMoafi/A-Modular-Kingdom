@@ -736,6 +736,7 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
         "<none>".to_string(),
+        /*instruction_source_paths*/ &[],
         /*refreshing_rate_limits*/ false,
     );
     let rendered = render_lines(&composite.display_lines(/*width*/ 120)).join("\n");
@@ -777,6 +778,7 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
         "<none>".to_string(),
+        /*instruction_source_paths*/ &[],
         /*refreshing_rate_limits*/ false,
     );
     let rendered = render_lines(&composite.display_lines(/*width*/ 120)).join("\n");
@@ -1587,6 +1589,7 @@ async fn status_snapshot_uses_default_reasoning_when_config_empty() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ Some(Some(ReasoningEffort::Medium)),
         "<none>".to_string(),
+        /*instruction_source_paths*/ &[],
         /*refreshing_rate_limits*/ false,
     );
     let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));

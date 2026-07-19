@@ -131,6 +131,7 @@ impl ChatWidget {
             };
             lines.push(Line::from(sequence_hint.dim()));
             lines.push(Line::from("w why · ↑↓ select · Tab close".dim()));
+            lines.push(Line::from("use /add to add a file or directory".dim()));
         }
         lines.push(Line::from(""));
 
@@ -265,7 +266,18 @@ impl ChatWidget {
                 .as_ref()
                 .map(|root| root.as_path()),
             self.config.cwd.as_path(),
+            &self.instruction_source_paths_as_path_bufs(),
         )
+    }
+
+    /// The server-reported instruction sources, converted for `elpis_context` — the
+    /// same list `/status` renders, so the ledger cannot disagree with it.
+    pub(super) fn instruction_source_paths_as_path_bufs(&self) -> Vec<std::path::PathBuf> {
+        self.instruction_source_paths
+            .iter()
+            .filter_map(|uri| uri.to_abs_path().ok())
+            .map(|path| path.as_path().to_path_buf())
+            .collect()
     }
 
     fn move_context_ledger_selection(&mut self, selectable: &[usize], delta: isize) {

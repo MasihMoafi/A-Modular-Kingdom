@@ -54,7 +54,7 @@ pub struct ContinuitySource {
     pub selectable: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ContinuitySourceCategory {
     Files,
     Memory,
@@ -72,10 +72,10 @@ impl ContinuitySourceCategory {
 
     pub fn display_name(self) -> &'static str {
         match self {
-            Self::Files => "FILES",
-            Self::Memory => "MEMORY",
+            Self::Files => "ACTIVE FILES",
+            Self::Memory => "DURABLE MEMORY",
             Self::Instructions => "INSTRUCTIONS",
-            Self::Evidence => "EVIDENCE",
+            Self::Evidence => "TOOL EVIDENCE",
         }
     }
 }
@@ -92,7 +92,11 @@ pub fn workspace_context_dir(memories_root: Option<&Path>, cwd: &Path) -> Option
 
 pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -> Option<String> {
     let mut sections = Vec::new();
-    for source in continuity_sources(memories_root, cwd) {
+    // Instruction rule files (AGENTS.md, dev rules) are deliberately NOT injected here:
+    // the app server already sends them natively as instructions, and re-reading them
+    // into this prompt double-sent every rule file on every turn. The ledger still
+    // lists them — as what they are: instructions the server admits, not extra payload.
+    for source in continuity_sources(memories_root, cwd, &[]) {
         if !source.admitted {
             continue;
         }
@@ -121,7 +125,16 @@ pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -
     ))
 }
 
-pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<ContinuitySource> {
+/// Lists every source the ledger and `/status` must agree on. Instruction rows come
+/// from `instruction_source_paths` — the paths the app server actually loaded and
+/// sends natively — never from guessed filesystem locations, so the two surfaces
+/// can no longer disagree. A manually `/add`-ed file whose canonical path is already
+/// covered by another row is skipped (dedupe).
+pub fn continuity_sources(
+    memories_root: Option<&Path>,
+    cwd: &Path,
+    instruction_source_paths: &[PathBuf],
+) -> Vec<ContinuitySource> {
     let Some(memories_root) = memories_root else {
         return Vec::new();
     };
@@ -129,73 +142,91 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         return Vec::new();
     };
     let admission = read_admission(&workspace_dir);
-    let dev_dir = cwd
-        .parent()
-        .map(|parent| parent.join("skills/dev"));
-    let global_rules = memories_root
-        .parent()
-        .and_then(Path::parent)
-        .map(|home| home.join(".codex/AGENTS.md"));
     let mut sources = Vec::new();
-    sources.extend(global_rules.and_then(|path| {
-        existing_file_source(
-            GLOBAL_RULES.to_string(),
-            path,
+    let mut canonical_paths = std::collections::HashSet::new();
+
+    for path in instruction_source_paths {
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        let is_dev_source = path.parent().is_some_and(|dir| dir.ends_with("skills/dev"));
+        let (name, reason): (String, &'static str) = if is_dev_source {
+            (
+                format!("{DEV_SOURCE_PREFIX}{file_name}"),
+                "configured development rules",
+            )
+        } else if file_name == "AGENTS.md" && path.starts_with(cwd) {
+            (PROJECT_RULES.to_string(), "applicable project rules")
+        } else if file_name == "AGENTS.md" {
+            (GLOBAL_RULES.to_string(), "applicable global rules")
+        } else {
+            (file_name.to_string(), "instruction source")
+        };
+        let admitted = if is_dev_source {
+            admission
+                .dev_sources
+                .get(file_name)
+                .copied()
+                .unwrap_or(true)
+        } else if name == GLOBAL_RULES {
+            admission.global_rules
+        } else if name == PROJECT_RULES {
+            admission.project_rules
+        } else {
+            true
+        };
+        if let Some(source) = existing_file_source(
+            name,
+            path.clone(),
             ContinuitySourceCategory::Instructions,
-            "applicable global rules",
-            admission.global_rules,
-        )
-    }));
-    sources.extend(existing_file_source(
-        PROJECT_RULES.to_string(),
-        cwd.join("AGENTS.md"),
-        ContinuitySourceCategory::Instructions,
-        "applicable project rules",
-        admission.project_rules,
-    ));
-    if let Some(dev_dir) = dev_dir {
-        if let Ok(entries) = std::fs::read_dir(&dev_dir) {
-            let mut file_names = entries
-                .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
-                .filter(|file_name| file_name.ends_with(".md"))
-                .collect::<Vec<_>>();
-            file_names.sort();
-            for file_name in file_names {
-                let admitted = admission
-                    .dev_sources
-                    .get(&file_name)
-                    .copied()
-                    .unwrap_or(true);
-                sources.extend(existing_file_source(
-                    format!("{DEV_SOURCE_PREFIX}{file_name}"),
-                    dev_dir.join(&file_name),
-                    ContinuitySourceCategory::Instructions,
-                    "configured development rules",
-                    admitted,
-                ));
+            reason,
+            admitted,
+        ) {
+            if let Ok(canonical) = path.canonicalize() {
+                canonical_paths.insert(canonical);
             }
+            sources.push(source);
         }
     }
-    sources.extend(existing_file_source(
+
+    let goal_path = workspace_dir.join("GOAL.md");
+    if let Some(source) = existing_file_source(
         "GOAL.md".to_string(),
-        workspace_dir.join("GOAL.md"),
+        goal_path.clone(),
         ContinuitySourceCategory::Files,
         "active workspace goal",
         admission.goal,
-    ));
-    sources.extend(existing_file_source(
+    ) {
+        if let Ok(canonical) = goal_path.canonicalize() {
+            canonical_paths.insert(canonical);
+        }
+        sources.push(source);
+    }
+    let checkpoint_path = workspace_dir.join("ES.md");
+    if let Some(source) = existing_file_source(
         "ES.md".to_string(),
-        workspace_dir.join("ES.md"),
+        checkpoint_path.clone(),
         ContinuitySourceCategory::Evidence,
         "lean session checkpoint",
         admission.checkpoint,
-    ));
+    ) {
+        if let Ok(canonical) = checkpoint_path.canonicalize() {
+            canonical_paths.insert(canonical);
+        }
+        sources.push(source);
+    }
     sources.extend(
         admission
             .custom_sources
             .iter()
             .filter_map(|(path, admitted)| {
                 let path = PathBuf::from(path);
+                if let Ok(canonical) = path.canonicalize()
+                    && canonical_paths.contains(&canonical)
+                {
+                    return None;
+                }
                 let metadata = std::fs::metadata(&path).ok()?;
                 (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
                     name: path.display().to_string(),
@@ -241,9 +272,7 @@ fn existing_file_source(
 fn estimate_tokens(path: &Path, bytes: u64, max_chars: usize) -> u64 {
     std::fs::read_to_string(path).map_or_else(
         |_| bytes.min(max_chars as u64).div_ceil(4),
-        |content| {
-            (content.trim().chars().count().min(max_chars) as u64).div_ceil(4)
-        },
+        |content| (content.trim().chars().count().min(max_chars) as u64).div_ceil(4),
     )
 }
 
@@ -455,7 +484,7 @@ mod tests {
         std::fs::write(workspace.join("ES.md"), "")?;
         std::fs::write(workspace.join("raw.log"), "hidden")?;
 
-        let sources = continuity_sources(Some(&memories), cwd);
+        let sources = continuity_sources(Some(&memories), cwd, &[]);
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].name, "GOAL.md");
         assert_eq!(sources[0].bytes, 10);
@@ -480,16 +509,18 @@ mod tests {
         std::fs::write(home.path().join(".codex/AGENTS.md"), "Global instructions")?;
         std::fs::write(cwd.join("AGENTS.md"), "Project instructions")?;
         std::fs::write(dev.join("SKILL.md"), "Development instructions")?;
-        std::fs::write(
-            workspace.join("GOAL.md"),
-            "x".repeat(MAX_GOAL_CHARS + 40),
-        )?;
+        std::fs::write(workspace.join("GOAL.md"), "x".repeat(MAX_GOAL_CHARS + 40))?;
         std::fs::write(workspace.join("ES.md"), "Verified command evidence")?;
         let memory = memories.join("MEMORY.md");
         std::fs::write(&memory, "Durable memory")?;
         add_continuity_source(Some(&memories), &cwd, &memory)?;
 
-        let sources = continuity_sources(Some(&memories), &cwd);
+        let instructions = vec![
+            home.path().join(".codex/AGENTS.md"),
+            cwd.join("AGENTS.md"),
+            dev.join("SKILL.md"),
+        ];
+        let sources = continuity_sources(Some(&memories), &cwd, &instructions);
         for (name, category) in [
             ("GOAL.md", ContinuitySourceCategory::Files),
             ("MEMORY.md", ContinuitySourceCategory::Memory),
@@ -551,7 +582,7 @@ mod tests {
 
         assert!(prompt.contains("Ship the ledger"));
         assert!(!prompt.contains("Keep the checkpoint"));
-        let sources = continuity_sources(Some(&memories), cwd);
+        let sources = continuity_sources(Some(&memories), cwd, &[]);
         assert!(
             sources
                 .iter()
@@ -570,7 +601,7 @@ mod tests {
         tokio::fs::write(&custom, "Keep this visible").await?;
 
         let added = add_continuity_source(Some(&memories), &cwd, Path::new("notes.md"))?;
-        let sources = continuity_sources(Some(&memories), &cwd);
+        let sources = continuity_sources(Some(&memories), &cwd, &[]);
         assert!(
             sources
                 .iter()
@@ -605,28 +636,32 @@ mod tests {
         tokio::fs::write(cwd.join("AGENTS.md"), "Project rule").await?;
         tokio::fs::write(dev.join("AGENTS.md"), "Dev rule").await?;
         tokio::fs::write(dev.join("SKILL.md"), "Skill rule").await?;
-        tokio::fs::write(dev.join("notes.txt"), "not a rule file").await?;
 
-        let sources = continuity_sources(Some(&memories), &cwd);
+        let instructions = vec![
+            home.path().join(".codex/AGENTS.md"),
+            cwd.join("AGENTS.md"),
+            dev.join("AGENTS.md"),
+            dev.join("SKILL.md"),
+        ];
+        let sources = continuity_sources(Some(&memories), &cwd, &instructions);
         assert!(
             sources
                 .iter()
                 .all(|source| source.selectable && source.admitted)
         );
+        assert!(sources.iter().any(|source| source.name == GLOBAL_RULES));
+        assert!(sources.iter().any(|source| source.name == PROJECT_RULES));
         assert!(sources.iter().any(|source| source.name == "dev/AGENTS.md"));
         assert!(sources.iter().any(|source| source.name == "dev/SKILL.md"));
-        assert!(!sources.iter().any(|source| source.name.contains("notes")));
 
         set_continuity_source_admitted(Some(&memories), &cwd, GLOBAL_RULES, false)?;
         set_continuity_source_admitted(Some(&memories), &cwd, "dev/SKILL.md", false)?;
-        let prompt = build_continuity_prompt(Some(&memories), &cwd)
-            .await
-            .expect("prompt");
-        assert!(!prompt.contains("Global rule"));
-        assert!(prompt.contains("Project rule"));
-        assert!(prompt.contains("Dev rule"));
-        assert!(!prompt.contains("Skill rule"));
-        let sources = continuity_sources(Some(&memories), &cwd);
+        let sources = continuity_sources(Some(&memories), &cwd, &instructions);
+        assert!(
+            sources
+                .iter()
+                .any(|source| source.name == GLOBAL_RULES && !source.admitted)
+        );
         assert!(
             sources
                 .iter()
@@ -637,6 +672,43 @@ mod tests {
                 .iter()
                 .any(|source| source.name == "dev/AGENTS.md" && source.admitted)
         );
+
+        // Rule files ride the server's native instruction channel; the continuity
+        // prompt must not re-inject them (that was the double-send).
+        assert!(
+            build_continuity_prompt(Some(&memories), &cwd)
+                .await
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn manually_added_file_already_listed_as_a_rule_appears_once() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = home.path().join("projects/Elpis");
+        let dev = home.path().join("projects/skills/dev");
+        std::fs::create_dir_all(&cwd)?;
+        std::fs::create_dir_all(&dev)?;
+        let dev_rule = dev.join("AGENTS.md");
+        std::fs::write(&dev_rule, "Dev rule")?;
+
+        add_continuity_source(Some(&memories), &cwd, &dev_rule)?;
+        let instructions = vec![dev_rule.clone()];
+        let sources = continuity_sources(Some(&memories), &cwd, &instructions);
+        let rows = sources
+            .iter()
+            .filter(|source| {
+                source
+                    .path
+                    .canonicalize()
+                    .ok()
+                    .zip(dev_rule.canonicalize().ok())
+                    .is_some_and(|(a, b)| a == b)
+            })
+            .count();
+        assert_eq!(rows, 1, "dedupe must collapse rule + manual add to one row");
         Ok(())
     }
 
