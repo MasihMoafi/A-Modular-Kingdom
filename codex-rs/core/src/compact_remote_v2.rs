@@ -35,6 +35,7 @@ use codex_protocol::models::ContentItem;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::CompactedItem;
 use codex_protocol::protocol::EventMsg;
+use codex_protocol::protocol::RawResponseCompletedEvent;
 use codex_protocol::protocol::TokenUsage;
 use codex_protocol::protocol::TruncationPolicy;
 use codex_protocol::protocol::TurnStartedEvent;
@@ -356,7 +357,27 @@ async fn run_remote_compaction_request_v2(
             )
             .await
         {
-            Ok(stream) => collect_compaction_output(stream).await,
+            Ok(stream) => {
+                let raw_result = collect_compaction_output(stream).await;
+                match raw_result {
+                    Ok(raw) => {
+                        if raw.saw_completed {
+                            if let Some(ref response_id) = raw.response_id {
+                                sess.send_event(
+                                    turn_context,
+                                    EventMsg::RawResponseCompleted(RawResponseCompletedEvent {
+                                        response_id: response_id.clone(),
+                                        token_usage: raw.token_usage.clone(),
+                                    }),
+                                )
+                                .await;
+                            }
+                        }
+                        validate_compaction_output(raw)
+                    }
+                    Err(err) => Err(err),
+                }
+            }
             Err(err) => Err(err),
         };
 
@@ -379,9 +400,18 @@ async fn run_remote_compaction_request_v2(
     }
 }
 
+pub(super) struct RawCompactionOutput {
+    pub(super) compaction_output: Option<ResponseItem>,
+    pub(super) compaction_count: usize,
+    pub(super) output_item_count: usize,
+    pub(super) saw_completed: bool,
+    pub(super) response_id: Option<String>,
+    pub(super) token_usage: Option<TokenUsage>,
+}
+
 async fn collect_compaction_output(
     mut stream: ResponseStream,
-) -> CodexResult<RemoteCompactionV2Output> {
+) -> CodexResult<RawCompactionOutput> {
     let mut output_item_count = 0usize;
     let mut compaction_count = 0usize;
     let mut compaction_output = None;
@@ -413,29 +443,41 @@ async fn collect_compaction_output(
         }
     }
 
-    if !saw_completed {
+    Ok(RawCompactionOutput {
+        compaction_output,
+        compaction_count,
+        output_item_count,
+        saw_completed,
+        response_id: completed_response_id,
+        token_usage: completed_token_usage,
+    })
+}
+
+fn validate_compaction_output(raw: RawCompactionOutput) -> CodexResult<RemoteCompactionV2Output> {
+    if !raw.saw_completed {
         return Err(CodexErr::Stream(
             "remote compaction v2 stream closed before response.completed".to_string(),
             None,
         ));
     }
 
-    if compaction_count != 1 {
+    if raw.compaction_count != 1 {
         return Err(CodexErr::Fatal(format!(
-            "remote compaction v2 expected exactly one compaction output item, got {compaction_count} from {output_item_count} output items"
+            "remote compaction v2 expected exactly one compaction output item, got {} from {} output items",
+            raw.compaction_count, raw.output_item_count
         )));
     }
 
-    let Some(compaction_output) = compaction_output else {
+    let Some(compaction_output) = raw.compaction_output else {
         unreachable!("compaction output must exist when count is exactly one");
     };
-    let Some(response_id) = completed_response_id else {
+    let Some(response_id) = raw.response_id else {
         unreachable!("response id must exist after response.completed");
     };
     Ok(RemoteCompactionV2Output {
         compaction_output,
         response_id,
-        token_usage: completed_token_usage,
+        token_usage: raw.token_usage,
     })
 }
 
@@ -843,9 +885,11 @@ mod tests {
             }),
         ]);
 
-        let output = collect_compaction_output(stream)
+        let raw_output = collect_compaction_output(stream)
             .await
             .expect("compaction should be collected");
+        let output = validate_compaction_output(raw_output)
+            .expect("compaction output should be valid");
 
         assert_eq!(output.compaction_output, compaction);
         assert_eq!(output.response_id, "resp-compact");
