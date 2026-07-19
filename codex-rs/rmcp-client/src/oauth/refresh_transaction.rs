@@ -222,15 +222,35 @@ impl OAuthPersistor {
         // the prior in-process credential and return the error; serving an unpersisted token would
         // hide the root cause until a later process restart. If the provider already consumed the
         // prior token, the next refresh may require reauthorization. That is the deliberate
-        // fail-closed policy.
-        // TODO: Add a bounded persistence retry only if telemetry shows this is common; never
-        // silently switch stores or continue with an unpersisted credential.
+        // fail-closed policy. Never silently switch stores or continue with an unpersisted credential.
         debug!("persisting refreshed MCP OAuth credentials to the resolved store");
-        if let Err(error) =
-            self.inner
-                .credential_store
-                .save(keyring_store, &self.inner.server_name, &refreshed)
-        {
+        let mut save_result = self.inner.credential_store.save(
+            keyring_store,
+            &self.inner.server_name,
+            &refreshed,
+        );
+
+        for (attempt, delay_ms) in [250, 500, 1_000].into_iter().enumerate() {
+            if save_result.is_ok() {
+                break;
+            }
+            let error = save_result.unwrap_err();
+            warn!(
+                attempt = attempt + 1,
+                max_attempts = 4,
+                delay_ms = delay_ms,
+                error = %error,
+                "failed to persist refreshed MCP OAuth credentials; retrying"
+            );
+            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+            save_result = self.inner.credential_store.save(
+                keyring_store,
+                &self.inner.server_name,
+                &refreshed,
+            );
+        }
+
+        if let Err(error) = save_result {
             warn!(
                 error = %error,
                 "failed to persist refreshed MCP OAuth credentials; returning the error and restoring the previous in-process credentials"
