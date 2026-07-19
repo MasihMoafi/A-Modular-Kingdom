@@ -54,7 +54,7 @@ pub struct ContinuitySource {
     pub selectable: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ContinuitySourceCategory {
     Files,
     Memory,
@@ -608,7 +608,14 @@ mod tests {
         tokio::fs::write(&custom, "Keep this visible").await?;
 
         let added = add_continuity_source(Some(&memories), &cwd, Path::new("notes.md"))?;
-        let sources = continuity_sources(Some(&memories), &cwd, &[]);
+        let instructions = vec![
+            home.path().join(".codex/AGENTS.md"),
+            cwd.join("AGENTS.md"),
+            dev.join("AGENTS.md"),
+            dev.join("SKILL.md"),
+        ];
+
+        let sources = continuity_sources(Some(&memories), &cwd, &instructions);
         assert!(
             sources
                 .iter()
@@ -664,13 +671,20 @@ mod tests {
 
         set_continuity_source_admitted(Some(&memories), &cwd, GLOBAL_RULES, false)?;
         set_continuity_source_admitted(Some(&memories), &cwd, "dev/SKILL.md", false)?;
-        let prompt = build_continuity_prompt(Some(&memories), &cwd, &instructions)
+        let prompt = build_continuity_prompt(Some(&memories), &cwd)
             .await
             .expect("prompt");
         assert!(!prompt.contains("Global rule"));
         assert!(prompt.contains("Project rule"));
         assert!(prompt.contains("Dev rule"));
         assert!(!prompt.contains("Skill rule"));
+        let instructions = vec![
+            home.path().join(".codex/AGENTS.md"),
+            cwd.join("AGENTS.md"),
+            dev.join("AGENTS.md"),
+            dev.join("SKILL.md"),
+        ];
+
         let sources = continuity_sources(Some(&memories), &cwd, &instructions);
         assert!(
             sources

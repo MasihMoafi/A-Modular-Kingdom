@@ -27,7 +27,10 @@ impl ChatWidget {
         if key_event.kind != KeyEventKind::Press {
             return false;
         }
-        if matches!(key_event.code, KeyCode::BackTab)
+        if matches!(key_event.code, KeyCode::Tab)
+            && key_event.modifiers.is_empty()
+            && self.bottom_pane.composer_is_empty()
+            && self.bottom_pane.no_modal_or_popup_active()
             && self
                 .last_rendered_width
                 .get()
@@ -124,7 +127,7 @@ impl ChatWidget {
             let sequence_hint = if self.context_ledger.pending_g {
                 "g … then i include all / e exclude all"
             } else {
-                "Space/Enter toggle · w why · ↑↓ select · Shift+Tab close"
+                "Space/Enter toggle · w why · ↑↓ select · Tab close"
             };
             lines.push(Line::from(sequence_hint.dim()));
             lines.push(Line::from("use /add to add a file or directory".dim()));
@@ -159,8 +162,7 @@ impl ChatWidget {
             }
             for (index, source) in category_sources {
                 let source_line_start = lines.len();
-                let selected =
-                    self.context_ledger.focused && index == self.context_ledger.selected;
+                let selected = self.context_ledger.focused && index == self.context_ledger.selected;
                 let marker = if source.selectable {
                     if source.admitted { "[x]" } else { "[ ]" }
                 } else {

@@ -3158,9 +3158,18 @@ async fn model_picker_groups_claude_code_and_switches_runtime() {
 
     chat.open_model_popup_with_presets(vec![preset]);
     let popup = render_bottom_popup(&chat, /*width*/ 80);
-    assert!(popup.contains("OPENAI"), "missing Codex provider group:\n{popup}");
-    assert!(popup.contains("CLAUDE CODE"), "missing provider group:\n{popup}");
-    assert!(popup.contains("Account default"), "missing runtime model:\n{popup}");
+    assert!(
+        popup.contains("OPENAI"),
+        "missing Codex provider group:\n{popup}"
+    );
+    assert!(
+        popup.contains("CLAUDE CODE"),
+        "missing provider group:\n{popup}"
+    );
+    assert!(
+        popup.contains("Account default"),
+        "missing runtime model:\n{popup}"
+    );
     assert!(
         popup.contains("CLI subscription chooses the model"),
         "missing honest model source:\n{popup}"

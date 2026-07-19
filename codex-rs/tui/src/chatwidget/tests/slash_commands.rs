@@ -2950,8 +2950,9 @@ async fn claude_code_slash_command_requests_takeover() {
 /// Proves a submitted message, once `active_runtime` is Claude Code, genuinely reaches
 /// `codex-claude-bridge`'s subprocess path (a real spawned process, a fake `claude` binary
 /// standing in for the real CLI since CI has no authenticated session) rather than the
-/// normal Codex `AppServerClient` path. Also proves the resulting session id is retained
-/// for `--resume` on a follow-up turn.
+/// normal Codex `AppServerClient` path. Also proves the ace pipeline runs: the turn is
+/// distilled into an outcome record (the fake binary answers the distillation call too)
+/// and the visible "context saved" metric renders.
 #[cfg(unix)]
 #[tokio::test]
 #[serial_test::serial(claude_bridge_binary_env)]
@@ -2989,12 +2990,18 @@ EOF
     assert!(chat.is_claude_code_turn_running());
 
     let completed = loop {
-        match rx.recv().await.expect("channel closed before turn completed") {
+        match rx
+            .recv()
+            .await
+            .expect("channel closed before turn completed")
+        {
             AppEvent::ClaudeCodeTurnCompleted {
                 text,
                 session_id,
                 error,
-            } => break (text, session_id, error),
+                outcome_record,
+                raw_chars,
+            } => break (text, session_id, error, outcome_record, raw_chars),
             _ => continue,
         }
     };
@@ -3003,14 +3010,17 @@ EOF
         std::env::remove_var(codex_claude_bridge::BINARY_OVERRIDE_ENV);
     }
 
-    let (text, session_id, error) = completed;
+    let (text, session_id, error, outcome_record, raw_chars) = completed;
     assert_eq!(error, None, "unexpected error from fake claude binary");
     assert_eq!(text.as_deref(), Some("fake reply"));
     assert_eq!(session_id.as_deref(), Some("fixture-session-789"));
+    // The distillation call hits the same fake binary, so the record is the canned reply.
+    assert_eq!(outcome_record.as_deref(), Some("fake reply"));
+    assert_eq!(raw_chars, "hello claude".len() + "fake reply".len());
 
     // event_dispatch.rs would call this in production; simulate that here since the
     // ChatWidget test fixture doesn't include the full App event loop.
-    chat.handle_claude_code_turn_completed(text, session_id, error);
+    chat.handle_claude_code_turn_completed(text, session_id, error, outcome_record, raw_chars);
     assert!(!chat.is_claude_code_turn_running());
 
     let cells = drain_insert_history(&mut rx);
@@ -3022,5 +3032,9 @@ EOF
     assert!(
         rendered.contains("fake reply"),
         "expected the fake Claude Code response to render, got {rendered:?}"
+    );
+    assert!(
+        rendered.contains("context saved:"),
+        "expected the per-turn context-saved metric to render, got {rendered:?}"
     );
 }

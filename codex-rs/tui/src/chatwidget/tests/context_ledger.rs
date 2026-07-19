@@ -7,11 +7,10 @@ fn render_ledger(chat: &ChatWidget, height: u16) -> String {
 
     (0..area.height)
         .map(|y| {
-            (0..area.width)
-                .fold(String::new(), |mut line, x| {
-                    line.push_str(buf[(x, y)].symbol());
-                    line
-                })
+            (0..area.width).fold(String::new(), |mut line, x| {
+                line.push_str(buf[(x, y)].symbol());
+                line
+            })
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -24,11 +23,8 @@ fn configure_ledger_sources(
     let memories = root.join(".elpis/memories");
     let cwd = root.join("projects/Elpis");
     let dev = root.join("projects/skills/dev");
-    let workspace = crate::legacy_core::elpis_context::workspace_context_dir(
-        Some(&memories),
-        &cwd,
-    )
-    .expect("workspace path");
+    let workspace = crate::legacy_core::elpis_context::workspace_context_dir(Some(&memories), &cwd)
+        .expect("workspace path");
 
     std::fs::create_dir_all(root.join(".codex"))?;
     std::fs::create_dir_all(&cwd)?;
@@ -57,7 +53,7 @@ async fn ledger_groups_real_sources_and_exposes_selected_reason() -> anyhow::Res
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
     configure_ledger_sources(&mut chat, root.path())?;
 
-    assert!(chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::BackTab)));
+    assert!(chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Tab)));
     assert!(chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('w'))));
     let rendered = render_ledger(&chat, 80);
 
@@ -80,7 +76,7 @@ async fn ledger_g_sequences_exclude_and_include_all_selectable_sources() -> anyh
     let root = tempdir()?;
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
     let (memories, cwd) = configure_ledger_sources(&mut chat, root.path())?;
-    chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::BackTab));
+    chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Tab));
 
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('g')));
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('e')));
@@ -91,8 +87,8 @@ async fn ledger_g_sequences_exclude_and_include_all_selectable_sources() -> anyh
             &chat
                 .instruction_source_paths
                 .iter()
-                .filter_map(|uri| uri.to_abs_path().ok())
-                .collect::<Vec<_>>(),
+                .filter_map(|uri| uri.to_abs_path().ok().map(|p| p.into()))
+                .collect::<Vec<std::path::PathBuf>>(),
         )
             .iter()
             .filter(|source| source.selectable)
@@ -108,8 +104,8 @@ async fn ledger_g_sequences_exclude_and_include_all_selectable_sources() -> anyh
             &chat
                 .instruction_source_paths
                 .iter()
-                .filter_map(|uri| uri.to_abs_path().ok())
-                .collect::<Vec<_>>(),
+                .filter_map(|uri| uri.to_abs_path().ok().map(|p| p.into()))
+                .collect::<Vec<std::path::PathBuf>>(),
         )
             .iter()
             .filter(|source| source.selectable)
@@ -124,7 +120,6 @@ async fn test_deduplication_of_manually_added_files() -> anyhow::Result<()> {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
     let (memories, cwd) = configure_ledger_sources(&mut chat, root.path())?;
 
-    // Manually add the dev rule file
     let dev_rule = root.path().join("projects/skills/dev/SKILL.md");
     crate::legacy_core::elpis_context::add_continuity_source(
         Some(&memories),
@@ -135,8 +130,8 @@ async fn test_deduplication_of_manually_added_files() -> anyhow::Result<()> {
     let instruction_paths = chat
         .instruction_source_paths
         .iter()
-        .filter_map(|uri| uri.to_abs_path().ok())
-        .collect::<Vec<_>>();
+        .filter_map(|uri| uri.to_abs_path().ok().map(|p| p.into()))
+        .collect::<Vec<std::path::PathBuf>>();
 
     let sources = crate::legacy_core::elpis_context::continuity_sources(
         Some(&memories),
@@ -144,7 +139,6 @@ async fn test_deduplication_of_manually_added_files() -> anyhow::Result<()> {
         &instruction_paths,
     );
 
-    // Count occurrences of the dev rule file
     let count = sources
         .iter()
         .filter(|source| source.path == dev_rule)
@@ -161,7 +155,6 @@ async fn test_totals_equal_sum_of_rows() -> anyhow::Result<()> {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
     let (memories, cwd) = configure_ledger_sources(&mut chat, root.path())?;
 
-    // Make sure we have some active custom source
     let notes = cwd.join("notes.md");
     tokio::fs::write(&notes, "Some random notes with tokens").await?;
     crate::legacy_core::elpis_context::add_continuity_source(
@@ -170,7 +163,6 @@ async fn test_totals_equal_sum_of_rows() -> anyhow::Result<()> {
         &notes,
     )?;
 
-    // Make sure all sources are admitted
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::BackTab));
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('g')));
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('i')));
@@ -178,8 +170,8 @@ async fn test_totals_equal_sum_of_rows() -> anyhow::Result<()> {
     let instruction_paths = chat
         .instruction_source_paths
         .iter()
-        .filter_map(|uri| uri.to_abs_path().ok())
-        .collect::<Vec<_>>();
+        .filter_map(|uri| uri.to_abs_path().ok().map(|p| p.into()))
+        .collect::<Vec<std::path::PathBuf>>();
 
     let sources = crate::legacy_core::elpis_context::continuity_sources(
         Some(&memories),

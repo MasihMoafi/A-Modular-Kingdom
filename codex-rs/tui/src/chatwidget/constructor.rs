@@ -109,8 +109,9 @@ impl ChatWidget {
             transcript: TranscriptState::new(active_cell),
             raw_output_mode: config.tui_raw_output_mode,
             active_runtime: ActiveRuntime::default(),
-            claude_code_session_id: None,
             claude_code_turn_running: false,
+            claude_outcome_records: Vec::new(),
+            claude_context_saved_chars: 0,
             config,
             effective_service_tier,
             skills_all: Vec::new(),
@@ -255,9 +256,7 @@ impl ChatWidget {
         widget
             .bottom_pane
             .set_vim_enabled(widget.config.tui_vim_mode_default);
-        widget
-            .bottom_pane
-            .set_status_line_enabled(false);
+        widget.bottom_pane.set_status_line_enabled(false);
         widget
             .bottom_pane
             .set_collaboration_modes_enabled(/*enabled*/ true);

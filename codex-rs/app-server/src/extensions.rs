@@ -139,7 +139,6 @@ impl ContextContributor for ElpisContinuityExtension {
             codex_core::elpis_context::build_continuity_prompt(
                 config.memories_root.as_ref().map(|root| root.as_path()),
                 config.cwd.as_path(),
-                &[],
             )
             .await
             .map(PromptFragment::separate_developer)
