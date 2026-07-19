@@ -318,6 +318,26 @@ pub fn add_continuity_source(
     cwd: &Path,
     requested_path: &Path,
 ) -> std::io::Result<PathBuf> {
+    let mut paths = add_continuity_sources(memories_root, cwd, requested_path)?;
+    paths.pop().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "context source must be a non-empty file",
+        )
+    })
+}
+
+/// Safety valve: refuse to bulk-admit unreasonably large directories.
+const MAX_DIRECTORY_ADD_FILES: usize = 200;
+
+/// Adds one file — or every non-empty file under a directory, recursively — to the
+/// ledger's custom sources. Hidden entries and dependency/build folders are skipped.
+/// Returns the admitted paths, sorted.
+pub fn add_continuity_sources(
+    memories_root: Option<&Path>,
+    cwd: &Path,
+    requested_path: &Path,
+) -> std::io::Result<Vec<PathBuf>> {
     let Some(workspace_dir) = workspace_context_dir(memories_root, cwd) else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -331,18 +351,62 @@ pub fn add_continuity_source(
     };
     let path = path.canonicalize()?;
     let metadata = std::fs::metadata(&path)?;
-    if !metadata.is_file() || metadata.len() == 0 {
+    let mut files = Vec::new();
+    if metadata.is_dir() {
+        collect_context_files(&path, &mut files)?;
+        files.sort();
+        if files.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "directory contains no non-empty files",
+            ));
+        }
+        if files.len() > MAX_DIRECTORY_ADD_FILES {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "directory contains {} files (limit {MAX_DIRECTORY_ADD_FILES}); add a smaller directory",
+                    files.len()
+                ),
+            ));
+        }
+    } else if metadata.is_file() && metadata.len() > 0 {
+        files.push(path);
+    } else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "context source must be a non-empty file",
+            "context source must be a non-empty file or a directory",
         ));
     }
     let mut selection = read_admission(&workspace_dir);
-    selection
-        .custom_sources
-        .insert(path.to_string_lossy().to_string(), true);
+    for file in &files {
+        selection
+            .custom_sources
+            .insert(file.to_string_lossy().to_string(), true);
+    }
     write_admission(&workspace_dir, &selection)?;
-    Ok(path)
+    Ok(files)
+}
+
+fn collect_context_files(dir: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') {
+            continue;
+        }
+        let metadata = entry.metadata()?;
+        if metadata.is_dir() {
+            if matches!(name.as_ref(), "node_modules" | "target" | "__pycache__") {
+                continue;
+            }
+            collect_context_files(&entry.path(), files)?;
+        } else if metadata.is_file() && metadata.len() > 0 {
+            files.push(entry.path());
+        }
+    }
+    Ok(())
 }
 
 fn write_admission(workspace_dir: &Path, selection: &ContinuityAdmission) -> std::io::Result<()> {
@@ -709,6 +773,48 @@ mod tests {
             })
             .count();
         assert_eq!(rows, 1, "dedupe must collapse rule + manual add to one row");
+        Ok(())
+    }
+
+    #[test]
+    fn add_continuity_sources_admits_every_file_in_a_directory() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = home.path().join("project");
+        let docs = cwd.join("docs");
+        let nested = docs.join("nested");
+        std::fs::create_dir_all(&nested)?;
+        std::fs::create_dir_all(docs.join(".hidden"))?;
+        std::fs::write(docs.join("a.md"), "alpha")?;
+        std::fs::write(nested.join("b.md"), "beta")?;
+        std::fs::write(docs.join("empty.md"), "")?;
+        std::fs::write(docs.join(".hidden/skip.md"), "hidden")?;
+
+        let added = add_continuity_sources(Some(&memories), &cwd, &docs)?;
+        assert_eq!(added.len(), 2, "non-empty visible files only: {added:?}");
+
+        let sources = continuity_sources(Some(&memories), &cwd, &[]);
+        for file in ["a.md", "b.md"] {
+            assert!(
+                sources
+                    .iter()
+                    .any(|source| source.path.file_name().is_some_and(|n| n == file)
+                        && source.admitted),
+                "missing admitted row for {file}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn add_continuity_sources_rejects_empty_directory() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = home.path().join("project");
+        let empty = cwd.join("empty-dir");
+        std::fs::create_dir_all(&empty)?;
+        let error = add_continuity_sources(Some(&memories), &cwd, &empty).unwrap_err();
+        assert!(error.to_string().contains("no non-empty files"));
         Ok(())
     }
 
