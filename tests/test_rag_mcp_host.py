@@ -16,3 +16,21 @@ def test_rag_tool_is_advertised_as_read_only() -> None:
         "idempotentHint": True,
         "openWorldHint": False,
     }
+
+
+def test_normalize_path_prevents_traversal() -> None:
+    from agent.host import _normalize_path
+    import pytest
+
+    with pytest.raises(ValueError, match="Path traversal detected"):
+        _normalize_path("../../../etc/passwd")
+
+    with pytest.raises(ValueError, match="Path traversal detected"):
+        _normalize_path("/etc/passwd")
+
+    # Should not raise exception for valid relative paths
+    try:
+        _normalize_path("valid_file.txt")
+        _normalize_path("./valid_folder/valid_file.txt")
+    except ValueError:
+        pytest.fail("Valid paths should not raise ValueError")

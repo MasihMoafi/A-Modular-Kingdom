@@ -142,7 +142,10 @@ def _normalize_path(path: str) -> str:
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
         candidate = workspace_root / candidate
-    return str(candidate.resolve())
+    resolved = candidate.resolve()
+    if not resolved.is_relative_to(workspace_root):
+        raise ValueError(f"Path traversal detected: {path} is outside workspace root")
+    return str(resolved)
 
 
 def _configured_limit(name: str, default: int) -> int:
