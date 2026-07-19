@@ -11,7 +11,6 @@ def clear_proxy_settings():
             del os.environ[var]
 clear_proxy_settings()
 
-import ollama
 from collections import Counter
 from typing import List, Dict, Any, Tuple, Callable, Optional
 from sentence_transformers import SentenceTransformer, CrossEncoder
