@@ -148,6 +148,20 @@ not claim unfinished behavior is available.
 
 ## Important — after the first-release foundation
 
+- Agent-owned post-turn context pruning, full contract (Masih's ace in the hole; see
+  `docs/CONTEXT_AND_SESSIONS.md`): agent-authored compact turn outcome record, deterministic
+  validation and expiry of exploratory traces from the next request, fail-closed
+  preservation, plus the evidence-first completion hierarchy rendering that same record.
+  The deterministic first pass (1,200-char receipts, whitespace cleanup, evidence pointers)
+  is merged; the outcome-record engine is not. Fable-owned.
+- Default tool integration, evaluated 2026-07-19: `rtk` 0.43.0 (token-optimizing command
+  proxy — candidate engine for pruning's compact action receipts), `codebase-memory-mcp`
+  (already reachable through inherited `~/.codex/config.toml`; decide default-on wiring and
+  the SessionStart hint), and `ponytail` (minimal-code discipline; ship as a default
+  `skills/dev` rule).
+- Context Ledger parity with `design-prototype.png` (kept in Masih's local files; not in the
+  repo): grouped sections (files/memory/instructions/evidence), per-row token counts,
+  include/exclude-all keys, and the "why included" panel. Delegable; spec is the prototype.
 - Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
   structured selectable prompt (question, options, multi-select) instead of silently
   assuming, and records the chosen answer in the session evidence.
@@ -188,12 +202,13 @@ not claim unfinished behavior is available.
 
 ## Current Action
 
-1. Make the build-cycle and archive branch green and compare its ordinary-change duration
-   with the 21-minute baseline.
-2. Inspect the uploaded Cargo timing report and select the highest-cost optional dependency
-   surface for one bounded deletion.
-3. Install the verified binary and run context, memory, OpenAI, and OpenRouter acceptance.
-4. The persistent cyan identity line, Context Ledger, and `Choose a mind` `/model` naming
-   are implemented; its `GOAL.md`/`ES.md`/`AGENTS.md`/`skills/dev` controls already govern
-   next-turn admission (`core/src/elpis_context.rs`). Remaining before UI/UX is complete:
-   the signature continuity event and the evidence-first completion hierarchy (see F7).
+1. Install the verified `main` binary (run `29663596709`) and finish acceptance: fixed
+   `ES.md` lean continuation, `/claude-code` runtime smoke, cyan header and context
+   accounting consistency. Already accepted live on 2026-07-18/19: dev-skills ledger rows
+   and toggles, `/status`, exact resume, memory teach/related-recall/unrelated-omission,
+   OpenAI end-to-end task. OpenRouter leg deferred (use a free model; low priority).
+2. Masih approves or rejects the installed build; release tagging happens only after his
+   approval.
+3. Cargo-timing first pass (2026-07-19): top costs are first-party crates (codex-core
+   39.7s, tui 22.1s, config 19.7s, app-server 17.8s); no dominant third-party dependency.
+   Select one bounded deletion from `docs/BUILD_AND_REDUCTION_AUDIT.md` candidates only.
