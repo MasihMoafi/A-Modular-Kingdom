@@ -176,7 +176,7 @@ impl OAuthPersistor {
                 refreshed_tokens(token_response, &latest, &self.inner)
             }
             Ok(Err(error @ AuthError::TokenRefreshFailed(_))) => {
-                // RMCP 1.8 collapses definitive OAuth rejection (for example,
+                // RMCP 1.8 (and 2.2.0, as checked) collapses definitive OAuth rejection (for example,
                 // `invalid_grant`) and transient token-endpoint failures into this string
                 // variant. Match RMCP's own request path for now so rejected refresh tokens
                 // prompt reauthorization instead of surfacing as generic MCP startup failures.
