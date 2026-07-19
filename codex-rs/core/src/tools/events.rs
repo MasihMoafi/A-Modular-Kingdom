@@ -402,16 +402,7 @@ impl ToolEmitter {
                 let result = Err(FunctionCallError::RespondToModel(message));
                 (event, result)
             }
-            Err(ToolError::Rejected(msg)) => {
-                // Normalize common rejection messages for exec tools so tests and
-                // users see a clear, consistent phrase.
-                //
-                // NOTE: ToolError::Rejected is currently used for both user-declined approvals
-                // and some operational/runtime rejection paths (for example setup failures).
-                // We intentionally map all of them through the "rejected" event path for now,
-                // which means a subset of non-user failures may be reported as Declined.
-                //
-                // TODO: We should add a new ToolError variant for user-declined approvals.
+            Err(ToolError::UserDeclined(msg)) => {
                 let normalized = if msg == "rejected by user" {
                     match self {
                         Self::Shell { .. } | Self::UnifiedExec { .. } => {
@@ -427,6 +418,14 @@ impl ToolEmitter {
                     applied_patch_delta,
                 });
                 let result = Err(FunctionCallError::RespondToModel(normalized));
+                (event, result)
+            }
+            Err(ToolError::Rejected(msg)) => {
+                let event = ToolEventStage::Failure(ToolEventFailure::Rejected {
+                    message: msg.clone(),
+                    applied_patch_delta,
+                });
+                let result = Err(FunctionCallError::RespondToModel(msg));
                 (event, result)
             }
         };
@@ -719,7 +718,7 @@ mod tests {
     #[tokio::test]
     async fn rejected_apply_patch_tracks_committed_delta() {
         assert_failed_apply_patch_tracks_committed_delta(
-            Err(ToolError::Rejected("rejected by user".to_string())),
+            Err(ToolError::UserDeclined("rejected by user".to_string())),
             PatchApplyStatus::Declined,
         )
         .await;
