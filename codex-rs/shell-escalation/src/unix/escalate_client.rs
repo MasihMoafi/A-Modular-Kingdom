@@ -13,6 +13,7 @@ use crate::unix::escalate_protocol::EscalateRequest;
 use crate::unix::escalate_protocol::EscalateResponse;
 use crate::unix::escalate_protocol::SuperExecMessage;
 use crate::unix::escalate_protocol::SuperExecResult;
+use crate::unix::escalate_protocol::SuperExecSignal;
 use crate::unix::socket::AsyncDatagramSocket;
 use crate::unix::socket::AsyncSocket;
 
@@ -76,8 +77,6 @@ pub async fn run_shell_escalation_execve_wrapper(
                 duplicate_fd_for_transfer(io::stderr(), "stderr")?,
             ];
 
-            // TODO: also forward signals over the super-exec socket
-
             client
                 .send_with_fds(
                     SuperExecMessage {
@@ -87,8 +86,36 @@ pub async fn run_shell_escalation_execve_wrapper(
                 )
                 .await
                 .context("failed to send SuperExecMessage")?;
-            let SuperExecResult { exit_code } = client.receive::<SuperExecResult>().await?;
-            Ok(exit_code)
+
+            let mut sigint =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
+            let mut sigterm =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+            let mut sigquit =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::quit())?;
+            let mut sighup =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())?;
+
+            loop {
+                tokio::select! {
+                    Some(()) = sigint.recv() => {
+                        let _ = client.send(SuperExecSignal { signal: libc::SIGINT }).await;
+                    }
+                    Some(()) = sigterm.recv() => {
+                        let _ = client.send(SuperExecSignal { signal: libc::SIGTERM }).await;
+                    }
+                    Some(()) = sigquit.recv() => {
+                        let _ = client.send(SuperExecSignal { signal: libc::SIGQUIT }).await;
+                    }
+                    Some(()) = sighup.recv() => {
+                        let _ = client.send(SuperExecSignal { signal: libc::SIGHUP }).await;
+                    }
+                    result = client.receive::<SuperExecResult>() => {
+                        let SuperExecResult { exit_code } = result?;
+                        return Ok(exit_code);
+                    }
+                }
+            }
         }
         EscalateAction::Run => {
             // We avoid std::process::Command here because we want to be as transparent as

@@ -81,6 +81,12 @@ pub struct SuperExecMessage {
     pub fds: Vec<RawFd>,
 }
 
+/// The client sends this to the server to forward a signal.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct SuperExecSignal {
+    pub signal: i32,
+}
+
 /// The server responds when the exec()'d command has exited.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SuperExecResult {
