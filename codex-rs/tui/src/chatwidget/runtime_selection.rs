@@ -30,17 +30,19 @@ impl super::ChatWidget {
         self.active_runtime
     }
 
-    /// Records the selected runtime and confirms the switch in the transcript. Does not
-    /// yet change how a turn is submitted — see the module doc comment.
+    /// Records the selected runtime and confirms the switch in the transcript.
     pub(crate) fn switch_active_runtime(&mut self, runtime: ActiveRuntime) {
         self.active_runtime = runtime;
+        let hint = match runtime {
+            ActiveRuntime::Codex => "Turns run through the configured Codex provider.",
+            ActiveRuntime::ClaudeCode => {
+                "Turns now run through the Claude Code CLI (text in/out; no streaming, \
+                 tool, or approval bridging yet)."
+            }
+        };
         self.add_info_message(
             format!("Active runtime switched to {}.", runtime.display_name()),
-            Some(
-                "Turn execution still runs through Codex regardless of this setting; \
-                 full routing is not implemented yet."
-                    .to_string(),
-            ),
+            Some(hint.to_string()),
         );
     }
 }

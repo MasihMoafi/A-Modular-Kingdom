@@ -202,11 +202,16 @@ not claim unfinished behavior is available.
 
 ## Current Action
 
-1. Install the verified `main` binary (run `29663596709`) and finish acceptance: fixed
-   `ES.md` lean continuation, `/claude-code` runtime smoke, cyan header and context
-   accounting consistency. Already accepted live on 2026-07-18/19: dev-skills ledger rows
-   and toggles, `/status`, exact resume, memory teach/related-recall/unrelated-omission,
-   OpenAI end-to-end task. OpenRouter leg deferred (use a free model; low priority).
+1. Acceptance completed 2026-07-19 on the installed run-`29663596709` binary: `ES.md` now
+   records result, changed files, and commands (verified live after the streamed-items
+   fix), lean continuation answers from the checkpoint without file reads, `/claude-code`
+   completes a real text round-trip through the Claude Code CLI, the cyan header shows
+   context percent and location, and header/footer accounting agree (5% used / 95% left).
+   Previously accepted: dev-skills ledger rows and toggles, `/status`, exact resume, memory
+   teach/related-recall/unrelated-omission, OpenAI end-to-end task. OpenRouter leg deferred
+   (free model; low priority). Cosmetic gaps: header `location` is untruncated on narrow
+   terminals, and the header context percent lacks a used/left label. The stale
+   "full routing is not implemented" switch notice is fixed in source.
 2. Masih approves or rejects the installed build; release tagging happens only after his
    approval.
 3. Cargo-timing first pass (2026-07-19): top costs are first-party crates (codex-core
