@@ -170,7 +170,7 @@ struct ApprovalResolution {
 impl ApprovalResolution {
     fn into_tool_result(self) -> Result<ReviewDecision, ToolError> {
         if let Some(rejection) = self.rejection {
-            Err(ToolError::Rejected(rejection))
+            Err(ToolError::UserDeclined(rejection))
         } else {
             Ok(self.decision)
         }

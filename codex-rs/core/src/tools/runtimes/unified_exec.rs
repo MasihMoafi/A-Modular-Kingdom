@@ -404,6 +404,9 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
                 ToolError::Rejected(_) => {
                     ToolError::Rejected("missing command line for PTY".to_string())
                 }
+                ToolError::UserDeclined(_) => {
+                    ToolError::UserDeclined("missing command line for PTY".to_string())
+                }
                 error @ ToolError::Codex(_) => error,
             })?;
             let options = unified_exec_options(attempt.network_denial_cancellation_token.clone());
@@ -469,6 +472,9 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
         .map_err(|error| match error {
             ToolError::Rejected(_) => {
                 ToolError::Rejected("missing command line for PTY".to_string())
+            }
+            ToolError::UserDeclined(_) => {
+                ToolError::UserDeclined("missing command line for PTY".to_string())
             }
             error @ ToolError::Codex(_) => error,
         })?;
