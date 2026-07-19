@@ -46,10 +46,38 @@ pub struct ContinuitySource {
     pub name: String,
     pub path: PathBuf,
     pub bytes: u64,
+    pub estimated_tokens: u64,
+    pub category: ContinuitySourceCategory,
     pub lifetime: &'static str,
     pub reason: &'static str,
     pub admitted: bool,
     pub selectable: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ContinuitySourceCategory {
+    Files,
+    Memory,
+    Instructions,
+    Evidence,
+}
+
+impl ContinuitySourceCategory {
+    pub const ALL: [Self; 4] = [
+        Self::Files,
+        Self::Memory,
+        Self::Instructions,
+        Self::Evidence,
+    ];
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Files => "FILES",
+            Self::Memory => "MEMORY",
+            Self::Instructions => "INSTRUCTIONS",
+            Self::Evidence => "EVIDENCE",
+        }
+    }
 }
 
 pub fn workspace_context_dir(memories_root: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
@@ -113,6 +141,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         existing_file_source(
             GLOBAL_RULES.to_string(),
             path,
+            ContinuitySourceCategory::Instructions,
             "applicable global rules",
             admission.global_rules,
         )
@@ -120,6 +149,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
     sources.extend(existing_file_source(
         PROJECT_RULES.to_string(),
         cwd.join("AGENTS.md"),
+        ContinuitySourceCategory::Instructions,
         "applicable project rules",
         admission.project_rules,
     ));
@@ -139,6 +169,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
                 sources.extend(existing_file_source(
                     format!("{DEV_SOURCE_PREFIX}{file_name}"),
                     dev_dir.join(&file_name),
+                    ContinuitySourceCategory::Instructions,
                     "configured development rules",
                     admitted,
                 ));
@@ -148,12 +179,14 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
     sources.extend(existing_file_source(
         "GOAL.md".to_string(),
         workspace_dir.join("GOAL.md"),
+        ContinuitySourceCategory::Files,
         "active workspace goal",
         admission.goal,
     ));
     sources.extend(existing_file_source(
         "ES.md".to_string(),
         workspace_dir.join("ES.md"),
+        ContinuitySourceCategory::Evidence,
         "lean session checkpoint",
         admission.checkpoint,
     ));
@@ -166,6 +199,12 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
                 let metadata = std::fs::metadata(&path).ok()?;
                 (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
                     name: path.display().to_string(),
+                    estimated_tokens: estimate_tokens(&path, metadata.len(), MAX_RULE_CHARS),
+                    category: if path.starts_with(memories_root) {
+                        ContinuitySourceCategory::Memory
+                    } else {
+                        ContinuitySourceCategory::Files
+                    },
                     path,
                     bytes: metadata.len(),
                     lifetime: "every turn",
@@ -181,19 +220,31 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
 fn existing_file_source(
     name: String,
     path: PathBuf,
+    category: ContinuitySourceCategory,
     reason: &'static str,
     admitted: bool,
 ) -> Option<ContinuitySource> {
     let metadata = std::fs::metadata(&path).ok()?;
     (metadata.is_file() && metadata.len() > 0).then_some(ContinuitySource {
+        estimated_tokens: estimate_tokens(&path, metadata.len(), source_char_limit(&name)),
         name,
         path,
         bytes: metadata.len(),
+        category,
         lifetime: "every turn",
         reason,
         admitted,
         selectable: true,
     })
+}
+
+fn estimate_tokens(path: &Path, bytes: u64, max_chars: usize) -> u64 {
+    std::fs::read_to_string(path).map_or_else(
+        |_| bytes.min(max_chars as u64).div_ceil(4),
+        |content| {
+            (content.trim().chars().count().min(max_chars) as u64).div_ceil(4)
+        },
+    )
 }
 
 pub fn set_continuity_source_admitted(
@@ -408,7 +459,58 @@ mod tests {
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].name, "GOAL.md");
         assert_eq!(sources[0].bytes, 10);
+        assert_eq!(sources[0].estimated_tokens, 3);
+        assert_eq!(sources[0].category, ContinuitySourceCategory::Files);
         assert_eq!(sources[0].lifetime, "every turn");
+        Ok(())
+    }
+
+    #[test]
+    fn sources_expose_honest_groups_and_capped_token_estimates() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = home.path().join("projects/Elpis");
+        let dev = home.path().join("projects/skills/dev");
+        let workspace = workspace_context_dir(Some(&memories), &cwd).expect("workspace path");
+        std::fs::create_dir_all(home.path().join(".codex"))?;
+        std::fs::create_dir_all(&memories)?;
+        std::fs::create_dir_all(&cwd)?;
+        std::fs::create_dir_all(&dev)?;
+        std::fs::create_dir_all(&workspace)?;
+        std::fs::write(home.path().join(".codex/AGENTS.md"), "Global instructions")?;
+        std::fs::write(cwd.join("AGENTS.md"), "Project instructions")?;
+        std::fs::write(dev.join("SKILL.md"), "Development instructions")?;
+        std::fs::write(
+            workspace.join("GOAL.md"),
+            "x".repeat(MAX_GOAL_CHARS + 40),
+        )?;
+        std::fs::write(workspace.join("ES.md"), "Verified command evidence")?;
+        let memory = memories.join("MEMORY.md");
+        std::fs::write(&memory, "Durable memory")?;
+        add_continuity_source(Some(&memories), &cwd, &memory)?;
+
+        let sources = continuity_sources(Some(&memories), &cwd);
+        for (name, category) in [
+            ("GOAL.md", ContinuitySourceCategory::Files),
+            ("MEMORY.md", ContinuitySourceCategory::Memory),
+            ("Global AGENTS.md", ContinuitySourceCategory::Instructions),
+            ("ES.md", ContinuitySourceCategory::Evidence),
+        ] {
+            let source = sources
+                .iter()
+                .find(|source| source.name.ends_with(name))
+                .unwrap_or_else(|| panic!("missing source {name}"));
+            assert_eq!(source.category, category, "wrong group for {name}");
+            assert!(source.estimated_tokens > 0, "missing estimate for {name}");
+        }
+        assert_eq!(
+            sources
+                .iter()
+                .find(|source| source.name == "GOAL.md")
+                .expect("goal source")
+                .estimated_tokens,
+            (MAX_GOAL_CHARS as u64).div_ceil(4)
+        );
         Ok(())
     }
 

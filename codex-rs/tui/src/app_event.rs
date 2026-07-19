@@ -144,6 +144,12 @@ pub(crate) enum KeymapEditIntent {
     ReplaceOne { old_key: String },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RuntimeSelection {
+    Codex,
+    ClaudeCode,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum AppEvent {
@@ -705,6 +711,9 @@ pub(crate) enum AppEvent {
 
     /// Update the current reasoning effort in the running app and widget.
     UpdateReasoningEffort(Option<ReasoningEffort>),
+
+    /// Switch which agent backend owns subsequent turns in this session.
+    SwitchActiveRuntime(RuntimeSelection),
 
     /// Update the current model slug in the running app and widget.
     UpdateModel(String),
