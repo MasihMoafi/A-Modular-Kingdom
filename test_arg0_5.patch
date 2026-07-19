@@ -1,0 +1,28 @@
+--- codex-rs/core/src/tools/runtimes/shell/unix_escalation.rs
++++ codex-rs/core/src/tools/runtimes/shell/unix_escalation.rs
+@@ -1030,6 +1030,7 @@ pub fn unix_escalation_daemon_launch_request(
+                         use_legacy_landlock: true,
+                         windows_sandbox_level: WindowsSandboxLevel::Sandbox,
+                         windows_sandbox_private_desktop: false,
++                        arg0: None,
+                     })
+                     .map(|request| {
+                         let options = ExecOptions {
+--- codex-rs/core/src/tools/sandboxing.rs
++++ codex-rs/core/src/tools/sandboxing.rs
+@@ -453,6 +453,7 @@ impl ToolSandboxPlatformAdapter {
+                 use_legacy_landlock,
+                 windows_sandbox_level,
+                 windows_sandbox_private_desktop: false,
++                arg0: None,
+             })
+             .map(|request| {
+                 ExecRequest::from_sandbox_exec_request(
+@@ -496,6 +497,7 @@ impl ToolSandboxPlatformAdapter {
+                 use_legacy_landlock,
+                 windows_sandbox_level,
+                 windows_sandbox_private_desktop: false,
++                arg0: None,
+             })
+             .map(|request| {
+                 ExecRequest::from_sandbox_exec_request(
