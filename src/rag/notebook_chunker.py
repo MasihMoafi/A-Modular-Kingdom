@@ -61,6 +61,13 @@ def extract_cells_from_notebook(notebook_path: str) -> List[Dict[str, Any]]:
     return extracted_cells
 
 
+_EXERCISE_PATTERNS = [
+    re.compile(r'#\s*GRADED\s+CELL:\s*exercise\s+(\d+)', re.IGNORECASE),
+    re.compile(r'###\s*Exercise\s+(\d+)', re.IGNORECASE),
+    re.compile(r'Exercise\s+(\d+)', re.IGNORECASE),
+]
+
+
 def extract_exercise_number(content: str) -> str:
     """
     Extract exercise number from cell content.
@@ -70,14 +77,8 @@ def extract_exercise_number(content: str) -> str:
     - "### Exercise 2:"
     - "Exercise 3 - "
     """
-    patterns = [
-        r'#\s*GRADED\s+CELL:\s*exercise\s+(\d+)',
-        r'###\s*Exercise\s+(\d+)',
-        r'Exercise\s+(\d+)',
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, content, re.IGNORECASE)
+    for pattern in _EXERCISE_PATTERNS:
+        match = pattern.search(content)
         if match:
             return match.group(1)
 
