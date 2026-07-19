@@ -202,7 +202,7 @@ impl ChatWidget {
             format!("{context}%").cyan(),
             " · location ".dim(),
             location.cyan(),
-            " · Shift+Tab Context Ledger".dim(),
+            " · Tab Context Ledger".dim(),
         ])
         .render(area, buf);
     }

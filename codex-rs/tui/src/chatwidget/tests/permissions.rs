@@ -1209,3 +1209,20 @@ async fn permissions_full_access_history_cell_emitted_only_after_confirmation() 
         "expected full access update history message, got: {rendered}"
     );
 }
+
+#[tokio::test]
+async fn test_cycle_approval_preset() {
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
+
+    // Guardian is disabled by default in these tests, but let's test cycling.
+    // It should jump to the next valid preset.
+
+    let initial_approval = chat.config_ref().permissions.approval_policy.value();
+
+    // Simulate Shift+Tab
+    chat.handle_key_event(KeyEvent::from(KeyCode::BackTab));
+
+    // Expect approval policy to have changed.
+    let current_approval = chat.config_ref().permissions.approval_policy.value();
+    assert_ne!(initial_approval, current_approval, "Shift+Tab should cycle permission preset");
+}

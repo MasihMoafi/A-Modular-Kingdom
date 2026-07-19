@@ -360,6 +360,73 @@ impl ChatWidget {
         apply_actions()
     }
 
+
+    pub(crate) fn cycle_approval_preset(&mut self) {
+        if self.config.explicit_permission_profile_mode {
+            return;
+        }
+
+        let include_read_only = cfg!(target_os = "windows");
+        let current_approval = AskForApproval::from(self.config.permissions.approval_policy.value());
+        let current_permission_profile = self.config.permissions.permission_profile().clone();
+        let guardian_approval_enabled = self.config.features.enabled(Feature::GuardianApproval);
+        let current_review_policy = self.config.approvals_reviewer;
+        let presets = builtin_approval_presets();
+
+        #[cfg(target_os = "windows")]
+        let windows_sandbox_level = crate::windows_sandbox::level_from_config(&self.config);
+        #[cfg(target_os = "windows")]
+        let windows_degraded_sandbox_enabled =
+            matches!(windows_sandbox_level, WindowsSandboxLevel::RestrictedToken);
+        #[cfg(not(target_os = "windows"))]
+        let windows_degraded_sandbox_enabled = false;
+
+        let mut available_presets = Vec::new();
+
+        for preset in presets {
+            if !include_read_only && preset.id == "read-only" {
+                continue;
+            }
+            let base_name = if preset.id == "auto" && windows_degraded_sandbox_enabled {
+                format!("{} (non-admin sandbox)", ASK_FOR_APPROVAL_LABEL)
+            } else if preset.id == "auto" {
+                ASK_FOR_APPROVAL_LABEL.to_string()
+            } else {
+                preset.label.to_string()
+            };
+
+            let approval_disabled_reason = self.config.permissions.approval_policy.can_set(&preset.approval).err();
+
+            if approval_disabled_reason.is_none() {
+                available_presets.push((preset.clone(), base_name.clone(), ApprovalsReviewer::User));
+                if preset.id == "auto" && guardian_approval_enabled {
+                    available_presets.push((preset.clone(), APPROVE_FOR_ME_LABEL.to_string(), ApprovalsReviewer::AutoReview));
+                }
+            }
+        }
+
+        if available_presets.is_empty() {
+            return;
+        }
+
+        let current_index = available_presets.iter().position(|(preset, _, reviewer)| {
+            *reviewer == current_review_policy && Self::preset_matches_current(current_approval, &current_permission_profile, self.config.cwd.as_path(), preset)
+        }).unwrap_or(0);
+
+        let next_index = (current_index + 1) % available_presets.len();
+        let (next_preset, next_label, next_reviewer) = available_presets[next_index].clone();
+
+        for action in Self::approval_preset_actions(
+            AskForApproval::from(next_preset.approval),
+            next_preset.permission_profile,
+            next_preset.active_permission_profile,
+            next_label,
+            next_reviewer,
+        ) {
+            action(&self.app_event_tx);
+        }
+    }
+
     pub(super) fn preset_matches_current(
         current_approval: AskForApproval,
         current_permission_profile: &PermissionProfile,

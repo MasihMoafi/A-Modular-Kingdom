@@ -177,12 +177,10 @@ impl ChatWidget {
                 code: KeyCode::BackTab,
                 kind: KeyEventKind::Press,
                 ..
-            } if self.collaboration_modes_enabled()
-                && !self.bottom_pane.is_task_running()
+            } if !self.bottom_pane.is_task_running()
                 && self.bottom_pane.no_modal_or_popup_active() =>
             {
-                self.cycle_collaboration_mode();
-                self.refresh_plan_mode_nudge();
+                self.cycle_approval_preset();
             }
             _ => {
                 let had_modal_or_popup = !self.bottom_pane.no_modal_or_popup_active();

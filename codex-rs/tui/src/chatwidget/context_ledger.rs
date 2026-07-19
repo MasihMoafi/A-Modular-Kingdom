@@ -27,7 +27,10 @@ impl ChatWidget {
         if key_event.kind != KeyEventKind::Press {
             return false;
         }
-        if matches!(key_event.code, KeyCode::BackTab)
+        if matches!(key_event.code, KeyCode::Tab)
+            && key_event.modifiers.is_empty()
+            && self.bottom_pane.composer_is_empty()
+            && self.bottom_pane.no_modal_or_popup_active()
             && self
                 .last_rendered_width
                 .get()
@@ -127,7 +130,7 @@ impl ChatWidget {
                 "Space/Enter toggle · g i all in · g e all out"
             };
             lines.push(Line::from(sequence_hint.dim()));
-            lines.push(Line::from("w why · ↑↓ select · Shift+Tab close".dim()));
+            lines.push(Line::from("w why · ↑↓ select · Tab close".dim()));
         }
         lines.push(Line::from(""));
 
