@@ -52,7 +52,7 @@ async fn ledger_groups_real_sources_and_exposes_selected_reason() -> anyhow::Res
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
     configure_ledger_sources(&mut chat, root.path())?;
 
-    assert!(chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::BackTab)));
+    assert!(chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Tab)));
     assert!(chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('w'))));
     let rendered = render_ledger(&chat, 80);
 
@@ -75,7 +75,7 @@ async fn ledger_g_sequences_exclude_and_include_all_selectable_sources() -> anyh
     let root = tempdir()?;
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
     let (memories, cwd) = configure_ledger_sources(&mut chat, root.path())?;
-    chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::BackTab));
+    chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Tab));
 
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('g')));
     chat.handle_context_ledger_key_event(KeyEvent::from(KeyCode::Char('e')));
