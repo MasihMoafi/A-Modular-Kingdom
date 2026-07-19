@@ -715,6 +715,10 @@ pub(crate) enum AppEvent {
     /// Switch which agent backend owns subsequent turns in this session.
     SwitchActiveRuntime(RuntimeSelection),
 
+    /// Suspend the Elpis TUI and run the real `claude` CLI interactively in this
+    /// terminal (takeover mode), restoring the TUI when it exits.
+    LaunchClaudeCodeTakeover,
+
     /// Update the current model slug in the running app and widget.
     UpdateModel(String),
 

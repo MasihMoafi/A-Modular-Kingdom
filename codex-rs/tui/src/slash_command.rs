@@ -113,7 +113,9 @@ impl SlashCommand {
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Stop => "kill all background terminals",
             SlashCommand::Model => "choose a provider-aware model and reasoning effort",
-            SlashCommand::ClaudeCode => "switch this session's active runtime to Claude Code",
+            SlashCommand::ClaudeCode => {
+                "hand this terminal to the Claude Code CLI; exit it to return to Elpis"
+            }
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
             }

@@ -46,8 +46,10 @@ subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned he
 - ChatGPT subscription authentication; OpenRouter through `OPENROUTER_API_KEY`; native
   Anthropic Messages and Google Gemini adapters (`--provider anthropic`,
   `--provider google-gemini`; live vendor acceptance pending).
-- `/claude-code`: route a turn through your local Claude Code CLI and subscription
-  (text round-trip today; tool/approval bridging is the current work).
+- `/claude-code`: hands this terminal to your locally installed Claude Code CLI — the
+  real `claude`, your subscription, full UI — and returns you to Elpis when it exits.
+  The `/model` picker can instead keep you in Elpis and route turns through the CLI as
+  a text bridge.
 - One internal, read-only RAG service: `/rag <query>`, `/rag <path> -- <query>`, and
   autonomous retrieval.
 - Portable `GOAL.md` + `ES.md` continuity; exact resume or lean continuation.
@@ -221,8 +223,10 @@ elpis --provider google-gemini
 ```
 
 `elpis --provider claude|gemini|gemini-flash` are OpenRouter compatibility shortcuts,
-distinct from the native adapters above. Inside a session, `/claude-code` switches the
-active runtime to your locally installed, separately authenticated Claude Code CLI.
+distinct from the native adapters above. Inside a session, `/claude-code` suspends
+Elpis and runs your locally installed, separately authenticated Claude Code CLI in the
+same terminal; exiting it brings Elpis back. Selecting Claude Code in the `/model`
+picker instead routes Elpis turns through the CLI as a text bridge.
 
 ## Verification
 

@@ -53,6 +53,48 @@ impl App {
         tui.frame_requester().schedule_frame();
     }
 
+    /// Takeover mode for `/claude-code`: fully restore the terminal, run the real
+    /// `claude` CLI interactively in the workspace directory, and bring the Elpis TUI
+    /// back when it exits — as if the user had typed `claude` in their shell.
+    pub(super) async fn launch_claude_code_takeover(&mut self, tui: &mut tui::Tui) {
+        let binary = codex_claude_bridge::resolve_binary();
+        let cwd = self.config.cwd.clone();
+        let status = tui
+            .with_restored(tui::RestoreMode::Full, || async {
+                tokio::process::Command::new(&binary)
+                    .current_dir(&cwd)
+                    .stdin(std::process::Stdio::inherit())
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit())
+                    .status()
+                    .await
+            })
+            .await;
+
+        match status {
+            Ok(status) if status.success() => {
+                self.chat_widget.add_info_message(
+                    "Claude Code exited — back in Elpis.".to_string(),
+                    /*hint*/ None,
+                );
+            }
+            Ok(status) => {
+                self.chat_widget.add_info_message(
+                    format!("Claude Code exited with {status} — back in Elpis."),
+                    /*hint*/ None,
+                );
+            }
+            Err(err) => {
+                self.chat_widget.add_error_message(format!(
+                    "Failed to launch Claude Code (`{binary}`): {err}. Install the Claude \
+                     Code CLI and run `claude` once in a shell to log in, then retry \
+                     /claude-code."
+                ));
+            }
+        }
+        tui.frame_requester().schedule_frame();
+    }
+
     pub(super) fn request_external_editor_launch(&mut self, tui: &mut tui::Tui) {
         self.chat_widget
             .set_external_editor_state(ExternalEditorState::Requested);
