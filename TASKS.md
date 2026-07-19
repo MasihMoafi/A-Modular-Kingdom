@@ -4,7 +4,10 @@ This is the project task source of truth. A feature is complete only after its s
 behavior is implemented and verified; vision documents describe intended behavior but must
 not claim unfinished behavior is available.
 
-## Foundational — required for the first release
+Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
+**Nice-to-have = v0.3+**. An item ships in v0.1 only if it is listed under Foundational.
+
+## Foundational — required for the first release (v0.1)
 
 ### F1. Clean canonical repository — complete
 
@@ -39,6 +42,11 @@ not claim unfinished behavior is available.
   surface in `/status`, and focused tests cover the behavior.
 - Remaining cleaner gap: the retained excerpt is positional (head/tail), not a semantic
   conclusion of the output.
+- Cleaner visibility gap (Masih, 2026-07-19: "I have not yet seen it work"): the cleaner
+  is wired into the live request path (`client.rs` calls `clean_transient_tool_outputs`),
+  but nothing in the TUI ever demonstrates it. Acceptance: a session with a long tool
+  output must show the eviction in `/status` and the user must be able to see the receipt
+  replacing the raw output. Until a user can watch it happen, it does not count as done.
 
 ### F4. Durable memory — implemented; end-to-end acceptance pending
 
@@ -112,7 +120,7 @@ not claim unfinished behavior is available.
   focused regression in `core/src/elpis_context.rs`). Remote verification is in progress;
   not accepted until the CI run passes and a terminal render check confirms the rows.
 
-### F8. Claude Code as a selectable runtime (R11) — first slice landed
+### F8. Claude Code as a selectable runtime (R11) — text routing verified live; agent capabilities missing
 
 - `codex-rs/claude-bridge`: a subprocess bridge to the Claude Code CLI's `--print`
   non-interactive mode (`claude -p --output-format stream-json`), with a typed event
@@ -120,6 +128,15 @@ not claim unfinished behavior is available.
 - `/claude-code` command and an `ActiveRuntime` (`Codex` | `ClaudeCode`) session enum
   exist (`codex-rs/tui/src/chatwidget/runtime_selection.rs`) and switching prints a
   confirmation in the transcript.
+- Live acceptance 2026-07-19 (tmux-driven, installed 11:54 binary): `/claude-code` then a
+  text prompt returned the exact reply `READY_E2E` rendered in the TUI. Text routing works
+  end to end on the installed build.
+- Why it looked broken to Masih: the installed binary predates commit `0084fcf` and still
+  prints the stale "full routing is not implemented yet" notice on switch; the header keeps
+  showing the Codex model (`gpt-5.5`) while Claude Code is active; and `/model` has no
+  Claude Code entry. Fixes: reinstall from a post-`0084fcf` build (triggered as run
+  `29681801846`); header must display the active runtime; picker entry is delegated
+  (LEDGER/PICKER worker branch).
 - Turn submission is actually routed through `claude-bridge` when the active runtime is
   Claude Code (`codex-rs/tui/src/chatwidget/claude_code_turn.rs`), not just recorded:
   whole-message text-in/text-out only — no incremental streaming render (unlike Codex's
@@ -133,6 +150,14 @@ not claim unfinished behavior is available.
   entries) — `/claude-code` is currently the only way to select it.
 - Claude Code authenticates via its own subscription login, separate from Codex/ChatGPT
   and from the native/OpenRouter provider credentials in F5.
+- The gap that matters most ("it doesn't turn into Claude"): the bridge is text-only, so a
+  Claude Code turn cannot run tools, edit files, stream, or use Elpis approval surfaces.
+  Bridging `tool_use`/`tool_result` events onto the existing Codex approval/diff UI is the
+  remaining core work and is Fable-owned (needs an empirical capture of a tool-using
+  `claude -p --verbose --output-format stream-json` run first).
+- Forking Claude Code itself is not an option: it is closed-source (an obfuscated
+  JavaScript CLI), unlike Codex (Apache-2.0 Rust). The correct architecture is exactly
+  this bridge plus UX parity work (see the v0.2 Claude-parity item).
 
 ## Reduction campaign
 
@@ -143,10 +168,14 @@ not claim unfinished behavior is available.
   branch and cherry-picked onto `agent/context-ledger-ui` (PR #49 closed as superseded);
   lands with that branch after CI passes.
 - Measured candidates are recorded in `docs/BUILD_AND_REDUCTION_AUDIT.md`.
+- New 2026-07-19: the installed binary is 356,440,368 bytes versus the 102,988,260-byte
+  stripped baseline artifact — a 3.5× size regression despite `file` reporting it
+  stripped. Investigate what the build-cycle CI changes (incremental compilation, profile
+  edits) did to the release profile before any code deletion is credited or blamed.
 - Do not delete arbitrary workspace crates: first prove they are reachable from the Elpis
   binary and optional under the product requirements.
 
-## Important — after the first-release foundation
+## Important — after the first-release foundation (v0.2)
 
 - Agent-owned post-turn context pruning, full contract (Masih's ace in the hole; see
   `docs/CONTEXT_AND_SESSIONS.md`): agent-authored compact turn outcome record, deterministic
@@ -158,7 +187,9 @@ not claim unfinished behavior is available.
   proxy — candidate engine for pruning's compact action receipts), `codebase-memory-mcp`
   (already reachable through inherited `~/.codex/config.toml`; decide default-on wiring and
   the SessionStart hint), and `ponytail` (minimal-code discipline; ship as a default
-  `skills/dev` rule).
+  `skills/dev` rule). A fourth candidate — a fast codebase-indexing bash script Masih
+  linked in an earlier (lost) conversation — needs Masih to re-send the link before it can
+  be evaluated.
 - Context Ledger parity with `design-prototype.png` (kept in Masih's local files; not in the
   repo): grouped sections (files/memory/instructions/evidence), per-row token counts,
   include/exclude-all keys, and the "why included" panel. Delegable; spec is the prototype.
@@ -186,7 +217,30 @@ not claim unfinished behavior is available.
 - A **Dynamic Context Files Panel** was proposed here in an earlier draft of this backlog;
   it is already implemented as the Context Ledger (see F7) and is not a future item.
 
-## Nice-to-have
+- Context Ledger corrections, from Masih's 2026-07-19 session review (verified findings):
+  the displayed numbers are file sizes in bytes, not tokens, and carry no unit label
+  (`5.0k` for the 5,076-byte global `~/.codex/AGENTS.md` is accurate but unlabeled); the
+  total (`29.4k admitted`) is the byte sum of admitted sources and legitimately differs
+  per workspace because sources are per-project, but nothing explains that; a source
+  capped by the 8,000-character admission limit still displays its full on-disk size.
+  Required: label units (or convert to a token estimate), show the truncated-vs-full size
+  when the cap applies, and state the workspace scope in the ledger header.
+- Context Ledger `/add` completion: `/add <path>` already admits single files
+  (`core/src/elpis_context.rs::add_continuity_source`), but the ledger shows no hint that
+  it exists. Required: a "use /add to add a file or directory" hint line in the ledger
+  panel, and directory support — `/add <dir>` opens a file chooser listing the directory's
+  files so the user picks which to admit as individual toggleable rows.
+- Claude Code UX parity, phase 1 (Masih explicitly wants Elpis to feel like Claude Code):
+  the four permission modes cycled with one key (normal / auto-accept edits / plan /
+  bypass) including an "auto" mode; composer mouse selection with Backspace deleting the
+  selection; composer undo/redo (Ctrl+Z / Ctrl+Y). Investigate what the inherited Ratatui
+  composer already supports before writing anything new.
+- Ship `tmux` as a recommended (not required) package alongside the `.deb`
+  (`Recommends:` field), since tmux-driven render checks are the project's own acceptance
+  method. Fable's position, stated for the record: a hard dependency would be wrong —
+  Elpis runs fine without tmux; Masih can overrule.
+
+## Nice-to-have (v0.3+)
 
 - `/auto` routing with a visible choice, reason, and manual override. A proposed shape:
   classify by complexity and route easy edits/summaries to a low-cost fast model, medium
@@ -198,39 +252,35 @@ not claim unfinished behavior is available.
   code-level token/cost harness to bound runaway loops.
 - Messaging adapters (Telegram/Discord) using OpenClaw/Pi connection patterns, so Elpis can
   run as a daemon connected to channels.
-- A `/elpis` poetry easter egg: a cyan-themed display of stylized lyrics or poems.
+- A `/elpis` poetry easter egg: a cyan-themed display of stylized lyrics or poems
+  (implementation in flight on `agent/rag-ux-easter-egg`, PR #54).
+- Claude Code UX parity, phase 2: managing running agents from the keyboard (Claude
+  Code's left-arrow agent panel), mid-turn message queuing, mobile remote control of a
+  session, and opt-in telemetry. Large, multi-slice work; explicitly not v0.1/v0.2.
 
 ## Current Action
 
-1. Acceptance completed 2026-07-19 on the installed run-`29663596709` binary: `ES.md` now
-   records result, changed files, and commands (verified live after the streamed-items
-   fix), lean continuation answers from the checkpoint without file reads, `/claude-code`
-   completes a real text round-trip through the Claude Code CLI, the cyan header shows
-   context percent and location, and header/footer accounting agree (5% used / 95% left).
-   Previously accepted: dev-skills ledger rows and toggles, `/status`, exact resume, memory
-   teach/related-recall/unrelated-omission, OpenAI end-to-end task. OpenRouter leg deferred
-   (free model; low priority). Cosmetic gaps: header `location` is untruncated on narrow
-   terminals, and the header context percent lacks a used/left label. The stale
-   "full routing is not implemented" switch notice is fixed in source.
-2. Masih approves or rejects the installed build; release tagging happens only after his
-   approval.
-3. Cargo-timing first pass (2026-07-19): top costs are first-party crates (codex-core
+1. Priority 1 — make Claude Code usable and believable inside Elpis (F8). Verified
+   2026-07-19 by a live tmux-driven run of the installed binary: text routing works
+   (`/claude-code` + prompt returned the exact requested reply in the TUI), but the
+   installed 11:54 binary predates commit `0084fcf` and still prints the false "full
+   routing is not implemented yet" notice, the header keeps showing the Codex model
+   while Claude Code is active, and `/model` offers no Claude Code entry — so to a user
+   the feature reads as absent. Actions: install the fresh post-fix build (run
+   `29681801846`, triggered); make the header show the active runtime; land the picker
+   entry (delegated, `agent/ledger-parity-model-picker`); then the Fable-owned core work —
+   bridge `tool_use`/`tool_result` events onto the existing approval/diff UI, starting
+   from an empirical capture of a tool-using `claude -p --verbose
+   --output-format stream-json` run.
+2. Masih approves or rejects the fresh installed build; release tagging happens only
+   after his approval. Everything accepted on 2026-07-19 remains accepted: continuity
+   (`ES.md`/`GOAL.md`, lean continuation, exact resume), memory
+   teach/recall/omission, `/status`, dev-skills ledger rows, OpenAI end-to-end task,
+   header/footer accounting agreement. OpenRouter leg deferred.
+3. Worker branches in flight: `agent/rag-ux-easter-egg` (terra, PR #54, CI pending) and
+   `agent/ledger-parity-model-picker` (sol, in progress). Integrate one at a time after
+   CI; the coordinator merges, workers do not.
+4. Cargo-timing first pass (2026-07-19): top costs are first-party crates (codex-core
    39.7s, tui 22.1s, config 19.7s, app-server 17.8s); no dominant third-party dependency.
-   Select one bounded deletion from `docs/BUILD_AND_REDUCTION_AUDIT.md` candidates only.
-4. R11 (Claude Code as a selectable runtime) — foundation merged to `main`, not complete.
-   Done and CI-verified: `codex-rs/claude-bridge` crate (spawns
-   `claude -p --output-format stream-json`, parses real captured event schema);
-   `/claude-code` command switches `ActiveRuntime`; submitting a message while active
-   routes through the bridge and renders plain-text replies
-   (`tui/src/chatwidget/claude_code_turn.rs`). Never run live by a human, only CI with a
-   fake `claude` binary (`CLAUDE_BRIDGE_BINARY_OVERRIDE_ENV`-style override — check the
-   crate for the exact env var name). Remaining, not started: (a) `/model` picker must
-   show Claude Code as its own provider group with its model listed beneath, matching
-   the pattern already used for other providers; (b) tool-call/permission event
-   rendering — `claude-bridge`'s own doc comments say `tool_use`/`tool_result` JSON
-   shapes were never empirically captured, only plain-text `assistant`/`result` events
-   were; a turn where Claude uses a tool currently shows "used tools, not rendered yet"
-   instead of the tool call. Next step for (b): capture a real `claude -p --verbose
-   --output-format stream-json` run that actually uses a tool, add typed variants for
-   the observed shape, then bridge to Elpis's existing approval/diff UI reused from the
-   Codex path — don't invent a parallel one.
+   Also investigate the 3.5× installed-binary size regression (see Reduction campaign)
+   before selecting one bounded deletion from `docs/BUILD_AND_REDUCTION_AUDIT.md`.
