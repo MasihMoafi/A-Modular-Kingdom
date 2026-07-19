@@ -310,6 +310,15 @@ and sol's grouped-ledger/picker branch merged; fresh binary from run `2968990548
 installed. Masih's live review of that build produced the list below. **v0.1 does not tag
 until every item here passes his test.**
 
+**Gate status (2026-07-19 night):** 1 MERGED (#63); 4 MERGED (#59); 2 in PR #87 (CI);
+3+5 in PR #88 (CI); #85 pending CI. Jules PR sweep: merged #63 #59 #83 #64 #74 #81 #79
+#82 #58 #61 #72 #69 #71 #73 #75; closed #57 #60 #62 #66 #84 (test-only, per Masih),
+#65 #68 #76 #80 (duplicates), #70 (speculative abstraction), #67 (broke explicit
+out-of-workspace RAG paths — the drag-&-drop use case), #78 #86 (TODO preconditions
+unmet); #77 superseded by #87. Real fix in #87: build_continuity_prompt no longer
+re-injects rule files the server already sends natively (rules were double-sent every
+turn). Next: merge #85/#87/#88 on green → fresh main build → install → Masih tests.
+
 1. **The ace — per-turn context deletion, visible (Fable-owned).** The deterministic
    cleaner is wired but invisible and positional. Required for v1: the agent-authored
    per-turn prune of the next request, plus the "context saved" metric and bar so the
