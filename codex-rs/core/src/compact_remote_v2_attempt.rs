@@ -109,31 +109,49 @@ pub(super) async fn run_remote_compact_v2_attempt(
         &responses_metadata,
     )
     .await;
+
+    if let Ok(RemoteCompactionV2Output {
+        response_id,
+        token_usage,
+        ..
+    }) = compaction_output_result.as_ref()
+    {
+        sess.send_event(
+            turn_context,
+            EventMsg::RawResponseCompleted(RawResponseCompletedEvent {
+                response_id: response_id.clone(),
+                token_usage: token_usage.clone(),
+            }),
+        )
+        .await;
+    }
+
+    let compaction_output_result = compaction_output_result.and_then(|output| {
+        if output.compaction_count != 1 {
+            return Err(codex_protocol::error::CodexErr::Fatal(format!(
+                "remote compaction v2 expected exactly one compaction output item, got {} from {} output items",
+                output.compaction_count, output.output_item_count
+            )));
+        }
+
+        let compaction_output = output
+            .compaction_output
+            .expect("compaction output must exist when count is exactly one");
+
+        Ok(RemoteCompactV2Attempt {
+            trace_input_history,
+            prompt_input,
+            compaction_output,
+            token_usage: output.token_usage,
+            owned_client_session,
+        })
+    });
+
     trace_attempt.record_result(
         compaction_output_result
             .as_ref()
             .map(|output| std::slice::from_ref(&output.compaction_output)),
     );
-    let RemoteCompactionV2Output {
-        compaction_output,
-        response_id,
-        token_usage,
-    } = compaction_output_result?;
-    // TODO: Emit this before compaction output validation so malformed completed
-    // responses still surface their raw upstream usage.
-    sess.send_event(
-        turn_context,
-        EventMsg::RawResponseCompleted(RawResponseCompletedEvent {
-            response_id,
-            token_usage: token_usage.clone(),
-        }),
-    )
-    .await;
-    Ok(RemoteCompactV2Attempt {
-        trace_input_history,
-        prompt_input,
-        compaction_output,
-        token_usage,
-        owned_client_session,
-    })
+
+    compaction_output_result
 }

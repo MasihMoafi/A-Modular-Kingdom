@@ -323,13 +323,15 @@ async fn run_remote_compact_task_inner_impl(
     Ok(())
 }
 
-struct RemoteCompactionV2Output {
-    compaction_output: ResponseItem,
-    response_id: String,
-    token_usage: Option<TokenUsage>,
+pub(super) struct RemoteCompactionV2Output {
+    pub(super) compaction_output: Option<ResponseItem>,
+    pub(super) output_item_count: usize,
+    pub(super) compaction_count: usize,
+    pub(super) response_id: String,
+    pub(super) token_usage: Option<TokenUsage>,
 }
 
-async fn run_remote_compaction_request_v2(
+pub(super) async fn run_remote_compaction_request_v2(
     sess: &Session,
     turn_context: &TurnContext,
     client_session: &mut ModelClientSession,
@@ -420,20 +422,13 @@ async fn collect_compaction_output(
         ));
     }
 
-    if compaction_count != 1 {
-        return Err(CodexErr::Fatal(format!(
-            "remote compaction v2 expected exactly one compaction output item, got {compaction_count} from {output_item_count} output items"
-        )));
-    }
-
-    let Some(compaction_output) = compaction_output else {
-        unreachable!("compaction output must exist when count is exactly one");
-    };
     let Some(response_id) = completed_response_id else {
         unreachable!("response id must exist after response.completed");
     };
     Ok(RemoteCompactionV2Output {
         compaction_output,
+        output_item_count,
+        compaction_count,
         response_id,
         token_usage: completed_token_usage,
     })
@@ -847,7 +842,9 @@ mod tests {
             .await
             .expect("compaction should be collected");
 
-        assert_eq!(output.compaction_output, compaction);
+        assert_eq!(output.compaction_output, Some(compaction));
+        assert_eq!(output.output_item_count, 2);
+        assert_eq!(output.compaction_count, 1);
         assert_eq!(output.response_id, "resp-compact");
         assert_eq!(
             output.token_usage,
