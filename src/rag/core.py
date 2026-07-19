@@ -1,7 +1,7 @@
 import sys
 import os, re, string, fitz, json, math
 import torch
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Dict, Tuple, Any, Callable
 
 # --- FIX for Ollama Proxy ---
 # This is necessary to ensure the local Ollama server can be reached.
@@ -12,7 +12,6 @@ def clear_proxy_settings():
 clear_proxy_settings()
 
 from collections import Counter
-from typing import List, Dict, Any, Tuple, Callable, Optional
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from .qdrant_backend import QdrantVectorDB
 
