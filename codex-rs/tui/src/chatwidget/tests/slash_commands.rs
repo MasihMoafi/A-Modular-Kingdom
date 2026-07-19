@@ -2926,22 +2926,24 @@ async fn compact_queues_user_messages_snapshot() {
 }
 
 #[tokio::test]
-async fn claude_code_slash_command_switches_active_runtime() {
+async fn claude_code_slash_command_requests_takeover() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
     assert_eq!(chat.active_runtime(), ActiveRuntime::Codex);
 
     chat.handle_slash_command_dispatch(SlashCommand::ClaudeCode);
 
-    assert_eq!(chat.active_runtime(), ActiveRuntime::ClaudeCode);
-    let cells = drain_insert_history(&mut rx);
-    let rendered = cells
-        .iter()
-        .map(|lines| lines_to_single_string(lines))
-        .collect::<Vec<_>>()
-        .join("\n");
+    // The slash command no longer flips the runtime in place; it asks the app layer to
+    // suspend the TUI and run the real `claude` CLI (takeover mode).
+    assert_eq!(chat.active_runtime(), ActiveRuntime::Codex);
+    let mut saw_takeover = false;
+    while let Ok(event) = rx.try_recv() {
+        if matches!(event, AppEvent::LaunchClaudeCodeTakeover) {
+            saw_takeover = true;
+        }
+    }
     assert!(
-        rendered.contains("Active runtime switched to Claude Code"),
-        "expected runtime-switch confirmation, got {rendered:?}"
+        saw_takeover,
+        "expected /claude-code to send AppEvent::LaunchClaudeCodeTakeover"
     );
 }
 
@@ -2978,7 +2980,9 @@ EOF
     }
 
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    chat.handle_slash_command_dispatch(SlashCommand::ClaudeCode);
+    // Switch the way the runtime picker does (the /claude-code slash command is now
+    // takeover mode, handled at the app layer).
+    chat.switch_active_runtime(ActiveRuntime::ClaudeCode);
     drain_insert_history(&mut rx); // discard the runtime-switch confirmation
 
     chat.submit_user_message(UserMessage::from("hello claude".to_string()));

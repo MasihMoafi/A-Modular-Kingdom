@@ -128,7 +128,7 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   source's inclusion reason. CI run `29682921080` passed; installed terminal render
   acceptance remains pending.
 
-### F8. Claude Code as a selectable runtime (R11) — text routing verified live; agent capabilities missing
+### F8. Claude Code as a selectable runtime (R11) — text bridge verified live; takeover mode built, awaiting live acceptance
 
 - `codex-rs/claude-bridge`: a subprocess bridge to the Claude Code CLI's `--print`
   non-interactive mode (`claude -p --output-format stream-json`), with a typed event
@@ -168,6 +168,15 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   `--append-system-prompt`, hooks, MCP). This is the Ollama pattern: Ollama never
   re-implemented Claude Code's UI — Claude Code's backend is swappable via its
   Anthropic-compatible API endpoint, and the real CLI does the rest. Fable-owned.
+- Takeover mode implemented 2026-07-19 (branch `agent/claude-code-takeover`):
+  `/claude-code` now sends `AppEvent::LaunchClaudeCodeTakeover`; the app layer reuses the
+  external-editor suspend machinery (`Tui::with_restored(RestoreMode::Full, ..)`) to
+  fully restore the terminal, run `claude` with inherited stdio in the workspace cwd,
+  and restore the TUI on exit. The runtime picker's `Account default` row keeps the
+  in-Elpis text bridge. Acceptance: Masih runs `/claude-code` on the fresh build and
+  lands in real Claude Code, exits, and is back in Elpis. Continuity injection via
+  Claude Code extension points (CLAUDE.md / `--append-system-prompt`) is the follow-up,
+  not part of this gate.
 - The existing text bridge remains for headless/scripted turns. Full
   `tool_use`/`tool_result` bridging onto Elpis approval surfaces is deprioritized —
   only worth building if takeover mode proves insufficient.

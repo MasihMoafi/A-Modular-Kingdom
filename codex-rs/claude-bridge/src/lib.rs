@@ -117,7 +117,9 @@ pub fn parse_event_line(line: &str) -> Result<ClaudeStreamEvent, ParseError> {
 /// of the real CLI, so routing logic can be exercised without a live authenticated session).
 pub const BINARY_OVERRIDE_ENV: &str = "CLAUDE_BRIDGE_BINARY";
 
-fn resolve_binary() -> String {
+/// The `claude` binary to invoke, honoring [`BINARY_OVERRIDE_ENV`]. Shared with the
+/// TUI's takeover mode so tests can substitute a fake CLI there too.
+pub fn resolve_binary() -> String {
     std::env::var(BINARY_OVERRIDE_ENV).unwrap_or_else(|_| "claude".to_string())
 }
 

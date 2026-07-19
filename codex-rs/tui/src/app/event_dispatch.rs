@@ -1159,6 +1159,9 @@ impl App {
                     self.launch_external_editor(tui).await;
                 }
             }
+            AppEvent::LaunchClaudeCodeTakeover => {
+                self.launch_claude_code_takeover(tui).await;
+            }
             AppEvent::OpenWindowsSandboxEnablePrompt {
                 preset,
                 profile_selection,
