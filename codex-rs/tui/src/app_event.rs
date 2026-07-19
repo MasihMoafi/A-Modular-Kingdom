@@ -976,7 +976,10 @@ pub(crate) enum AppEvent {
     },
 
     /// Submit a scoped, read-only RAG request chosen from the local path prompt.
-    SubmitRagSearch { query: String, doc_path: String },
+    SubmitRagSearch {
+        query: String,
+        doc_path: String,
+    },
 
     /// Open the approval popup.
     FullScreenApprovalRequest(ApprovalRequest),

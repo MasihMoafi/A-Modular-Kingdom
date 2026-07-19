@@ -129,9 +129,7 @@ pub fn continuity_sources(memories_root: Option<&Path>, cwd: &Path) -> Vec<Conti
         return Vec::new();
     };
     let admission = read_admission(&workspace_dir);
-    let dev_dir = cwd
-        .parent()
-        .map(|parent| parent.join("skills/dev"));
+    let dev_dir = cwd.parent().map(|parent| parent.join("skills/dev"));
     let global_rules = memories_root
         .parent()
         .and_then(Path::parent)
@@ -241,9 +239,7 @@ fn existing_file_source(
 fn estimate_tokens(path: &Path, bytes: u64, max_chars: usize) -> u64 {
     std::fs::read_to_string(path).map_or_else(
         |_| bytes.min(max_chars as u64).div_ceil(4),
-        |content| {
-            (content.trim().chars().count().min(max_chars) as u64).div_ceil(4)
-        },
+        |content| (content.trim().chars().count().min(max_chars) as u64).div_ceil(4),
     )
 }
 
@@ -480,10 +476,7 @@ mod tests {
         std::fs::write(home.path().join(".codex/AGENTS.md"), "Global instructions")?;
         std::fs::write(cwd.join("AGENTS.md"), "Project instructions")?;
         std::fs::write(dev.join("SKILL.md"), "Development instructions")?;
-        std::fs::write(
-            workspace.join("GOAL.md"),
-            "x".repeat(MAX_GOAL_CHARS + 40),
-        )?;
+        std::fs::write(workspace.join("GOAL.md"), "x".repeat(MAX_GOAL_CHARS + 40))?;
         std::fs::write(workspace.join("ES.md"), "Verified command evidence")?;
         let memory = memories.join("MEMORY.md");
         std::fs::write(&memory, "Durable memory")?;

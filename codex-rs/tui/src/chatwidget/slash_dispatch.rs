@@ -36,8 +36,7 @@ const SIDE_SLASH_COMMAND_UNAVAILABLE_HINT: &str =
     "Press Ctrl+C to return to the main thread first.";
 const GOAL_USAGE_HINT: &str = "Example: /goal improve benchmark coverage";
 const RAG_USAGE: &str = "Usage: /rag <query> or /rag <path> -- <query>";
-const ELPIS_POEM: &str =
-    "Elpis\n\nA cyan thread through changing minds—\nwhat matters stays,\nand hope keeps the way home.";
+const ELPIS_POEM: &str = "Elpis\n\nA cyan thread through changing minds—\nwhat matters stays,\nand hope keeps the way home.";
 
 fn rag_request(doc_path: &str, query: &str) -> String {
     format!(

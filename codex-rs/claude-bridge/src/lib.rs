@@ -151,9 +151,16 @@ fn build_command(options: &ClaudePrintOptions) -> Command {
 /// `parse_event_line` against captured fixtures, not end-to-end here.
 pub async fn spawn_and_stream_events(
     options: ClaudePrintOptions,
-) -> Result<(Child, mpsc::UnboundedReceiver<Result<ClaudeStreamEvent, ParseError>>), ClaudeBridgeError>
-{
-    let mut child = build_command(&options).spawn().map_err(ClaudeBridgeError::Spawn)?;
+) -> Result<
+    (
+        Child,
+        mpsc::UnboundedReceiver<Result<ClaudeStreamEvent, ParseError>>,
+    ),
+    ClaudeBridgeError,
+> {
+    let mut child = build_command(&options)
+        .spawn()
+        .map_err(ClaudeBridgeError::Spawn)?;
     let stdout = child.stdout.take().ok_or(ClaudeBridgeError::NoStdout)?;
     let (tx, rx) = mpsc::unbounded_channel();
 

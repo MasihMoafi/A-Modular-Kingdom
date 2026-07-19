@@ -2989,7 +2989,11 @@ EOF
     assert!(chat.is_claude_code_turn_running());
 
     let completed = loop {
-        match rx.recv().await.expect("channel closed before turn completed") {
+        match rx
+            .recv()
+            .await
+            .expect("channel closed before turn completed")
+        {
             AppEvent::ClaudeCodeTurnCompleted {
                 text,
                 session_id,

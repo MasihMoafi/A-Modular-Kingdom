@@ -2056,6 +2056,11 @@ async fn request_user_input_interrupt_pauses_active_goal_turn() {
 
         chat.handle_key_event(key_event);
 
+        assert_matches!(
+            rx.try_recv(),
+            Ok(AppEvent::CodexOp(Op::UserInputAnswer { .. }))
+        );
+        assert_matches!(rx.try_recv(), Ok(AppEvent::InsertHistoryCell(_)));
         assert_matches!(rx.try_recv(), Ok(AppEvent::CodexOp(Op::Interrupt)));
         assert_goal_paused_event(&mut rx, thread_id);
     }
