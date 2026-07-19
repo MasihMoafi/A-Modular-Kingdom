@@ -1,12 +1,7 @@
 {
-  "name": "RAG",
+  "name": "Elpis",
   "version": "1.0.0",
-  "description": "AI-Powered Multi-Agent System with transferable RAG, memory, vision, and advanced tools for any document directory",
-  "mcpServers": {
-    "unified_knowledge_agent": {
-      "command": "python",
-      "args": ["/home/masih/Desktop/migrate/Projects/A-Modular-Kingdom/A-Modular-Kingdom/agent/host.py"]
-    }
-  },
-  "contextFileName": "KINGDOM.md"
+  "description": "Provider-neutral terminal agent shell for controlled context, persistent memory, safe execution, and session continuity.",
+  "contextFileName": "ELPIS.md",
+  "note": "Elpis is a terminal agent shell rather than a Gemini CLI MCP extension. See the repository README for the current setup."
 }
