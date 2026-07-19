@@ -1,12 +1,10 @@
 //! Which agent backend owns the active session.
 //!
-//! This is the first slice of R11 (`REQUIREMENTS.md`): today this enum only records the
-//! user's selection and drives `/claude-code`'s confirmation message. It does NOT yet
-//! change how a turn is executed — submitting a message still always goes through
-//! `codex_app_server_client::AppServerClient` regardless of this value. Routing an actual
-//! turn through `codex-claude-bridge` when `ActiveRuntime::ClaudeCode` is selected is the
-//! next, larger step (touches turn submission and the Codex event-bridging path), not
-//! done here.
+//! Both `/claude-code` and provider-grouped model-picker selections converge on this
+//! runtime switch. Turn submission consults the selected value before choosing the Codex
+//! app-server or Claude Code CLI path.
+
+use crate::app_event::RuntimeSelection;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum ActiveRuntime {
@@ -44,6 +42,16 @@ impl super::ChatWidget {
             format!("Active runtime switched to {}.", runtime.display_name()),
             Some(hint.to_string()),
         );
+    }
+
+    pub(crate) fn switch_active_runtime_selection(&mut self, selection: RuntimeSelection) {
+        let runtime = match selection {
+            RuntimeSelection::Codex => ActiveRuntime::Codex,
+            RuntimeSelection::ClaudeCode => ActiveRuntime::ClaudeCode,
+        };
+        if self.active_runtime != runtime {
+            self.switch_active_runtime(runtime);
+        }
     }
 }
 

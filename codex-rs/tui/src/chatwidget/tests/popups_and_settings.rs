@@ -3151,6 +3151,64 @@ async fn model_picker_hides_show_in_picker_false_models_from_cache() {
 }
 
 #[tokio::test]
+async fn model_picker_groups_claude_code_and_switches_runtime() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.6-sol")).await;
+    let preset = get_available_model(&chat, "gpt-5.6-sol");
+    while rx.try_recv().is_ok() {}
+
+    chat.open_model_popup_with_presets(vec![preset]);
+    let popup = render_bottom_popup(&chat, /*width*/ 80);
+    assert!(popup.contains("OPENAI"), "missing Codex provider group:\n{popup}");
+    assert!(popup.contains("CLAUDE CODE"), "missing provider group:\n{popup}");
+    assert!(popup.contains("Account default"), "missing runtime model:\n{popup}");
+    assert!(
+        popup.contains("CLI subscription chooses the model"),
+        "missing honest model source:\n{popup}"
+    );
+
+    chat.handle_key_event(KeyEvent::from(KeyCode::Down));
+    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
+    let selection = std::iter::from_fn(|| rx.try_recv().ok()).find_map(|event| match event {
+        AppEvent::SwitchActiveRuntime(selection) => Some(selection),
+        _ => None,
+    });
+    assert_eq!(
+        selection,
+        Some(crate::app_event::RuntimeSelection::ClaudeCode)
+    );
+    chat.switch_active_runtime_selection(selection.expect("runtime selection"));
+    assert_eq!(chat.active_runtime(), ActiveRuntime::ClaudeCode);
+}
+
+#[tokio::test]
+async fn codex_model_selection_restores_codex_runtime() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.6-sol")).await;
+    chat.switch_active_runtime(ActiveRuntime::ClaudeCode);
+    while rx.try_recv().is_ok() {}
+    let mut preset = get_available_model(&chat, "gpt-5.6-sol");
+    preset.default_reasoning_effort = ReasoningEffortConfig::Medium;
+    preset.supported_reasoning_efforts = vec![ReasoningEffortPreset {
+        effort: ReasoningEffortConfig::Medium,
+        description: "medium".to_string(),
+    }];
+
+    chat.open_reasoning_popup(preset);
+    let events = std::iter::from_fn(|| rx.try_recv().ok()).collect::<Vec<_>>();
+    let runtime = events.iter().find_map(|event| match event {
+        AppEvent::SwitchActiveRuntime(runtime) => Some(*runtime),
+        _ => None,
+    });
+    assert_eq!(runtime, Some(crate::app_event::RuntimeSelection::Codex));
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, AppEvent::UpdateModel(model) if model == "gpt-5.6-sol"))
+    );
+    chat.switch_active_runtime_selection(runtime.expect("runtime selection"));
+    assert_eq!(chat.active_runtime(), ActiveRuntime::Codex);
+}
+
+#[tokio::test]
 async fn server_overloaded_error_does_not_switch_models() {
     let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     chat.set_model("gpt-5.2");
