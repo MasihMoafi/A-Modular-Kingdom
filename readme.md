@@ -3,56 +3,68 @@
 [![Linux verification](https://github.com/MasihMoafi/Elpis/actions/workflows/embedded-elpis-linux.yml/badge.svg)](https://github.com/MasihMoafi/Elpis/actions/workflows/embedded-elpis-linux.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**The technical substrate is a provider-agnostic shell — goals, context, memory, permissions, evidence — that survives underneath whichever model or runtime you plug into it. The "become Elpis" framing is the narrative layer on top of that: instead of the user adapting to each tool's quirks, the tool adapts to the user and stays legible no matter which model sits inside it.**
+**Your terminal agent forgets everything. Elpis doesn't.**
 
-Elpis exists because long agent sessions lose shape. Goals get buried in transcripts,
-decisions disappear after compaction, and a new session often begins with the user explaining
-the same task again.
+Every coding agent today has the same disease: the longer you work, the worse it gets.
+Goals drown in transcripts. Decisions vanish at compaction. Every new session starts with
+you explaining your task *again*, and every model request resends an ever-fatter history
+you're paying for.
 
-Elpis keeps the active goal, admitted context, decisions, verification, and next action
-explicit. Exact evidence stays on disk. Model-visible context stays small.
+Elpis is a terminal agent shell that treats context as a managed asset, not an
+ever-growing log:
 
-It contains the Codex Rust execution foundation for terminal interaction, patches,
-permissions, sandboxing, and ChatGPT authentication. Elpis owns its retrieval, portable
-context, local memory, provider support, behavior, and interface.
+- **Post-turn context pruning.** After a turn delivers its answer, raw exploration —
+  command dumps, file reads, failed probes — is replaced in the *next* request by compact
+  receipts with exact evidence pointers. The full transcript stays on disk, retrievable on
+  demand; it just stops being resent by default. No other open agent does this per-turn.
+- **The Context Ledger.** A visible, scrollable panel showing *exactly* what enters your
+  next model request — every rule file, goal, checkpoint, and added file as its own row,
+  each one toggleable. You decide what the model sees. `/add` a file of your own.
+- **Portable continuity.** The active goal (`GOAL.md`) and a lean checkpoint (`ES.md`)
+  survive compaction, session death, and even switching runtimes. Resume a thread exactly,
+  or start a fresh one that already knows your goal, last result, and next action —
+  without replaying history.
+- **Earned memory.** Facts become durable memory only after repeated useful recall across
+  distinct contexts. Everything else stays as searchable evidence. Deleted memories are
+  archived before reset — never silently lost.
+- **Runtime-agnostic.** The shell survives underneath whichever model performs the loop:
+  ChatGPT/Codex subscription login, OpenRouter, native Anthropic and Gemini adapters,
+  Bedrock, Ollama, LM Studio — and a bridge to the Claude Code CLI (`/claude-code`).
+  Put a model into Elpis and it becomes Elpis: your goals, context, memory, and rules.
 
-> **Current state:** under active development. `v0.1.0` will be tagged after the release
-> checks in [TASKS.md](TASKS.md) pass.
+The execution foundation (terminal UI, patches, permissions, sandboxing, sessions) is a
+subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned here.
 
-## What works
+> **Current state:** approaching first release. `v0.1.0` is tagged only after live
+> acceptance recorded in [TASKS.md](TASKS.md). A green badge means those checks passed —
+> it never means unfinished work is finished.
+
+## What works today
 
 - Native Ratatui terminal interface with streaming commands, patches, permission modes,
   sandboxing, mouse selection, sessions, and compaction.
-- ChatGPT subscription authentication inherited from Codex.
-- OpenRouter support through `OPENROUTER_API_KEY`, separate from ChatGPT login.
-- Claude Sonnet and Gemini Pro/Flash launcher shortcuts through OpenRouter.
-- Native Anthropic Messages and Google Gemini adapters (`--provider anthropic`,
-  `--provider google-gemini`) with streaming and mock-server tests; live vendor
-  acceptance pending.
-- One internal, read-only RAG service with `/rag` and autonomous retrieval.
-- Portable workspace state through compact `GOAL.md` and `ES.md` files.
-- Exact thread resume or lean continuation in a fresh thread.
-- `/status` reporting for admitted context: source, size, lifetime, and reason.
-- Local bounded memory with age-aware retrieval, diversity, recall tracking, promotion after
-  repeated use across distinct contexts, and an archive for deleted or faded facts.
+- ChatGPT subscription authentication; OpenRouter through `OPENROUTER_API_KEY`; native
+  Anthropic Messages and Google Gemini adapters (`--provider anthropic`,
+  `--provider google-gemini`; live vendor acceptance pending).
+- `/claude-code`: route a turn through your local Claude Code CLI and subscription
+  (text round-trip today; tool/approval bridging is the current work).
+- One internal, read-only RAG service: `/rag <query>`, `/rag <path> -- <query>`, and
+  autonomous retrieval.
+- Portable `GOAL.md` + `ES.md` continuity; exact resume or lean continuation.
+- The Context Ledger with per-file rows and toggles; `/status` reporting every admitted
+  source with size, lifetime, and reason.
+- Bounded local memory with recall tracking, promotion, provenance, and a
+  fail-closed archive.
+- Deterministic first-pass context cleaning: older long tool outputs become bounded
+  excerpts with durable `rollout://` evidence pointers.
 
-The context and memory foundations compile and pass focused remote checks, but their
-user-visible end-to-end acceptance is still pending. The `claude` and `gemini` launcher
-shortcuts use OpenRouter compatibility routes, while native Anthropic and Google adapters
-exist as the separate `anthropic` and `google-gemini` providers; live vendor acceptance is
-still pending. The distinctive
-cyan continuity interface (identity header and Context Ledger) is partially implemented;
-the `Choose a mind` model picker, signature continuity event, and evidence-first
-completion hierarchy remain. [TASKS.md](TASKS.md)
-is the current-state record.
+The full pruning engine — the agent-authored turn outcome record described in
+[`docs/CONTEXT_AND_SESSIONS.md`](docs/CONTEXT_AND_SESSIONS.md) — is the flagship feature
+in active development, alongside a visible per-turn "context saved" metric.
 
 ## The working model
 
 Elpis keeps the surrounding control environment stable while the selected runtime performs the model loop. Exact evidence remains durable; only a small, reasoned working set enters the next request.
-
-### Operating model
-
-Elpis owns context, memory, continuity, permissions, and evidence around an explicitly selected runtime. The runtime may change without silently discarding Elpis-owned state.
 
 ```mermaid
 flowchart LR
@@ -63,9 +75,11 @@ flowchart LR
     memory["Bounded local memory"] --> control
     control --> runtime{"Select runtime"}
     runtime --> openai["OpenAI / Codex"]
-    runtime --> router["OpenRouter families"]
+    runtime --> claude["Claude Code CLI"]
+    runtime --> router["OpenRouter · Anthropic · Gemini"]
     runtime --> other["Bedrock / Ollama / LM Studio"]
     openai --> execution["Tools · edits · commands"]
+    claude --> execution
     router --> execution
     other --> execution
     execution --> evidence[("Workspace + exact evidence")]
@@ -73,13 +87,13 @@ flowchart LR
 
 ### Context management
 
-Elpis admits rules, the current request, portable state, and relevant memory into a small working set. `/status` exposes why each source is present while full artifacts stay on disk.
+Elpis admits rules, the current request, portable state, and relevant memory into a small working set. The Context Ledger and `/status` expose why each source is present while full artifacts stay on disk.
 
 The working context is not the transcript. Full conversations, terminal events, and artifacts
-remain available as evidence, but are retrieved only when a later task needs them. Retrieval may
-use an exact evidence pointer first and RAG only when the relevant artifact is not already known;
-neither makes the full history a default prompt attachment. The aim is to make a modest context
-window useful and legible, rather than pay to resend an ever-growing one.
+remain available as evidence, but are retrieved only when a later task needs them — by exact
+evidence pointer first, RAG second. Neither makes the full history a default prompt
+attachment. The aim is to make a modest context window sufficient and legible, rather than
+pay to resend an ever-growing one.
 
 ```mermaid
 flowchart LR
@@ -87,12 +101,12 @@ flowchart LR
     goal["GOAL.md ≤ 6,000 chars"] --> working
     checkpoint["ES.md ≤ 8,000 chars"] --> working
     memory["Relevant memory"] --> working
-    status["/status: source · size · lifetime · reason"] -.-> working
+    status["Context Ledger + /status"] -.-> working
     working --> runtime["Selected runtime request"]
     runtime --> results["Tool and function results"]
     results --> disk[("Full transcript + artifacts on disk")]
     results --> large{"Old tool output > 1,200 chars?"}
-    large -->|Yes| marker["Temporary output cleaner"]
+    large -->|Yes| marker["Compact receipt + evidence pointer"]
     large -->|No| keep["Keep in request context"]
 ```
 
@@ -182,7 +196,8 @@ flowchart LR
 
 ## Install
 
-Tagged releases publish a Linux x86_64 binary and checksum. From a checkout:
+Linux x86_64 today; macOS and Windows builds are planned through CI release runners.
+Tagged releases publish a checksummed binary. From a checkout:
 
 ```bash
 scripts/install-elpis.sh
@@ -190,30 +205,24 @@ scripts/install-elpis.sh
 
 The installer verifies the checksum and installs `elpis` into `~/.local/bin` atomically.
 
-OpenAI subscription login is the default. OpenRouter is separate:
+OpenAI subscription login is the default. Other routes:
 
 ```bash
+# OpenRouter (separate key)
 export OPENROUTER_API_KEY="your-key"
 elpis --provider openrouter --model "provider/model"
-```
 
-Compatibility shortcuts:
-
-```bash
-elpis --provider claude
-elpis --provider gemini
-elpis --provider gemini-flash
-```
-
-These shortcuts use OpenRouter. The native vendor adapters are separate providers:
-
-```bash
+# Native vendor adapters
 export ANTHROPIC_API_KEY="your-key"
 elpis --provider anthropic
 
 export GEMINI_API_KEY="your-key"
 elpis --provider google-gemini
 ```
+
+`elpis --provider claude|gemini|gemini-flash` are OpenRouter compatibility shortcuts,
+distinct from the native adapters above. Inside a session, `/claude-code` switches the
+active runtime to your locally installed, separately authenticated Claude Code CLI.
 
 ## Verification
 
@@ -224,8 +233,7 @@ inherited TUI/app-server regression runs nightly, manually, and for tagged relea
 
 The Python retrieval service has focused tests under `tests/`. Release acceptance is tracked
 in [TASKS.md](TASKS.md). The measured build and dependency-reduction plan is documented in
-[`docs/BUILD_AND_REDUCTION_AUDIT.md`](docs/BUILD_AND_REDUCTION_AUDIT.md). A green workflow
-badge means that workflow passed. It does not mean unfinished work is finished.
+[`docs/BUILD_AND_REDUCTION_AUDIT.md`](docs/BUILD_AND_REDUCTION_AUDIT.md).
 
 ## Principles
 
@@ -240,19 +248,11 @@ badge means that workflow passed. It does not mean unfinished work is finished.
 
 - `codex-rs/` — Rust application and TUI.
 - `src/` — the single-tool Python retrieval service.
-- `AGENTS.md` — agent entry point: dispatch, worktree workflow, and definition of done.
+- `AGENTS.md` — agent entry point: dispatch, workflow, and definition of done.
 - `GUIDE.md` — product vision, requirements, and architecture source of truth.
-- `TASKS.md` — release work, acceptance state, and backlog.
+- `TASKS.md` — release work, acceptance state, and version-mapped backlog.
 - `docs/CONTEXT_AND_SESSIONS.md` — context and continuation contract.
 - `docs/BUILD_AND_REDUCTION_AUDIT.md` — build baseline and measured subtraction plan.
-
-## Development
-
-Rust verification and Linux binary builds run in GitHub Actions. Local Rust compilation is
-intentionally avoided on the maintainer's workstation. The Python service uses the project
-virtual environment and focused tests under `tests/`.
-
-Elpis is not yet presented as a stable public release.
 
 ## License
 

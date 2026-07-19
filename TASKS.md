@@ -47,6 +47,9 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   but nothing in the TUI ever demonstrates it. Acceptance: a session with a long tool
   output must show the eviction in `/status` and the user must be able to see the receipt
   replacing the raw output. Until a user can watch it happen, it does not count as done.
+  Masih's concrete ask: a per-turn "context saved" metric — how many bytes/tokens the
+  cleaner removed from the next request — visible as a number and bar in the header,
+  ledger, or `/context`, so a user can watch context go *down*, not only up.
 
 ### F4. Durable memory — implemented; end-to-end acceptance pending
 
@@ -150,11 +153,17 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   entries) — `/claude-code` is currently the only way to select it.
 - Claude Code authenticates via its own subscription login, separate from Codex/ChatGPT
   and from the native/OpenRouter provider credentials in F5.
-- The gap that matters most ("it doesn't turn into Claude"): the bridge is text-only, so a
-  Claude Code turn cannot run tools, edit files, stream, or use Elpis approval surfaces.
-  Bridging `tool_use`/`tool_result` events onto the existing Codex approval/diff UI is the
-  remaining core work and is Fable-owned (needs an empirical capture of a tool-using
-  `claude -p --verbose --output-format stream-json` run first).
+- Direction change 2026-07-19 (Masih): the primary interactive path is now **takeover
+  mode** — `/claude-code` suspends the Elpis TUI and launches the user's real `claude`
+  CLI in the same terminal (exactly as if the user typed `claude`), restoring Elpis on
+  exit. This gives 100% genuine Claude Code UX with zero re-implementation; Elpis state
+  enters the session through Claude Code's own extension points (workspace CLAUDE.md /
+  `--append-system-prompt`, hooks, MCP). This is the Ollama pattern: Ollama never
+  re-implemented Claude Code's UI — Claude Code's backend is swappable via its
+  Anthropic-compatible API endpoint, and the real CLI does the rest. Fable-owned.
+- The existing text bridge remains for headless/scripted turns. Full
+  `tool_use`/`tool_result` bridging onto Elpis approval surfaces is deprioritized —
+  only worth building if takeover mode proves insufficient.
 - Forking Claude Code itself is not an option: it is closed-source (an obfuscated
   JavaScript CLI), unlike Codex (Apache-2.0 Rust). The correct architecture is exactly
   this bridge plus UX parity work (see the v0.2 Claude-parity item).
@@ -235,6 +244,23 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   bypass) including an "auto" mode; composer mouse selection with Backspace deleting the
   selection; composer undo/redo (Ctrl+Z / Ctrl+Y). Investigate what the inherited Ratatui
   composer already supports before writing anything new.
+- Distribution strategy ("publish everywhere", Masih 2026-07-19): package Elpis's
+  differentiators — durable memory and post-turn pruning — as a Claude Code plugin
+  (MCP server + hooks) and a Codex-compatible equivalent, publishable to their plugin
+  marketplaces, so Claude/Codex users get Elpis features without leaving their tool.
+  Separately: an Anthropic-API-compatible proxy endpoint served by Elpis, so the real
+  Claude Code CLI can run *any* Elpis-routed model (the same mechanism Ollama uses).
+  Release engineering: macOS and Windows binaries are built on GitHub Actions macOS/
+  Windows runners — owning a Mac is not required; publish .deb + tarball + checksums,
+  and report compressed download size per platform.
+- Startup speed: audit the elpis launch path (config, sqlite, auth, MCP host) for work
+  that blocks the first frame, using the audit method in
+  `docs/BUILD_AND_REDUCTION_AUDIT.md`; the binary must feel faster than a Node CLI or
+  the Rust choice is being wasted. Related: the 3.5× size regression above.
+- `codebase-memory-mcp` heats Masih's CPU (~90°C) when indexing: it must not be wired
+  default-on; if integrated, index lazily/throttled and never at session start.
+- Spinner identity: replace inherited working-state words with Elpis language
+  ("elpising…"), matching the cyan identity; small, delegable.
 - Ship `tmux` as a recommended (not required) package alongside the `.deb`
   (`Recommends:` field), since tmux-driven render checks are the project's own acceptance
   method. Fable's position, stated for the record: a hard dependency would be wrong —
