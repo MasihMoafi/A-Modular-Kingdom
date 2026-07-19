@@ -608,7 +608,7 @@ mod tests {
         tokio::fs::write(&custom, "Keep this visible").await?;
 
         let added = add_continuity_source(Some(&memories), &cwd, Path::new("notes.md"))?;
-        let sources = continuity_sources(Some(&memories), &cwd, &instructions);
+        let sources = continuity_sources(Some(&memories), &cwd, &[]);
         assert!(
             sources
                 .iter()
