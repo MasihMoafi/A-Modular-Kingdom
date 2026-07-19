@@ -7,11 +7,10 @@ fn render_ledger(chat: &ChatWidget, height: u16) -> String {
 
     (0..area.height)
         .map(|y| {
-            (0..area.width)
-                .fold(String::new(), |mut line, x| {
-                    line.push_str(buf[(x, y)].symbol());
-                    line
-                })
+            (0..area.width).fold(String::new(), |mut line, x| {
+                line.push_str(buf[(x, y)].symbol());
+                line
+            })
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -24,11 +23,8 @@ fn configure_ledger_sources(
     let memories = root.join(".elpis/memories");
     let cwd = root.join("projects/Elpis");
     let dev = root.join("projects/skills/dev");
-    let workspace = crate::legacy_core::elpis_context::workspace_context_dir(
-        Some(&memories),
-        &cwd,
-    )
-    .expect("workspace path");
+    let workspace = crate::legacy_core::elpis_context::workspace_context_dir(Some(&memories), &cwd)
+        .expect("workspace path");
 
     std::fs::create_dir_all(root.join(".codex"))?;
     std::fs::create_dir_all(&cwd)?;

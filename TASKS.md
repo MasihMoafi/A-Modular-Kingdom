@@ -325,6 +325,16 @@ until every item here passes his test.**
    `--append-system-prompt`; raw transcript stays on disk. The same composition
    architecture applies to Codex-runtime turns via the existing request path. The
    "context saved" number = bytes/tokens of raw turn output minus its outcome record.
+   **IMPLEMENTED — PR #63** (`agent/ace-context-composition`, 2026-07-19 night):
+   fresh-per-turn calls, haiku distillation with raw-excerpt fallback, records-only
+   re-send, raw transcript at `<codex_home>/claude_turns.jsonl`, per-turn
+   `context saved` line with percent bar + `saved` field in the ELPIS status line
+   (chars, labeled), Codex-runtime cleaner feeds the same counter. Unit + fake-binary
+   pipeline tests written but not run locally (no-compile rule) — CI is the gate,
+   pending at time of writing; NOT yet e2e-tested against real Claude (needs
+   installed build). Follow-up after gate 2
+   merges: also compose rules/goal/admitted-ledger files into the Claude working set
+   (today it carries outcome records only).
 2. **Context Ledger tells the whole truth (delegable).** The ledger pane must list every
    admitted source exactly as `/status` does (global/project AGENTS.md, each dev/ file,
    ES.md, manual adds) as individual toggleable rows — today it hides the dev group and

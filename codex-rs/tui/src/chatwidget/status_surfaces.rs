@@ -180,6 +180,9 @@ impl ChatWidget {
             crate::legacy_core::context_cleaner::eviction_count(),
             latest_eviction.as_deref(),
         );
+        crate::branding::sync_context_saved(
+            crate::legacy_core::context_cleaner::saved_chars() as u64
+        );
 
         // Identity and runtime details live above the chat surface; keep its footer clear.
         self.bottom_pane.set_status_line_enabled(false);

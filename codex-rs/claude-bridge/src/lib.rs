@@ -43,12 +43,17 @@ pub struct ParseError {
 }
 
 /// Options for one non-interactive `claude -p` invocation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ClaudePrintOptions {
     pub prompt: String,
     /// Passed as `--resume <id>` to continue a prior Claude Code session.
     pub resume_session_id: Option<String>,
     pub cwd: Option<PathBuf>,
+    /// Passed as `--model <name>` (e.g. `haiku` for cheap distillation calls).
+    pub model: Option<String>,
+    /// Passed as `--append-system-prompt <text>` — how Elpis injects its composed
+    /// working set (outcome records) into an otherwise fresh session.
+    pub append_system_prompt: Option<String>,
 }
 
 /// One parsed line of `claude ... --output-format stream-json` output.
@@ -133,6 +138,12 @@ fn build_command(options: &ClaudePrintOptions) -> Command {
     if let Some(id) = &options.resume_session_id {
         cmd.arg("--resume").arg(id);
     }
+    if let Some(model) = &options.model {
+        cmd.arg("--model").arg(model);
+    }
+    if let Some(text) = &options.append_system_prompt {
+        cmd.arg("--append-system-prompt").arg(text);
+    }
     if let Some(cwd) = &options.cwd {
         cmd.current_dir(cwd);
     }
@@ -151,9 +162,16 @@ fn build_command(options: &ClaudePrintOptions) -> Command {
 /// `parse_event_line` against captured fixtures, not end-to-end here.
 pub async fn spawn_and_stream_events(
     options: ClaudePrintOptions,
-) -> Result<(Child, mpsc::UnboundedReceiver<Result<ClaudeStreamEvent, ParseError>>), ClaudeBridgeError>
-{
-    let mut child = build_command(&options).spawn().map_err(ClaudeBridgeError::Spawn)?;
+) -> Result<
+    (
+        Child,
+        mpsc::UnboundedReceiver<Result<ClaudeStreamEvent, ParseError>>,
+    ),
+    ClaudeBridgeError,
+> {
+    let mut child = build_command(&options)
+        .spawn()
+        .map_err(ClaudeBridgeError::Spawn)?;
     let stdout = child.stdout.take().ok_or(ClaudeBridgeError::NoStdout)?;
     let (tx, rx) = mpsc::unbounded_channel();
 
@@ -303,7 +321,7 @@ mod tests {
         let options = ClaudePrintOptions {
             prompt: "hi".to_string(),
             resume_session_id: Some("abc-123".to_string()),
-            cwd: None,
+            ..Default::default()
         };
         let cmd = build_command(&options);
         let args: Vec<String> = cmd
@@ -313,6 +331,26 @@ mod tests {
             .collect();
         assert!(args.contains(&"--resume".to_string()));
         assert!(args.contains(&"abc-123".to_string()));
+    }
+
+    #[test]
+    fn build_command_includes_model_and_append_system_prompt_when_set() {
+        let options = ClaudePrintOptions {
+            prompt: "hi".to_string(),
+            model: Some("haiku".to_string()),
+            append_system_prompt: Some("prior outcome records".to_string()),
+            ..Default::default()
+        };
+        let cmd = build_command(&options);
+        let args: Vec<String> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert!(args.contains(&"--model".to_string()));
+        assert!(args.contains(&"haiku".to_string()));
+        assert!(args.contains(&"--append-system-prompt".to_string()));
+        assert!(args.contains(&"prior outcome records".to_string()));
     }
 
     /// Writes a fake `claude`-like script that ignores its arguments and prints canned
@@ -352,8 +390,7 @@ EOF"#,
 
         let result = run_print_turn(ClaudePrintOptions {
             prompt: "ignored by fake script".to_string(),
-            resume_session_id: None,
-            cwd: None,
+            ..Default::default()
         })
         .await;
 
@@ -393,7 +430,7 @@ printf '{"type":"result","subtype":"success","is_error":false,"result":"resumed"
         let result = run_print_turn(ClaudePrintOptions {
             prompt: "continue".to_string(),
             resume_session_id: Some("prior-session-456".to_string()),
-            cwd: None,
+            ..Default::default()
         })
         .await;
 
