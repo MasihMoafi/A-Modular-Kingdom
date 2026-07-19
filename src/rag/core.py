@@ -13,7 +13,7 @@ clear_proxy_settings()
 
 import ollama
 from collections import Counter
-from typing import List, Dict, Any, Tuple, Callable, Optional
+from typing import List, Dict, Any, Tuple, Optional
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from .qdrant_backend import QdrantVectorDB
 
