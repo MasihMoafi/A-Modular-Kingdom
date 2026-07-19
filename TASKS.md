@@ -122,6 +122,11 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   individual, independently toggleable rows admitted by default (commit `2f85ce3`, with a
   focused regression in `core/src/elpis_context.rs`). Remote verification is in progress;
   not accepted until the CI run passes and a terminal render check confirms the rows.
+- Context Ledger prototype-parity slice is implemented in PR #55: real admitted sources are
+  grouped as files/memory/instructions/evidence, row/section/total counts are explicitly
+  estimated tokens, `g i`/`g e` toggle all selectable rows, and `w` shows the selected
+  source's inclusion reason. CI run `29682921080` passed; installed terminal render
+  acceptance remains pending.
 
 ### F8. Claude Code as a selectable runtime (R11) — text routing verified live; agent capabilities missing
 
@@ -148,9 +153,11 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   tool shows nothing in the TUI until the process exits, then only its final text (if
   any). `codex-rs/claude-bridge`'s own parser doesn't decode those block shapes yet
   either, so this is a source-level limitation, not just an integration gap.
-- Not yet implemented: Claude Code does not appear in the `/model` picker as its own
-  provider group (`codex-rs/tui/src/chatwidget/model_popups.rs` has no Claude Code
-  entries) — `/claude-code` is currently the only way to select it.
+- Implemented in PR #55: `/model` shows a `CLAUDE CODE` provider/runtime group with an
+  honest `Account default` row because the CLI subscription chooses the actual model.
+  Selecting it reuses the existing `ActiveRuntime::ClaudeCode` switch path; selecting a
+  Codex model switches back to Codex. CI run `29682921080` passed; installed picker render
+  acceptance remains pending.
 - Claude Code authenticates via its own subscription login, separate from Codex/ChatGPT
   and from the native/OpenRouter provider credentials in F5.
 - Direction change 2026-07-19 (Masih): the primary interactive path is now **takeover
@@ -201,7 +208,8 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   be evaluated.
 - Context Ledger parity with `design-prototype.png` (kept in Masih's local files; not in the
   repo): grouped sections (files/memory/instructions/evidence), per-row token counts,
-  include/exclude-all keys, and the "why included" panel. Delegable; spec is the prototype.
+  include/exclude-all keys, and the "why included" panel are implemented in PR #55 and
+  CI-green; installed terminal render acceptance remains.
 - Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
   structured selectable prompt (question, options, multi-select) instead of silently
   assuming, and records the chosen answer in the session evidence.
@@ -234,6 +242,8 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   capped by the 8,000-character admission limit still displays its full on-disk size.
   Required: label units (or convert to a token estimate), show the truncated-vs-full size
   when the cap applies, and state the workspace scope in the ledger header.
+  PR #55 converts the rows and totals to explicitly estimated, admission-capped tokens;
+  truncated-vs-full disclosure and an explicit workspace-scope label remain.
 - Context Ledger `/add` completion: `/add <path>` already admits single files
   (`core/src/elpis_context.rs::add_continuity_source`), but the ledger shows no hint that
   it exists. Required: a "use /add to add a file or directory" hint line in the ledger
@@ -293,8 +303,8 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
    routing is not implemented yet" notice, the header keeps showing the Codex model
    while Claude Code is active, and `/model` offers no Claude Code entry — so to a user
    the feature reads as absent. Actions: install the fresh post-fix build (run
-   `29681801846`, triggered); make the header show the active runtime; land the picker
-   entry (delegated, `agent/ledger-parity-model-picker`); then the Fable-owned core work —
+   `29681801846`, triggered); make the header show the active runtime; merge the CI-green
+   picker entry (PR #55, `agent/ledger-parity-model-picker`); then the Fable-owned core work —
    bridge `tool_use`/`tool_result` events onto the existing approval/diff UI, starting
    from an empirical capture of a tool-using `claude -p --verbose
    --output-format stream-json` run.
@@ -303,9 +313,9 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
    (`ES.md`/`GOAL.md`, lean continuation, exact resume), memory
    teach/recall/omission, `/status`, dev-skills ledger rows, OpenAI end-to-end task,
    header/footer accounting agreement. OpenRouter leg deferred.
-3. Worker branches in flight: `agent/rag-ux-easter-egg` (terra, PR #54, CI pending) and
-   `agent/ledger-parity-model-picker` (sol, in progress). Integrate one at a time after
-   CI; the coordinator merges, workers do not.
+3. Worker branches in flight: `agent/rag-ux-easter-egg` (terra, PR #54) and
+   `agent/ledger-parity-model-picker` (sol, PR #55, CI run `29682921080` green). Integrate
+   one at a time; the coordinator merges, workers do not.
 4. Cargo-timing first pass (2026-07-19): top costs are first-party crates (codex-core
    39.7s, tui 22.1s, config 19.7s, app-server 17.8s); no dominant third-party dependency.
    Also investigate the 3.5× installed-binary size regression (see Reduction campaign)
