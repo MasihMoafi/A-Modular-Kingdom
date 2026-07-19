@@ -5237,7 +5237,6 @@ pub(crate) async fn build_world_state_from_turn_context(
     session.build_world_state_for_step(&step_context).await
 }
 
-// todo: use online model info
 pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
     let (tx_event, _rx_event) = async_channel::unbounded();
     let codex_home = tempfile::tempdir().expect("create temp dir");
@@ -5253,9 +5252,17 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
     let agent_control = AgentControl::default();
     let exec_policy = Arc::new(ExecPolicyManager::default());
     let (agent_status_tx, _agent_status_rx) = watch::channel(AgentStatus::PendingInit);
-    let model = get_model_offline_for_tests(config.model.as_deref());
-    let model_info =
-        construct_model_info_offline_for_tests(model.as_str(), &config.to_models_manager_config());
+    let model = models_manager
+        .get_default_model(
+            &config.model,
+            false,
+            codex_models_manager::manager::RefreshStrategy::Online,
+            crate::test_support::default_http_client_factory(),
+        )
+        .await;
+    let model_info = models_manager
+        .get_model_info(model.as_str(), &config.to_models_manager_config())
+        .await;
     let reasoning_effort = config.model_reasoning_effort.clone();
     let collaboration_mode = CollaborationMode {
         mode: ModeKind::Default,
