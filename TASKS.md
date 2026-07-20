@@ -224,6 +224,12 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   assuming, and records the chosen answer in the session evidence.
 - Live vendor acceptance of the implemented native Anthropic and Google adapters (see F5).
 - Additional provider/runtime adapters using proven Pi/OpenClaw patterns.
+- Full OpenRouter model catalog, not a hand-picked subset (Masih, 2026-07-19): list
+  (near-)all models OpenRouter exposes — including current GPT, Claude (Sonnet/Opus/
+  Fable-family), and Gemini IDs — via the OpenRouter models API rather than hardcoding
+  names that go stale as vendors update. Pi already implements this pattern (and also
+  supports Gemini directly); fetch its repo for reference before building. OpenClaw noted
+  as another reference/target. Deliberately deferred — backlog is already long.
 - Behavioral enforcement across runtimes.
 - Dictation with visible consent and editable, unsent text.
 - Further Codex subtraction, one measured capability at a time.
