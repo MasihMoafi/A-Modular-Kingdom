@@ -3174,19 +3174,46 @@ async fn model_picker_groups_claude_code_and_switches_runtime() {
         popup.contains("CLI subscription chooses the model"),
         "missing honest model source:\n{popup}"
     );
+    for model in ["Haiku 4.5", "Sonnet 5", "Opus 4.8", "Fable 5"] {
+        assert!(
+            popup.contains(model),
+            "missing Claude Code model {model}:\n{popup}"
+        );
+    }
 
     chat.handle_key_event(KeyEvent::from(KeyCode::Down));
     chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
-    let selection = std::iter::from_fn(|| rx.try_recv().ok()).find_map(|event| match event {
-        AppEvent::SwitchActiveRuntime(selection) => Some(selection),
+    let events = std::iter::from_fn(|| rx.try_recv().ok()).collect::<Vec<_>>();
+    let selection = events.iter().find_map(|event| match event {
+        AppEvent::SelectClaudeCodeModel(model) => Some(model.clone()),
         _ => None,
     });
     assert_eq!(
         selection,
-        Some(crate::app_event::RuntimeSelection::ClaudeCode)
+        Some(None),
+        "Account default carries no --model alias"
     );
-    chat.switch_active_runtime_selection(selection.expect("runtime selection"));
+    chat.select_claude_code_model(selection.flatten());
     assert_eq!(chat.active_runtime(), ActiveRuntime::ClaudeCode);
+}
+
+#[tokio::test]
+async fn model_picker_claude_code_haiku_row_carries_haiku_alias() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.6-sol")).await;
+    let preset = get_available_model(&chat, "gpt-5.6-sol");
+    while rx.try_recv().is_ok() {}
+
+    chat.open_model_popup_with_presets(vec![preset]);
+    // gpt-5.6-sol (current, selected) -> Account default -> Haiku 4.5.
+    chat.handle_key_event(KeyEvent::from(KeyCode::Down));
+    chat.handle_key_event(KeyEvent::from(KeyCode::Down));
+    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
+    let events = std::iter::from_fn(|| rx.try_recv().ok()).collect::<Vec<_>>();
+    let selection = events.iter().find_map(|event| match event {
+        AppEvent::SelectClaudeCodeModel(model) => Some(model.clone()),
+        _ => None,
+    });
+    assert_eq!(selection, Some(Some("haiku".to_string())));
 }
 
 #[tokio::test]

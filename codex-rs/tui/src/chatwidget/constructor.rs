@@ -109,6 +109,7 @@ impl ChatWidget {
             transcript: TranscriptState::new(active_cell),
             raw_output_mode: config.tui_raw_output_mode,
             active_runtime: ActiveRuntime::default(),
+            claude_model: None,
             claude_code_turn_running: false,
             claude_outcome_records: Vec::new(),
             claude_context_saved_chars: 0,

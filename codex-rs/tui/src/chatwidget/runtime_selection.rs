@@ -42,16 +42,47 @@ impl super::ChatWidget {
             format!("Active runtime switched to {}.", runtime.display_name()),
             Some(hint.to_string()),
         );
+        self.sync_branding_for_active_runtime();
     }
 
     pub(crate) fn switch_active_runtime_selection(&mut self, selection: RuntimeSelection) {
         let runtime = match selection {
             RuntimeSelection::Codex => ActiveRuntime::Codex,
-            RuntimeSelection::ClaudeCode => ActiveRuntime::ClaudeCode,
         };
         if self.active_runtime != runtime {
             self.switch_active_runtime(runtime);
         }
+    }
+
+    /// Selects the `--model` alias Claude Code turns use (`None` = account default) and
+    /// makes sure Claude Code is the active runtime.
+    pub(crate) fn select_claude_code_model(&mut self, model: Option<String>) {
+        self.claude_model = model;
+        if self.active_runtime == ActiveRuntime::ClaudeCode {
+            self.sync_branding_for_active_runtime();
+        } else {
+            self.switch_active_runtime(ActiveRuntime::ClaudeCode);
+        }
+    }
+
+    /// The status line ("ELPIS · provider · model · …") is normally kept in sync by
+    /// Codex app-server notifications (`protocol.rs`). Those notifications keep arriving
+    /// even while Claude Code is the active runtime and would otherwise stomp the
+    /// display back to the Codex model, so this is the one place that sets it directly
+    /// for both runtimes.
+    fn sync_branding_for_active_runtime(&mut self) {
+        match self.active_runtime {
+            ActiveRuntime::ClaudeCode => {
+                let model = self.claude_model.as_deref().unwrap_or("account default");
+                crate::branding::record_provider_switch("claude-code", model);
+            }
+            ActiveRuntime::Codex => {
+                let provider = self.model_provider_display_name();
+                let model = self.current_model().to_string();
+                crate::branding::record_provider_switch(&provider, &model);
+            }
+        }
+        self.refresh_status_line();
     }
 }
 

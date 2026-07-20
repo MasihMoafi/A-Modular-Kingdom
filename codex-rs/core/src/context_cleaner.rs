@@ -4,9 +4,9 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 1_200;
-const RETAINED_EDGE_CHARS: usize = 400;
-const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 2;
+const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 400;
+const RETAINED_EDGE_CHARS: usize = 150;
+const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 1;
 static EVICTED_TOOL_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
 static SAVED_CHARS: AtomicUsize = AtomicUsize::new(0);
 static LAST_EVICTION_EVENT: Mutex<Option<String>> = Mutex::new(None);
@@ -143,29 +143,37 @@ mod tests {
     }
 
     #[test]
-    fn evicts_only_old_large_outputs_and_preserves_evidence_pointer() {
+    fn evicts_all_but_the_single_newest_large_output() {
+        // RECENT_TOOL_OUTPUTS_TO_KEEP == 1: only the very last tool output in the
+        // conversation stays intact; everything older gets a receipt, no matter how
+        // far back it is. This matters most for resumed sessions, where dozens of
+        // old tool outputs can be sitting in history with only the newest protected.
         let large = format!("HEAD{}TAIL", "x".repeat(5_000));
         let mut input = vec![
-            output("old", large.clone()),
-            output("recent-1", large.clone()),
-            output("recent-2", large.clone()),
+            output("old-1", large.clone()),
+            output("old-2", large.clone()),
+            output("old-3", large.clone()),
+            output("recent", large.clone()),
         ];
 
-        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
-        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
-            panic!("function output");
-        };
-        let text = output.text_content().expect("text");
-        assert!(text.contains("evidence=rollout://tool-call/old"));
-        assert!(text.contains("HEAD"));
-        assert!(text.contains("TAIL"));
-        assert!(text.contains("full evidence remains in durable rollout"));
-        for item in &input[1..] {
-            let ResponseItem::FunctionCallOutput { output, .. } = item else {
+        assert_eq!(clean_transient_tool_outputs(&mut input), 3);
+        for item in &input[..3] {
+            let ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            } = item
+            else {
                 panic!("function output");
             };
-            assert_eq!(output.text_content(), Some(large.as_str()));
+            let text = output.text_content().expect("text");
+            assert!(text.contains(&format!("evidence=rollout://tool-call/{call_id}")));
+            assert!(text.contains("HEAD"));
+            assert!(text.contains("TAIL"));
+            assert!(text.contains("full evidence remains in durable rollout"));
         }
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[3] else {
+            panic!("function output");
+        };
+        assert_eq!(output.text_content(), Some(large.as_str()));
     }
 
     #[test]
@@ -179,8 +187,7 @@ mod tests {
                 output: FunctionCallOutputPayload::from_text(large.clone()),
                 internal_chat_message_metadata_passthrough: None,
             },
-            output("recent-1", large.clone()),
-            output("recent-2", large),
+            output("recent", large),
         ];
 
         assert_eq!(clean_transient_tool_outputs(&mut input), 1);
@@ -190,6 +197,29 @@ mod tests {
         let text = output.text_content().expect("text");
         assert!(text.contains("tool=browser"));
         assert!(text.contains("evidence=rollout://tool-call/custom-old"));
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[1] else {
+            panic!("function output");
+        };
+        assert_eq!(output.text_content().map(str::len), Some(5_000));
+    }
+
+    #[test]
+    fn tightened_threshold_catches_outputs_that_previously_survived() {
+        // 800 chars used to be well under the old 1_200-char floor and would never
+        // get compacted. Under the tightened 400-char floor it must now be evicted.
+        let mid = "m".repeat(800);
+        let mut input = vec![
+            output("old", mid.clone()),
+            output("recent", "ok".to_string()),
+        ];
+
+        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+            panic!("function output");
+        };
+        let text = output.text_content().expect("text");
+        assert!(text.contains("evidence=rollout://tool-call/old"));
+        assert!(text.chars().count() < mid.len());
     }
 
     #[test]
@@ -226,6 +256,39 @@ mod tests {
         let text = output.text_content().expect("text");
         assert!(text.contains("line one\n\nline two"));
         assert!(!text.contains("line one   "));
+    }
+
+    #[test]
+    fn never_touches_plain_messages_interleaved_with_evicted_tool_outputs() {
+        use codex_protocol::models::ContentItem;
+
+        fn user_message(text: &str) -> ResponseItem {
+            ResponseItem::Message {
+                id: None,
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: text.to_string(),
+                }],
+                phase: None,
+                internal_chat_message_metadata_passthrough: None,
+            }
+        }
+
+        let large = "q".repeat(5_000);
+        let mut input = vec![
+            user_message("first, please grep the repo"),
+            output("old", large.clone()),
+            user_message("now check the other file"),
+            output("recent", large),
+        ];
+
+        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+        assert_eq!(input[0], user_message("first, please grep the repo"));
+        assert_eq!(input[2], user_message("now check the other file"));
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[3] else {
+            panic!("function output");
+        };
+        assert_eq!(output.text_content().map(str::len), Some(5_000));
     }
 
     #[test]

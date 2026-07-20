@@ -164,9 +164,17 @@ impl Renderable for ChatWidget {
 
     fn desired_height(&self, width: u16) -> u16 {
         let ledger_width = self.context_ledger_width(width);
-        self.as_renderable()
+        let content_height = self
+            .as_renderable()
             .desired_height(width.saturating_sub(ledger_width))
-            .saturating_add(1)
+            .saturating_add(1);
+        if ledger_width > 0 {
+            // Claim enough rows to read as a real sidebar rather than being clipped to
+            // whatever the composer alone needs.
+            content_height.max(super::context_ledger::LEDGER_MIN_HEIGHT)
+        } else {
+            content_height
+        }
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
@@ -191,7 +199,14 @@ impl ChatWidget {
         if area.is_empty() {
             return;
         }
-        let model = self.config.model.as_deref().unwrap_or("select a model");
+        // `config.model` is always the Codex model; while Claude Code is the active
+        // runtime this header must reflect that instead (this was bug: it kept showing
+        // the stale Codex model after switching runtimes).
+        let model = if self.active_runtime == ActiveRuntime::ClaudeCode {
+            self.claude_model.as_deref().unwrap_or("account default")
+        } else {
+            self.config.model.as_deref().unwrap_or("select a model")
+        };
         let context = self.status_line_context_used_percent().unwrap_or(0);
         let location = format_directory_display(self.status_line_cwd(), /*max_width*/ None);
         Line::from(vec![

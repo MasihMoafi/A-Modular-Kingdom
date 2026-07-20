@@ -17,10 +17,12 @@
 
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Duration;
 
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncReadExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
@@ -147,9 +149,12 @@ fn build_command(options: &ClaudePrintOptions) -> Command {
     if let Some(cwd) = &options.cwd {
         cmd.current_dir(cwd);
     }
+    // stderr is piped (not inherited): the caller runs inside a raw-mode/alt-screen TUI,
+    // and a subprocess writing straight to the terminal would corrupt the frame instead
+    // of surfacing as a readable error.
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
+        .stderr(Stdio::piped());
     cmd
 }
 
@@ -209,45 +214,112 @@ pub struct TurnOutcome {
     pub error_message: Option<String>,
 }
 
+/// Ceiling on one `claude -p` turn (including the cheap haiku distillation call). Plain
+/// text-in/text-out turns are normally seconds; this is a backstop against a hung
+/// subprocess (e.g. an interactive auth prompt with no TTY to answer it) leaving the
+/// turn silently unresolved forever.
+const DEFAULT_TURN_TIMEOUT: Duration = Duration::from_secs(180);
+
 /// Runs one `claude -p` turn to completion and aggregates it into a [`TurnOutcome`].
 /// Convenience wrapper over [`spawn_and_stream_events`] for callers that don't need
 /// incremental events. Waits for the child process to exit.
 pub async fn run_print_turn(options: ClaudePrintOptions) -> Result<TurnOutcome, ClaudeBridgeError> {
+    run_print_turn_with_timeout(options, DEFAULT_TURN_TIMEOUT).await
+}
+
+async fn run_print_turn_with_timeout(
+    options: ClaudePrintOptions,
+    timeout: Duration,
+) -> Result<TurnOutcome, ClaudeBridgeError> {
     let (mut child, mut rx) = spawn_and_stream_events(options).await?;
+    // Drained concurrently, not after the fact: stderr is piped now (see `build_command`),
+    // and letting it sit unread risks the child blocking on a full pipe if it writes a lot.
+    let stderr_task = child.stderr.take().map(|stderr| {
+        tokio::spawn(async move {
+            let mut buf = String::new();
+            let _ = BufReader::new(stderr).read_to_string(&mut buf).await;
+            buf
+        })
+    });
+
     let mut text = String::new();
     let mut outcome = TurnOutcome::default();
 
-    while let Some(parsed) = rx.recv().await {
-        match parsed {
-            Ok(ClaudeStreamEvent::Assistant(message)) => {
-                if let Some(blocks) = message.message.get("content").and_then(Value::as_array) {
-                    for block in blocks {
-                        if block.get("type").and_then(Value::as_str) == Some("text")
-                            && let Some(chunk) = block.get("text").and_then(Value::as_str)
-                        {
-                            text.push_str(chunk);
+    let timed_out = tokio::time::timeout(timeout, async {
+        while let Some(parsed) = rx.recv().await {
+            match parsed {
+                Ok(ClaudeStreamEvent::Assistant(message)) => {
+                    if let Some(blocks) = message.message.get("content").and_then(Value::as_array) {
+                        for block in blocks {
+                            if block.get("type").and_then(Value::as_str) == Some("text")
+                                && let Some(chunk) = block.get("text").and_then(Value::as_str)
+                            {
+                                text.push_str(chunk);
+                            }
                         }
                     }
                 }
-            }
-            Ok(ClaudeStreamEvent::Result(result)) => {
-                outcome.session_id = Some(result.session_id);
-                outcome.is_error = result.is_error;
-                if result.is_error {
-                    outcome.error_message = result.result.clone();
+                Ok(ClaudeStreamEvent::Result(result)) => {
+                    outcome.session_id = Some(result.session_id);
+                    outcome.is_error = result.is_error;
+                    if result.is_error {
+                        outcome.error_message = result.result.clone();
+                    }
+                }
+                Ok(_) => {}
+                Err(_) => {
+                    // Malformed line from the CLI itself (not our concern to fail the whole
+                    // turn over) — skip it and keep aggregating.
                 }
             }
-            Ok(_) => {}
-            Err(_) => {
-                // Malformed line from the CLI itself (not our concern to fail the whole
-                // turn over) — skip it and keep aggregating.
-            }
         }
+    })
+    .await
+    .is_err();
+
+    if timed_out {
+        let _ = child.start_kill();
+    }
+    let exit_status = child.wait().await.ok();
+    let stderr_text = match stderr_task {
+        Some(task) => task.await.unwrap_or_default(),
+        None => String::new(),
+    };
+
+    outcome.text = if text.is_empty() { None } else { Some(text) };
+
+    if timed_out {
+        outcome.is_error = true;
+        outcome.error_message = Some(format!(
+            "claude did not respond within {}s{}",
+            timeout.as_secs(),
+            stderr_excerpt(&stderr_text)
+        ));
+    } else if outcome.error_message.is_none()
+        && (outcome.is_error
+            || (outcome.text.is_none() && !exit_status.is_some_and(|status| status.success())))
+    {
+        outcome.is_error = true;
+        outcome.error_message = Some(format!(
+            "claude exited with {}{}",
+            exit_status.map_or_else(|| "unknown status".to_string(), |status| status.to_string()),
+            stderr_excerpt(&stderr_text)
+        ));
     }
 
-    let _ = child.wait().await;
-    outcome.text = if text.is_empty() { None } else { Some(text) };
     Ok(outcome)
+}
+
+/// Formats captured stderr as an error-message suffix, capped so one runaway CLI dump
+/// can't blow up the transcript.
+fn stderr_excerpt(stderr: &str) -> String {
+    const MAX_CHARS: usize = 500;
+    let trimmed = stderr.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let excerpt: String = trimmed.chars().take(MAX_CHARS).collect();
+    format!(": {excerpt}")
 }
 
 #[cfg(test)]
@@ -440,5 +512,74 @@ printf '{"type":"result","subtype":"success","is_error":false,"result":"resumed"
 
         let outcome = result.expect("run_print_turn should succeed against fake binary");
         assert_eq!(outcome.session_id.as_deref(), Some("prior-session-456"));
+    }
+
+    /// A process that fails before emitting any stream-json `result` line (e.g. an auth
+    /// error) used to surface as total silence: stdout aggregated to nothing, `is_error`
+    /// stayed at its `false` default, and stderr was inherited straight to the raw-mode
+    /// terminal instead of being captured. This proves the fallback path: exit status is
+    /// checked, and stderr is captured and reported.
+    #[cfg(unix)]
+    #[tokio::test]
+    #[serial_test::serial(claude_bridge_binary_env)]
+    async fn run_print_turn_surfaces_stderr_when_process_exits_without_result_event() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let script = write_fake_claude_script(
+            &dir,
+            r#"echo "authentication required" 1>&2
+exit 1"#,
+        );
+
+        unsafe {
+            std::env::set_var(BINARY_OVERRIDE_ENV, &script);
+        }
+
+        let result = run_print_turn(ClaudePrintOptions {
+            prompt: "hi".to_string(),
+            ..Default::default()
+        })
+        .await;
+
+        unsafe {
+            std::env::remove_var(BINARY_OVERRIDE_ENV);
+        }
+
+        let outcome = result.expect("run_print_turn should not itself error");
+        assert!(outcome.text.is_none());
+        assert!(outcome.is_error);
+        let message = outcome.error_message.expect("expected an error message");
+        assert!(message.contains("authentication required"), "{message}");
+    }
+
+    /// A hung child (e.g. an interactive prompt with no TTY to answer it) must not leave
+    /// the turn unresolved forever; it should time out, get killed, and report why.
+    #[cfg(unix)]
+    #[tokio::test]
+    #[serial_test::serial(claude_bridge_binary_env)]
+    async fn run_print_turn_with_timeout_reports_timeout_and_kills_hung_child() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let script = write_fake_claude_script(&dir, "sleep 5");
+
+        unsafe {
+            std::env::set_var(BINARY_OVERRIDE_ENV, &script);
+        }
+
+        let result = run_print_turn_with_timeout(
+            ClaudePrintOptions {
+                prompt: "hi".to_string(),
+                ..Default::default()
+            },
+            Duration::from_millis(200),
+        )
+        .await;
+
+        unsafe {
+            std::env::remove_var(BINARY_OVERRIDE_ENV);
+        }
+
+        let outcome = result.expect("run_print_turn_with_timeout should not itself error");
+        assert!(outcome.is_error);
+        let message = outcome.error_message.expect("expected a timeout message");
+        assert!(message.contains("did not respond within"), "{message}");
     }
 }

@@ -92,10 +92,14 @@ pub fn workspace_context_dir(memories_root: Option<&Path>, cwd: &Path) -> Option
 
 pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -> Option<String> {
     let mut sections = Vec::new();
-    // Instruction rule files (AGENTS.md, dev rules) are deliberately NOT injected here:
-    // the app server already sends them natively as instructions, and re-reading them
-    // into this prompt double-sent every rule file on every turn. The ledger still
-    // lists them — as what they are: instructions the server admits, not extra payload.
+    // Global/project AGENTS.md are deliberately NOT injected here: the app server
+    // already sends them natively as instructions, and re-reading them into this prompt
+    // double-sent every rule file on every turn. Passing an empty instruction list makes
+    // `continuity_sources` skip them entirely (it only turns server-reported paths into
+    // Global/Project AGENTS.md rows). `skills/dev/*.md` rows, by contrast, come from
+    // `continuity_sources`'s own on-disk discovery (the server never reports them), so
+    // they DO get read and injected below — that discovery is the only way they reach
+    // the model at all.
     for source in continuity_sources(memories_root, cwd, &[]) {
         if !source.admitted {
             continue;
@@ -145,7 +149,35 @@ pub fn continuity_sources(
     let mut sources = Vec::new();
     let mut canonical_paths = std::collections::HashSet::new();
 
-    for path in instruction_source_paths {
+    let mut instruction_paths: Vec<PathBuf> = instruction_source_paths.to_vec();
+    // The app server only sends global/project AGENTS.md natively; `skills/dev/*.md`
+    // files are Elpis-specific and it never learns about them. They used to reach the
+    // ledger and the prompt only via a continuity-prompt injection that read this same
+    // directory — removing that injection (to fix a genuine global/project double-send)
+    // silently dropped dev files entirely. Discovering them here, once, keeps both the
+    // ledger (called with the server's real list) and `build_continuity_prompt` (called
+    // with an empty list, since server-sent rules must not be re-injected) in sync.
+    if let Some(dev_dir) = cwd.parent().map(|parent| parent.join("skills/dev")) {
+        let already_listed: std::collections::HashSet<PathBuf> = instruction_paths
+            .iter()
+            .filter_map(|path| path.canonicalize().ok())
+            .collect();
+        if let Ok(entries) = std::fs::read_dir(&dev_dir) {
+            let mut dev_files: Vec<PathBuf> = entries
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.path())
+                .filter(|path| path.extension().is_some_and(|ext| ext == "md"))
+                .filter(|path| {
+                    path.canonicalize()
+                        .is_ok_and(|canonical| !already_listed.contains(&canonical))
+                })
+                .collect();
+            dev_files.sort();
+            instruction_paths.extend(dev_files);
+        }
+    }
+
+    for path in &instruction_paths {
         let file_name = path
             .file_name()
             .and_then(|name| name.to_str())
@@ -274,6 +306,13 @@ fn estimate_tokens(path: &Path, bytes: u64, max_chars: usize) -> u64 {
         |_| bytes.min(max_chars as u64).div_ceil(4),
         |content| (content.trim().chars().count().min(max_chars) as u64).div_ceil(4),
     )
+}
+
+/// The same token estimate the context ledger uses for instruction/rule sources,
+/// exposed so `/status` can report a number that means the same thing for the same
+/// files instead of a raw byte count the ledger doesn't show.
+pub fn estimate_rule_tokens(path: &Path, bytes: u64) -> u64 {
+    estimate_tokens(path, bytes, MAX_RULE_CHARS)
 }
 
 pub fn set_continuity_source_admitted(
@@ -737,13 +776,48 @@ mod tests {
                 .any(|source| source.name == "dev/AGENTS.md" && source.admitted)
         );
 
-        // Rule files ride the server's native instruction channel; the continuity
-        // prompt must not re-inject them (that was the double-send).
+        // Global/project AGENTS.md ride the server's native instruction channel; the
+        // continuity prompt must not re-inject them (that was the double-send). Dev
+        // rules are never sent by the server at all, so admitted ones DO get injected —
+        // except dev/SKILL.md, excluded just above.
+        let prompt = build_continuity_prompt(Some(&memories), &cwd)
+            .await
+            .expect("dev/AGENTS.md is still admitted, so a prompt is built");
+        assert!(prompt.contains("Dev rule"));
+        assert!(!prompt.contains("Skill rule"));
+        assert!(!prompt.contains("Global rule"));
+        assert!(!prompt.contains("Project rule"));
+        Ok(())
+    }
+
+    /// The regression this guards: the app server's `instruction_source_paths` only ever
+    /// contains global/project AGENTS.md, never `skills/dev/*.md` — so passing the
+    /// server's real (dev-less) list must still surface dev rules, both in the ledger and
+    /// in the injected prompt.
+    #[tokio::test]
+    async fn dev_rules_are_discovered_even_when_server_omits_them() -> anyhow::Result<()> {
+        let home = tempdir()?;
+        let memories = home.path().join(".elpis/memories");
+        let cwd = home.path().join("projects/Elpis");
+        let dev = home.path().join("projects/skills/dev");
+        tokio::fs::create_dir_all(&cwd).await?;
+        tokio::fs::create_dir_all(&dev).await?;
+        tokio::fs::write(dev.join("AGENTS.md"), "Dev rule").await?;
+
+        // Simulates the real server response: no dev paths in the list at all.
+        let server_reported: Vec<PathBuf> = vec![];
+        let sources = continuity_sources(Some(&memories), &cwd, &server_reported);
         assert!(
-            build_continuity_prompt(Some(&memories), &cwd)
-                .await
-                .is_none()
+            sources
+                .iter()
+                .any(|source| source.name == "dev/AGENTS.md" && source.admitted),
+            "dev file missing from ledger sources: {sources:?}"
         );
+
+        let prompt = build_continuity_prompt(Some(&memories), &cwd)
+            .await
+            .expect("dev rule should be injected since the server never sends it");
+        assert!(prompt.contains("Dev rule"));
         Ok(())
     }
 

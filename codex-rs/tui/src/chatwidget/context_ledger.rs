@@ -7,6 +7,12 @@ use ratatui::widgets::Borders;
 
 const LEDGER_MIN_TERMINAL_WIDTH: u16 = 100;
 const LEDGER_WIDTH: u16 = 52;
+/// Rows the widget claims whenever the ledger is showing, so it reads as the tall,
+/// always-visible sidebar of the design prototype instead of being clipped to the
+/// bottom pane's normal few-row height. Elpis has no alt-screen mode (chat history is
+/// terminal scrollback, so `ChatWidget` only ever renders the bottom viewport) — this
+/// is the compromise until that changes.
+pub(super) const LEDGER_MIN_HEIGHT: u16 = 38;
 
 #[derive(Default)]
 pub(super) struct ContextLedgerState {
@@ -17,6 +23,9 @@ pub(super) struct ContextLedgerState {
 }
 
 impl ChatWidget {
+    /// The ledger is always visible as a sidebar once the terminal is wide enough —
+    /// it's meant to be transparent, not something you have to remember to open.
+    /// Tab still focuses it for keyboard control (select/toggle/why).
     pub(super) fn context_ledger_width(&self, terminal_width: u16) -> u16 {
         (terminal_width >= LEDGER_MIN_TERMINAL_WIDTH)
             .then_some(LEDGER_WIDTH)
@@ -107,6 +116,9 @@ impl ChatWidget {
     }
 
     pub(super) fn render_context_ledger(&self, area: Rect, buf: &mut Buffer) {
+        // Content width inside the left border, used to right-align each row's
+        // tokens/state against the same edge instead of stacking them on their own line.
+        let content_width = area.width.saturating_sub(1).max(1) as usize;
         let sources = self.continuity_sources();
         let total_tokens = sources
             .iter()
@@ -176,6 +188,12 @@ impl ChatWidget {
                 };
                 let marker_style = if source.admitted { cyan } else { muted };
                 let prefix = if selected { "› " } else { "  " };
+                let left = format!("{prefix}{marker} {}", source.name);
+                let right = format!("≈{} {state}", format_tokens(source.estimated_tokens));
+                let pad = content_width
+                    .saturating_sub(left.chars().count())
+                    .saturating_sub(right.chars().count())
+                    .max(1);
                 lines.push(Line::from(vec![
                     Span::styled(prefix, cyan),
                     Span::styled(marker, marker_style),
@@ -188,14 +206,8 @@ impl ChatWidget {
                             Style::default()
                         },
                     ),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::raw("      "),
-                    Span::styled(
-                        format!("≈{} tokens · ", format_tokens(source.estimated_tokens)),
-                        muted,
-                    ),
-                    Span::styled(state, marker_style),
+                    Span::raw(" ".repeat(pad)),
+                    Span::styled(right, marker_style),
                 ]));
 
                 if selected && self.context_ledger.why_visible {
