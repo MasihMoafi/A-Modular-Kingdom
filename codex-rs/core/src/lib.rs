@@ -42,6 +42,7 @@ pub mod connectors;
 pub mod context;
 pub mod context_cleaner;
 mod context_manager;
+pub mod context_pruner;
 mod current_time;
 mod elicitation;
 pub mod elpis_context;

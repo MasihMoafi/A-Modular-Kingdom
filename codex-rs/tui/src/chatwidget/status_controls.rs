@@ -242,6 +242,10 @@ impl ChatWidget {
             agents_summary,
             &instruction_paths,
             refreshing_rate_limits,
+            crate::legacy_core::context_cleaner::eviction_count(),
+            crate::legacy_core::context_cleaner::saved_chars(),
+            crate::legacy_core::context_pruner::pass_count(),
+            crate::legacy_core::context_pruner::saved_chars(),
         );
         if let Some(request_id) = request_id {
             self.refreshing_status_outputs.push((request_id, handle));

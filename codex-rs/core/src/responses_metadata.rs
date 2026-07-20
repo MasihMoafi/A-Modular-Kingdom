@@ -117,6 +117,9 @@ pub(crate) enum CodexResponsesRequestKind {
     Prewarm,
     Compaction(CompactionTurnMetadata),
     Memory,
+    /// Layer 2 context-pruning pass (`core/src/session/context_prune.rs`) — a
+    /// background, non-turn call, same shape as `Memory`.
+    ContextPrune,
 }
 
 impl CodexResponsesRequestKind {
@@ -126,11 +129,15 @@ impl CodexResponsesRequestKind {
             CodexResponsesRequestKind::Prewarm => ("prewarm", None),
             CodexResponsesRequestKind::Compaction(metadata) => ("compaction", Some(metadata)),
             CodexResponsesRequestKind::Memory => ("memory", None),
+            CodexResponsesRequestKind::ContextPrune => ("context_prune", None),
         }
     }
 
     fn has_turn_identity(self) -> bool {
-        !matches!(self, CodexResponsesRequestKind::Memory)
+        !matches!(
+            self,
+            CodexResponsesRequestKind::Memory | CodexResponsesRequestKind::ContextPrune
+        )
     }
 }
 

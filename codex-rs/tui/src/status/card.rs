@@ -122,6 +122,14 @@ struct StatusHistoryCell {
     forked_from: Option<String>,
     token_usage: StatusTokenUsageData,
     rate_limit_state: Arc<RwLock<StatusRateLimitState>>,
+    /// Layer 1: count of deterministic tool-output compactions and cumulative chars
+    /// saved by them (`context_cleaner::eviction_count`/`saved_chars`).
+    context_cleaner_evictions: usize,
+    context_cleaner_saved_chars: usize,
+    /// Layer 2: count of agent-authored prune passes and cumulative chars saved by
+    /// them (`context_pruner::pass_count`/`saved_chars`).
+    context_pruner_passes: usize,
+    context_pruner_saved_chars: usize,
 }
 
 #[cfg(test)]
@@ -197,6 +205,10 @@ pub(crate) fn new_status_output_with_rate_limits(
         "<none>".to_string(),
         /*instruction_source_paths*/ &[],
         refreshing_rate_limits,
+        /*context_cleaner_evictions*/ 0,
+        /*context_cleaner_saved_chars*/ 0,
+        /*context_pruner_passes*/ 0,
+        /*context_pruner_saved_chars*/ 0,
     )
     .0
 }
@@ -221,6 +233,10 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
     agents_summary: String,
     instruction_source_paths: &[std::path::PathBuf],
     refreshing_rate_limits: bool,
+    context_cleaner_evictions: usize,
+    context_cleaner_saved_chars: usize,
+    context_pruner_passes: usize,
+    context_pruner_saved_chars: usize,
 ) -> (CompositeHistoryCell, StatusHistoryHandle) {
     let command = PlainHistoryCell::new(vec!["/status".magenta().into()]);
     let (card, handle) = StatusHistoryCell::new(
@@ -242,6 +258,10 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
         agents_summary,
         instruction_source_paths,
         refreshing_rate_limits,
+        context_cleaner_evictions,
+        context_cleaner_saved_chars,
+        context_pruner_passes,
+        context_pruner_saved_chars,
     );
 
     (
@@ -271,6 +291,10 @@ impl StatusHistoryCell {
         agents_summary: String,
         instruction_source_paths: &[std::path::PathBuf],
         refreshing_rate_limits: bool,
+        context_cleaner_evictions: usize,
+        context_cleaner_saved_chars: usize,
+        context_pruner_passes: usize,
+        context_pruner_saved_chars: usize,
     ) -> (Self, StatusHistoryHandle) {
         let approval_policy = AskForApproval::from(config.permissions.approval_policy.value());
         let permission_profile = config.permissions.effective_permission_profile();
@@ -381,6 +405,10 @@ impl StatusHistoryCell {
                 agents_summary,
                 continuity_sources,
                 rate_limit_state: rate_limit_state.clone(),
+                context_cleaner_evictions,
+                context_cleaner_saved_chars,
+                context_pruner_passes,
+                context_pruner_saved_chars,
             },
             StatusHistoryHandle { rate_limit_state },
         )
@@ -417,6 +445,38 @@ impl StatusHistoryCell {
             Span::from(" used / ").dim(),
             Span::from(window_fmt).dim(),
             Span::from(")").dim(),
+        ])
+    }
+
+    /// Combined Layer 1 (deterministic) + Layer 2 (agent-authored) savings, plus a
+    /// percentage of the context window recovered — so pruning is a number you can
+    /// watch, not a claim you have to trust.
+    fn context_pruning_spans(&self) -> Option<Vec<Span<'static>>> {
+        let total_saved_chars = self.context_cleaner_saved_chars + self.context_pruner_saved_chars;
+        if total_saved_chars == 0 {
+            return None;
+        }
+        let saved_tokens = i64::try_from(codex_utils_string::approx_tokens_from_byte_count(
+            total_saved_chars,
+        ))
+        .unwrap_or(i64::MAX);
+        let saved_fmt = format_tokens_compact(saved_tokens);
+        let percent = self
+            .token_usage
+            .context_window
+            .as_ref()
+            .filter(|context| context.window > 0)
+            .map(|context| (saved_tokens.saturating_mul(100)) / context.window)
+            .unwrap_or(0);
+
+        Some(vec![
+            Span::from(format!("~{saved_fmt} tokens saved")),
+            Span::from(format!(" ({percent}% of context window)")).dim(),
+            Span::from(format!(
+                " — {} deterministic, {} agent-authored",
+                self.context_cleaner_evictions, self.context_pruner_passes
+            ))
+            .dim(),
         ])
     }
 
@@ -784,6 +844,9 @@ impl HistoryCell for StatusHistoryCell {
         for source in &self.continuity_sources {
             push_label(&mut labels, &mut seen, &source.name);
         }
+        if self.context_cleaner_saved_chars > 0 || self.context_pruner_saved_chars > 0 {
+            push_label(&mut labels, &mut seen, "Context pruning");
+        }
         push_label(&mut labels, &mut seen, "Token usage");
         if self.token_usage.context_window.is_some() {
             push_label(&mut labels, &mut seen, "Context window");
@@ -890,6 +953,10 @@ impl HistoryCell for StatusHistoryCell {
 
         if let Some(spans) = self.context_window_spans() {
             lines.push(formatter.line("Context window", spans));
+        }
+
+        if let Some(spans) = self.context_pruning_spans() {
+            lines.push(formatter.line("Context pruning", spans));
         }
 
         lines.extend(self.rate_limit_lines(&rate_limit_state, available_inner_width, &formatter));

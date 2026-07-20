@@ -908,7 +908,7 @@ impl ModelClient {
         Ok(request)
     }
 
-    fn prepare_response_items_for_request(&self, input: &mut [ResponseItem], store: bool) {
+    fn prepare_response_items_for_request(&self, input: &mut Vec<ResponseItem>, store: bool) {
         for item in input.iter_mut() {
             if item.id().is_some_and(|id| !id.is_prefixed()) {
                 item.set_id(/*new_id*/ None);
@@ -916,6 +916,7 @@ impl ModelClient {
         }
 
         if !store {
+            crate::context_cleaner::strip_reasoning_items(input);
             clean_transient_tool_outputs(input);
         }
 
