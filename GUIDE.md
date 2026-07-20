@@ -150,12 +150,12 @@ evidence and product optionality, not crate names.
 memory, permissions, and evidence. The [UI Identity](#ui-identity) section below is the
 acceptance contract, not proof that every surface it describes already ships.
 
-**R11. Claude Code as a selectable runtime** — Confirmed by Masih 2026-07-18. Claude
-Code, authenticated via its own subscription login (not an extracted/reused
-credential), is a second selectable runtime alongside Codex, not merely another model
-under the existing runtime: it appears in the `/model` picker as its own provider
-group with its model shown beneath it, and a dedicated `/claude-code` command switches
-the active session to it directly. See `TASKS.md` F8 for implementation status.
+**R11. Claude Code as a selectable runtime** — Confirmed by Masih 2026-07-18, **reversed
+by Masih 2026-07-20**: the CLI-subprocess bridge (`/claude-code`, the `ClaudeCode`
+runtime, `codex-rs/claude-bridge`) is inherently slower than a native model — every turn
+spawns a fresh `claude` CLI process — and was removed entirely rather than kept in a
+known-degraded state. The native Anthropic Messages API adapter (`--provider anthropic`)
+is unaffected and remains the supported way to run Claude models in Elpis.
 
 ### First-Release Order
 

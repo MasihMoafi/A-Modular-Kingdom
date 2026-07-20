@@ -144,12 +144,6 @@ pub(crate) enum KeymapEditIntent {
     ReplaceOne { old_key: String },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RuntimeSelection {
-    Codex,
-    ClaudeCode,
-}
-
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum AppEvent {
@@ -712,13 +706,6 @@ pub(crate) enum AppEvent {
     /// Update the current reasoning effort in the running app and widget.
     UpdateReasoningEffort(Option<ReasoningEffort>),
 
-    /// Switch which agent backend owns subsequent turns in this session.
-    SwitchActiveRuntime(RuntimeSelection),
-
-    /// Suspend the Elpis TUI and run the real `claude` CLI interactively in this
-    /// terminal (takeover mode), restoring the TUI when it exits.
-    LaunchClaudeCodeTakeover,
-
     /// Update the current model slug in the running app and widget.
     UpdateModel(String),
 
@@ -1013,20 +1000,6 @@ pub(crate) enum AppEvent {
 
     /// Launch the external editor after a normal draw has completed.
     LaunchExternalEditor,
-
-    /// A `/claude-code` runtime turn finished (success or failure). Whole-message result,
-    /// not incremental streaming — see `chatwidget/claude_code_turn.rs`.
-    ClaudeCodeTurnCompleted {
-        text: Option<String>,
-        session_id: Option<String>,
-        error: Option<String>,
-        /// Haiku-distilled record of this turn — the ONLY part re-sent on future turns
-        /// (the ace: deletion by composition; the raw transcript stays on disk).
-        outcome_record: Option<String>,
-        /// Size of the raw turn (user prompt + assistant text) in chars, for the
-        /// "context saved" metric.
-        raw_chars: usize,
-    },
 
     /// Async update of the current git branch for status line rendering.
     StatusLineBranchUpdated {

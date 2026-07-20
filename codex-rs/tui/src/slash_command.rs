@@ -13,7 +13,6 @@ pub enum SlashCommand {
     // DO NOT ALPHA-SORT! Enum order is presentation order in the popup, so
     // more frequently used commands should be listed first.
     Model,
-    ClaudeCode,
     Ide,
     Permissions,
     #[strum(to_string = "hotkeys")]
@@ -113,9 +112,6 @@ impl SlashCommand {
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Stop => "kill all background terminals",
             SlashCommand::Model => "choose a provider-aware model and reasoning effort",
-            SlashCommand::ClaudeCode => {
-                "hand this terminal to the Claude Code CLI; exit it to return to Elpis"
-            }
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
             }
@@ -210,8 +206,7 @@ impl SlashCommand {
             | SlashCommand::Review
             | SlashCommand::Plan
             | SlashCommand::Clear
-            | SlashCommand::Logout
-            | SlashCommand::ClaudeCode => false,
+            | SlashCommand::Logout => false,
             SlashCommand::Diff
             | SlashCommand::Resume
             | SlashCommand::Model
@@ -269,8 +264,7 @@ impl SlashCommand {
             | SlashCommand::Status
             | SlashCommand::Mcp
             | SlashCommand::Quit
-            | SlashCommand::Clear
-            | SlashCommand::ClaudeCode => true,
+            | SlashCommand::Clear => true,
             SlashCommand::Keymap
             | SlashCommand::Hooks
             | SlashCommand::Rename
