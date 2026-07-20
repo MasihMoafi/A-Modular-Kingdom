@@ -3174,7 +3174,7 @@ async fn model_picker_groups_claude_code_and_switches_runtime() {
         popup.contains("CLI subscription chooses the model"),
         "missing honest model source:\n{popup}"
     );
-    for model in ["Haiku 4.5", "Sonnet 5", "Opus 4.8"] {
+    for model in ["Haiku 4.5", "Sonnet 5", "Opus 4.8", "Fable 5"] {
         assert!(
             popup.contains(model),
             "missing Claude Code model {model}:\n{popup}"

@@ -64,7 +64,7 @@ impl ChatWidget {
         let claude_active = self.active_runtime == ActiveRuntime::ClaudeCode;
         // `--model` aliases the Claude Code CLI accepts, matching the Claude Code
         // account's actual model lineup rather than Codex's model catalog.
-        let rows: [(&str, Option<&str>, &str); 4] = [
+        let rows: [(&str, Option<&str>, &str); 5] = [
             (
                 "Account default",
                 None,
@@ -80,6 +80,11 @@ impl ChatWidget {
                 "Opus 4.8",
                 Some("opus"),
                 "Most capable; slower and higher usage.",
+            ),
+            (
+                "Fable 5",
+                Some("claude-fable-5"),
+                "Most intelligent generally available Claude model.",
             ),
         ];
         for (name, model, description) in rows {

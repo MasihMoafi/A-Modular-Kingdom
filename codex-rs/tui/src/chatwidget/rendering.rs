@@ -169,9 +169,9 @@ impl Renderable for ChatWidget {
             .desired_height(width.saturating_sub(ledger_width))
             .saturating_add(1);
         if ledger_width > 0 {
-            // Focused: claim enough rows to read as a real sidebar rather than being
-            // clipped to whatever the composer alone needs.
-            content_height.max(super::context_ledger::LEDGER_FOCUSED_MIN_HEIGHT)
+            // Claim enough rows to read as a real sidebar rather than being clipped to
+            // whatever the composer alone needs.
+            content_height.max(super::context_ledger::LEDGER_MIN_HEIGHT)
         } else {
             content_height
         }

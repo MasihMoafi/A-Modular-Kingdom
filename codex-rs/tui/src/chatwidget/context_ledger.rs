@@ -7,12 +7,12 @@ use ratatui::widgets::Borders;
 
 const LEDGER_MIN_TERMINAL_WIDTH: u16 = 100;
 const LEDGER_WIDTH: u16 = 52;
-/// Rows the widget claims while the ledger is focused, so it reads as the tall
-/// full-height sidebar it's designed to be instead of being clipped to the bottom
-/// pane's normal few-row height. Elpis has no alt-screen mode (chat history is
+/// Rows the widget claims whenever the ledger is showing, so it reads as the tall,
+/// always-visible sidebar of the design prototype instead of being clipped to the
+/// bottom pane's normal few-row height. Elpis has no alt-screen mode (chat history is
 /// terminal scrollback, so `ChatWidget` only ever renders the bottom viewport) — this
 /// is the compromise until that changes.
-pub(super) const LEDGER_FOCUSED_MIN_HEIGHT: u16 = 38;
+pub(super) const LEDGER_MIN_HEIGHT: u16 = 38;
 
 #[derive(Default)]
 pub(super) struct ContextLedgerState {
@@ -23,10 +23,11 @@ pub(super) struct ContextLedgerState {
 }
 
 impl ChatWidget {
-    /// The ledger is a sidebar only while focused (Tab); otherwise it stays out of the
-    /// way entirely rather than permanently narrowing the chat area.
+    /// The ledger is always visible as a sidebar once the terminal is wide enough —
+    /// it's meant to be transparent, not something you have to remember to open.
+    /// Tab still focuses it for keyboard control (select/toggle/why).
     pub(super) fn context_ledger_width(&self, terminal_width: u16) -> u16 {
-        (terminal_width >= LEDGER_MIN_TERMINAL_WIDTH && self.context_ledger.focused)
+        (terminal_width >= LEDGER_MIN_TERMINAL_WIDTH)
             .then_some(LEDGER_WIDTH)
             .unwrap_or(0)
     }
