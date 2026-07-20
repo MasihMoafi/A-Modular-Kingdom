@@ -84,6 +84,11 @@ pub mod legacy_core {
         pub use codex_core::context_cleaner::saved_chars;
     }
 
+    pub mod context_pruner {
+        pub use codex_core::context_pruner::pass_count;
+        pub use codex_core::context_pruner::saved_chars;
+    }
+
     pub mod config {
         pub use codex_core::config::*;
 

@@ -1,0 +1,357 @@
+//! Layer 2 of Elpis's context pruning (see `docs/CONTEXT_AND_SESSIONS.md`, "Masih's
+//! Ace in the Hole"). Layer 1 (`context_cleaner.rs`) is unconditional and
+//! deterministic: oversized tool output and hidden reasoning are trimmed no matter
+//! what. This layer handles what Layer 1 can't, because it requires judgment —
+//! deciding whether a search was a dead end (delete outright, no trace) or found
+//! something that matters (keep one evidence-pointer line). That judgment comes from
+//! a model call. Deliberately not summarization: the model deletes noise rather than
+//! paraphrasing everything, which is why this is safe to trust — nothing that earns a
+//! line gets reworded, and nothing that doesn't earn a line is described at all.
+//!
+//! Trigger: once uncovered turn-lifetime content reaches `PRUNE_TRIGGER_PERCENT` of
+//! the active model's context window, one pass runs over exactly that batch. Passes
+//! chain — each new record is appended after prior ones, never re-compressed. On any
+//! failure (model error, timeout, unparseable output) the batch is left alone; Layer
+//! 1's deterministic receipts remain the fallback safety net, and the next request's
+//! larger uncovered total will simply retry.
+
+use codex_protocol::models::FunctionCallOutputBody;
+use codex_protocol::models::ResponseItem;
+use codex_utils_output_truncation::approx_bytes_for_tokens;
+use std::collections::HashSet;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+
+/// Trigger threshold: run a pass once uncovered turn-lifetime content reaches this
+/// fraction of the active model's context window.
+const PRUNE_TRIGGER_PERCENT: i64 = 10;
+
+/// Sentinel the model replies with when nothing in the batch is worth keeping.
+/// Kept identical to the instruction in `prompts/templates/context_prune/prompt.md`.
+const NOTHING_TO_KEEP: &str = "NOTHING_TO_KEEP";
+
+static PRUNE_PASSES: AtomicUsize = AtomicUsize::new(0);
+static PRUNE_SAVED_CHARS: AtomicUsize = AtomicUsize::new(0);
+
+/// Number of Layer 2 pruning passes applied during this Elpis process.
+pub fn pass_count() -> usize {
+    PRUNE_PASSES.load(Ordering::Relaxed)
+}
+
+/// Cumulative chars removed from request context by Layer 2 during this Elpis
+/// process — separate from Layer 1's `context_cleaner::saved_chars()`.
+pub fn saved_chars() -> usize {
+    PRUNE_SAVED_CHARS.load(Ordering::Relaxed)
+}
+
+/// One completed pruning pass: the evidence-pointer text the model produced (may be
+/// empty when the pass kept nothing), plus the exact tool-call ids it covers.
+/// Applying a record replaces those items' raw content with a tiny receipt — the
+/// record text is what carries "why it mattered" forward, not the raw output.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct PruneRecord {
+    pub(crate) covered_call_ids: Vec<String>,
+    pub(crate) text: String,
+}
+
+impl PruneRecord {
+    fn is_empty(&self) -> bool {
+        self.covered_call_ids.is_empty()
+    }
+}
+
+/// True once uncovered turn-lifetime content has grown to `PRUNE_TRIGGER_PERCENT` of
+/// the model's context window.
+pub(crate) fn should_prune(uncovered_chars: usize, context_window: i64) -> bool {
+    if context_window <= 0 {
+        return false;
+    }
+    let threshold_tokens = (context_window * PRUNE_TRIGGER_PERCENT) / 100;
+    let threshold_chars = approx_bytes_for_tokens(threshold_tokens.max(0) as usize);
+    threshold_chars > 0 && uncovered_chars >= threshold_chars
+}
+
+fn prunable_text(item: &ResponseItem) -> Option<(&str, &str)> {
+    match item {
+        ResponseItem::FunctionCallOutput {
+            call_id, output, ..
+        }
+        | ResponseItem::CustomToolCallOutput {
+            call_id, output, ..
+        } => match &output.body {
+            FunctionCallOutputBody::Text(text) => Some((call_id.as_str(), text.as_str())),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Chars of turn-lifetime tool call/output content in `input` not already covered by
+/// a prior record. Only counts what a pass could plausibly do anything about;
+/// durable rules, messages, and already-covered items are excluded.
+pub(crate) fn uncovered_transient_chars(
+    input: &[ResponseItem],
+    covered_call_ids: &HashSet<String>,
+) -> usize {
+    input
+        .iter()
+        .filter_map(prunable_text)
+        .filter(|(call_id, _)| !covered_call_ids.contains(*call_id))
+        .map(|(_, text)| text.chars().count())
+        .sum()
+}
+
+/// Snapshot of the batch eligible for one pruning pass: `(call_id, text)` pairs not
+/// yet covered by a prior record, oldest first.
+pub(crate) fn build_prune_batch(
+    input: &[ResponseItem],
+    covered_call_ids: &HashSet<String>,
+) -> Vec<(String, String)> {
+    input
+        .iter()
+        .filter_map(prunable_text)
+        .filter(|(call_id, _)| !covered_call_ids.contains(*call_id))
+        .map(|(call_id, text)| (call_id.to_string(), text.to_string()))
+        .collect()
+}
+
+/// Builds the user-message text sent to the pruning model: each batch entry tagged
+/// with its call id so the model's output lines can be matched back to it.
+pub(crate) fn build_prune_input(batch: &[(String, String)]) -> String {
+    let mut out = String::new();
+    for (call_id, text) in batch {
+        out.push_str(&format!("--- id: {call_id} ---\n{text}\n"));
+    }
+    out
+}
+
+/// Parses one pass's raw model output into a record. A line only counts if it starts
+/// with an id the batch actually contains — the model does not get to reference ids
+/// it wasn't given. Every batch item ends up covered regardless of whether it earned
+/// a line: items that didn't matter are deleted outright, not left dangling for a
+/// future pass to re-litigate. Returns `None` when the output is unusable (neither
+/// the sentinel nor any recognizable line) so the caller leaves the batch alone
+/// rather than silently discarding evidence on a malformed reply.
+pub(crate) fn parse_prune_output(raw: &str, batch: &[(String, String)]) -> Option<PruneRecord> {
+    if batch.is_empty() {
+        return None;
+    }
+    let all_covered = || batch.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>();
+
+    if raw.trim() == NOTHING_TO_KEEP {
+        return Some(PruneRecord {
+            covered_call_ids: all_covered(),
+            text: String::new(),
+        });
+    }
+
+    let known_ids: HashSet<&str> = batch.iter().map(|(id, _)| id.as_str()).collect();
+    let kept_lines: Vec<&str> = raw
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .filter(|line| {
+            line.split_once(':')
+                .is_some_and(|(id, _)| known_ids.contains(id.trim()))
+        })
+        .collect();
+
+    if kept_lines.is_empty() {
+        return None;
+    }
+
+    Some(PruneRecord {
+        covered_call_ids: all_covered(),
+        text: kept_lines.join("\n"),
+    })
+}
+
+/// Replaces every item in `input` covered by `record` with a tiny receipt pointing
+/// at the durable evidence, mirroring `context_cleaner.rs`'s existing style. Returns
+/// chars saved. Safe to call on an already-applied record: items too small to shrink
+/// further are left untouched rather than grown.
+pub(crate) fn apply_prune_record(input: &mut [ResponseItem], record: &PruneRecord) -> usize {
+    if record.is_empty() {
+        return 0;
+    }
+    let covered: HashSet<&str> = record.covered_call_ids.iter().map(String::as_str).collect();
+    let mut saved = 0usize;
+    for item in input.iter_mut() {
+        let (call_id, body) = match item {
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            }
+            | ResponseItem::CustomToolCallOutput {
+                call_id, output, ..
+            } => (call_id.as_str(), &mut output.body),
+            _ => continue,
+        };
+        if !covered.contains(call_id) {
+            continue;
+        }
+        let FunctionCallOutputBody::Text(text) = body else {
+            continue;
+        };
+        let original_chars = text.chars().count();
+        let receipt = format!(
+            "[ELPIS CONTEXT UPDATE]\nreason=covered by agent-authored prune record\nevidence=rollout://tool-call/{call_id}\noriginal_chars={original_chars}"
+        );
+        let new_chars = receipt.chars().count();
+        if new_chars >= original_chars {
+            continue;
+        }
+        saved += original_chars - new_chars;
+        *text = receipt;
+    }
+    PRUNE_PASSES.fetch_add(1, Ordering::Relaxed);
+    PRUNE_SAVED_CHARS.fetch_add(saved, Ordering::Relaxed);
+    saved
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use codex_protocol::models::FunctionCallOutputPayload;
+
+    fn tool_output(call_id: &str, text: &str) -> ResponseItem {
+        ResponseItem::FunctionCallOutput {
+            id: None,
+            call_id: call_id.to_string(),
+            output: FunctionCallOutputPayload::from_text(text.to_string()),
+            internal_chat_message_metadata_passthrough: None,
+        }
+    }
+
+    #[test]
+    fn should_prune_respects_ten_percent_threshold() {
+        // 1_000_000-token window -> 100_000-token threshold -> ~400_000 chars.
+        assert!(!should_prune(399_999, 1_000_000));
+        assert!(should_prune(400_000, 1_000_000));
+    }
+
+    #[test]
+    fn should_prune_false_for_non_positive_context_window() {
+        assert!(!should_prune(1_000_000, 0));
+        assert!(!should_prune(1_000_000, -1));
+    }
+
+    #[test]
+    fn uncovered_transient_chars_excludes_already_covered_and_non_transient_items() {
+        use codex_protocol::models::ContentItem;
+
+        let input = vec![
+            ResponseItem::Message {
+                id: None,
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "please grep the repo".to_string(),
+                }],
+                phase: None,
+                internal_chat_message_metadata_passthrough: None,
+            },
+            tool_output("a", "aaaa"),
+            tool_output("b", "bb"),
+        ];
+        let mut covered = HashSet::new();
+        assert_eq!(uncovered_transient_chars(&input, &covered), 6);
+        covered.insert("a".to_string());
+        assert_eq!(uncovered_transient_chars(&input, &covered), 2);
+    }
+
+    #[test]
+    fn build_prune_batch_skips_covered_ids() {
+        let input = vec![tool_output("a", "aaaa"), tool_output("b", "bb")];
+        let covered: HashSet<String> = ["a".to_string()].into_iter().collect();
+        let batch = build_prune_batch(&input, &covered);
+        assert_eq!(batch, vec![("b".to_string(), "bb".to_string())]);
+    }
+
+    #[test]
+    fn parse_prune_output_keeps_only_lines_with_known_ids() {
+        let batch = vec![
+            ("a".to_string(), "text a".to_string()),
+            ("b".to_string(), "text b".to_string()),
+        ];
+        let raw = "a: found the answer at foo.rs:10 — this is why it mattered\n\
+                   made-up-id: should be dropped, unknown id\n\
+                   not a colon line, dropped too";
+        let record = parse_prune_output(raw, &batch).expect("record");
+        assert_eq!(
+            record.covered_call_ids,
+            vec!["a".to_string(), "b".to_string()]
+        );
+        assert!(record.text.contains("foo.rs:10"));
+        assert!(!record.text.contains("made-up-id"));
+    }
+
+    #[test]
+    fn parse_prune_output_nothing_to_keep_covers_batch_with_empty_text() {
+        let batch = vec![("a".to_string(), "text a".to_string())];
+        let record = parse_prune_output("NOTHING_TO_KEEP", &batch).expect("record");
+        assert_eq!(record.covered_call_ids, vec!["a".to_string()]);
+        assert_eq!(record.text, "");
+    }
+
+    #[test]
+    fn parse_prune_output_returns_none_on_unusable_reply() {
+        let batch = vec![("a".to_string(), "text a".to_string())];
+        assert_eq!(
+            parse_prune_output("I looked at everything and it's fine.", &batch),
+            None
+        );
+        assert_eq!(parse_prune_output("", &batch), None);
+    }
+
+    #[test]
+    fn parse_prune_output_returns_none_for_empty_batch() {
+        assert_eq!(parse_prune_output(NOTHING_TO_KEEP, &[]), None);
+    }
+
+    #[test]
+    fn apply_prune_record_replaces_only_covered_items_and_reports_savings() {
+        let large = "x".repeat(2_000);
+        let mut input = vec![tool_output("a", &large), tool_output("b", &large)];
+        let record = PruneRecord {
+            covered_call_ids: vec!["a".to_string()],
+            text: "a: found X at foo.rs:1 — mattered because Y".to_string(),
+        };
+
+        let saved = apply_prune_record(&mut input, &record);
+        assert!(saved > 0);
+
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+            panic!("function output");
+        };
+        let text = output.text_content().expect("text");
+        assert!(text.contains("evidence=rollout://tool-call/a"));
+
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[1] else {
+            panic!("function output");
+        };
+        assert_eq!(output.text_content(), Some(large.as_str()));
+    }
+
+    #[test]
+    fn apply_prune_record_is_a_no_op_for_empty_record() {
+        let mut input = vec![tool_output("a", "aaaa")];
+        assert_eq!(apply_prune_record(&mut input, &PruneRecord::default()), 0);
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+            panic!("function output");
+        };
+        assert_eq!(output.text_content(), Some("aaaa"));
+    }
+
+    #[test]
+    fn apply_prune_record_never_grows_an_already_small_item() {
+        let mut input = vec![tool_output("a", "ok")];
+        let record = PruneRecord {
+            covered_call_ids: vec!["a".to_string()],
+            text: "a: trivial".to_string(),
+        };
+        assert_eq!(apply_prune_record(&mut input, &record), 0);
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[0] else {
+            panic!("function output");
+        };
+        assert_eq!(output.text_content(), Some("ok"));
+    }
+}

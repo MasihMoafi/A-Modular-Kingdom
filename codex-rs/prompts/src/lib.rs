@@ -1,5 +1,6 @@
 mod apply_patch;
 mod compact;
+mod context_prune;
 mod goals;
 mod permissions_instructions;
 mod realtime;
@@ -9,6 +10,7 @@ mod review_request;
 pub use apply_patch::APPLY_PATCH_TOOL_INSTRUCTIONS;
 pub use compact::SUMMARIZATION_PROMPT;
 pub use compact::SUMMARY_PREFIX;
+pub use context_prune::CONTEXT_PRUNE_PROMPT;
 pub use goals::budget_limit_prompt;
 pub use goals::continuation_prompt;
 pub use goals::objective_updated_prompt;

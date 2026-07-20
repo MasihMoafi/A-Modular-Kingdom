@@ -30,6 +30,16 @@ pub fn latest_eviction_event() -> Option<String> {
         .and_then(|event| event.clone())
 }
 
+/// Hidden reasoning must never be preserved as transcript context (only the resulting
+/// decision and evidence should be) — see `docs/CONTEXT_AND_SESSIONS.md`. Unlike tool
+/// output, there is no threshold or recency exemption: every `Reasoning` item is
+/// dropped, unconditionally, every request.
+pub(crate) fn strip_reasoning_items(input: &mut Vec<ResponseItem>) -> usize {
+    let before = input.len();
+    input.retain(|item| !matches!(item, ResponseItem::Reasoning { .. }));
+    before - input.len()
+}
+
 /// Applies Elpis's deterministic lifecycle to transient tool output.
 ///
 /// The newest outputs remain intact. Older oversized outputs retain bounded head/tail
@@ -299,5 +309,36 @@ mod tests {
             panic!("function output");
         };
         assert_eq!(output.text_content(), Some("ok"));
+    }
+
+    fn reasoning() -> ResponseItem {
+        ResponseItem::Reasoning {
+            id: None,
+            summary: Vec::new(),
+            content: None,
+            encrypted_content: None,
+            internal_chat_message_metadata_passthrough: None,
+        }
+    }
+
+    #[test]
+    fn strip_reasoning_items_removes_every_reasoning_item_unconditionally() {
+        let mut input = vec![
+            reasoning(),
+            output("keep", "ok".to_string()),
+            reasoning(),
+            reasoning(),
+        ];
+
+        assert_eq!(strip_reasoning_items(&mut input), 3);
+        assert_eq!(input.len(), 1);
+        assert!(matches!(input[0], ResponseItem::FunctionCallOutput { .. }));
+    }
+
+    #[test]
+    fn strip_reasoning_items_is_a_no_op_when_none_present() {
+        let mut input = vec![output("keep", "ok".to_string())];
+        assert_eq!(strip_reasoning_items(&mut input), 0);
+        assert_eq!(input.len(), 1);
     }
 }
