@@ -8,8 +8,8 @@
 //! those records are re-sent (via `--append-system-prompt`), so working context
 //! shrinks instead of growing. The raw transcript is appended to
 //! `<codex_home>/claude_turns.jsonl` as durable evidence, and the chars *not*
-//! re-sent surface as the visible "context saved" metric (per-turn line + the
-//! `saved` field in the ELPIS status line).
+//! re-sent accumulate into the `saved` field in the ELPIS status line (no
+//! per-turn line in the transcript — it crowded the chat history).
 //!
 //! Still whole-message text-in/text-out only: no incremental streaming render,
 //! and `tool_use`/`tool_result` events are not bridged onto Elpis's
@@ -43,7 +43,7 @@ impl super::ChatWidget {
             return;
         }
 
-        self.add_info_message(format!("You (Claude Code): {text}"), None);
+        self.add_info_message(format!("You: {text}"), None);
         self.claude_code_turn_running = true;
         self.request_redraw();
 
@@ -53,7 +53,7 @@ impl super::ChatWidget {
             // the distilled records composed below.
             resume_session_id: None,
             cwd: Some(self.config.cwd.to_path_buf()),
-            model: None,
+            model: self.claude_model.clone(),
             append_system_prompt: compose_working_set(&self.claude_outcome_records),
         };
         let transcript_path = self.config.codex_home.as_path().join("claude_turns.jsonl");
@@ -121,7 +121,7 @@ impl super::ChatWidget {
         if let Some(error) = error {
             self.add_error_message(format!("Claude Code turn failed: {error}"));
         } else if let Some(text) = text {
-            self.add_info_message(format!("Claude Code: {text}"), None);
+            self.add_info_message(format!("elpis: {text}"), None);
         } else {
             self.add_info_message(
                 "Claude Code turn completed with no text output (it may have only used \
@@ -135,21 +135,10 @@ impl super::ChatWidget {
             let saved = raw_chars.saturating_sub(kept_chars);
             self.claude_outcome_records.push(record);
             self.claude_context_saved_chars = self.claude_context_saved_chars.saturating_add(saved);
+            // Not printed per-turn (it crowded the transcript); the running total feeds
+            // the `saved` field in the ELPIS status line instead, so it's visible without
+            // repeating on every message.
             crate::branding::record_context_saved(saved as u64);
-            let working_set_chars: usize = self
-                .claude_outcome_records
-                .iter()
-                .map(|record| record.chars().count())
-                .sum();
-            self.add_info_message(
-                format_context_saved_line(
-                    saved,
-                    raw_chars,
-                    self.claude_context_saved_chars,
-                    working_set_chars,
-                ),
-                None,
-            );
         }
         self.request_redraw();
     }
@@ -235,40 +224,6 @@ fn append_raw_transcript(
     }
 }
 
-/// The visible per-turn metric: chars saved, a ten-cell bar, session total, and
-/// the size of what the NEXT turn will actually carry. Chars, labeled as chars —
-/// not unlabeled mystery numbers.
-fn format_context_saved_line(
-    saved_chars: usize,
-    raw_chars: usize,
-    session_total_saved: usize,
-    working_set_chars: usize,
-) -> String {
-    let percent = if raw_chars == 0 {
-        0
-    } else {
-        saved_chars * 100 / raw_chars
-    };
-    let filled = (percent / 10).min(10);
-    let bar: String = "█".repeat(filled) + &"░".repeat(10 - filled);
-    format!(
-        "context saved: {} of {} chars this turn ({percent}%) {bar} · session total {} · \
-         next turn carries {}",
-        format_chars(saved_chars),
-        format_chars(raw_chars),
-        format_chars(session_total_saved),
-        format_chars(working_set_chars),
-    )
-}
-
-fn format_chars(chars: usize) -> String {
-    if chars >= 1000 {
-        format!("{:.1}k", chars as f64 / 1000.0)
-    } else {
-        chars.to_string()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,23 +240,6 @@ mod tests {
         let a = composed.find("--- turn 1 ---\noutcome: a").expect("turn 1");
         let b = composed.find("--- turn 2 ---\noutcome: b").expect("turn 2");
         assert!(a < b);
-    }
-
-    #[test]
-    fn context_saved_line_reports_percent_bar_and_labels_chars() {
-        let line = format_context_saved_line(9_000, 10_000, 12_345, 600);
-        assert!(line.contains("9.0k of 10.0k chars"), "{line}");
-        assert!(line.contains("(90%)"), "{line}");
-        assert!(line.contains("█████████░"), "{line}");
-        assert!(line.contains("session total 12.3k"), "{line}");
-        assert!(line.contains("next turn carries 600"), "{line}");
-    }
-
-    #[test]
-    fn context_saved_line_handles_zero_raw() {
-        let line = format_context_saved_line(0, 0, 0, 0);
-        assert!(line.contains("(0%)"), "{line}");
-        assert!(line.contains("░░░░░░░░░░"), "{line}");
     }
 
     #[test]

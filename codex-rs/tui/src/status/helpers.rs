@@ -82,7 +82,11 @@ pub(crate) fn compose_agents_summary(config: &Config, paths: &[PathUri]) -> Stri
         };
         let display = match std::fs::metadata(p) {
             Ok(metadata) if metadata.is_file() => {
-                format!("{display} ({} bytes; durable rules)", metadata.len())
+                // Same estimate the context ledger shows for these files, so the two
+                // surfaces report the same number instead of bytes vs. tokens.
+                let tokens =
+                    crate::legacy_core::elpis_context::estimate_rule_tokens(p, metadata.len());
+                format!("{display} (\u{2248}{tokens} tokens; durable rules)")
             }
             _ => display,
         };

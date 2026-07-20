@@ -539,6 +539,9 @@ pub(crate) struct ChatWidget {
     config: Config,
     raw_output_mode: bool,
     active_runtime: ActiveRuntime,
+    /// `--model` alias (`"haiku"`/`"sonnet"`/`"opus"`) for Claude Code turns, or `None`
+    /// for the CLI's account default.
+    claude_model: Option<String>,
     claude_code_turn_running: bool,
     /// The ace: distilled outcome records of prior Claude Code turns. These — not the
     /// raw transcript — are what gets re-sent, so context shrinks instead of growing.

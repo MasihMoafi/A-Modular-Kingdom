@@ -33,7 +33,7 @@ impl ChatWidget {
         self.open_model_popup_with_presets(presets);
     }
 
-    fn model_provider_display_name(&self) -> String {
+    pub(super) fn model_provider_display_name(&self) -> String {
         let provider_id = self.config.model_provider_id.trim();
         let provider_name = self.config.model_provider.name.trim();
         match (provider_name.is_empty(), provider_id.is_empty()) {
@@ -61,20 +61,40 @@ impl ChatWidget {
             is_disabled: true,
             ..Default::default()
         });
-        items.push(SelectionItem {
-            name: "Account default".to_string(),
-            description: Some(
-                "Claude Code CLI subscription chooses the model for this runtime.".to_string(),
+        let claude_active = self.active_runtime == ActiveRuntime::ClaudeCode;
+        // `--model` aliases the Claude Code CLI accepts, matching the Claude Code
+        // account's actual model lineup rather than Codex's model catalog.
+        let rows: [(&str, Option<&str>, &str); 4] = [
+            (
+                "Account default",
+                None,
+                "Claude Code CLI subscription chooses the model.",
             ),
-            is_current: self.active_runtime == ActiveRuntime::ClaudeCode,
-            actions: vec![Box::new(|tx| {
-                tx.send(AppEvent::SwitchActiveRuntime(
-                    crate::app_event::RuntimeSelection::ClaudeCode,
-                ));
-            })],
-            dismiss_on_select: true,
-            ..Default::default()
-        });
+            (
+                "Haiku 4.5",
+                Some("haiku"),
+                "Fastest and cheapest; good for quick turns.",
+            ),
+            ("Sonnet 5", Some("sonnet"), "Balanced speed and quality."),
+            (
+                "Opus 4.8",
+                Some("opus"),
+                "Most capable; slower and higher usage.",
+            ),
+        ];
+        for (name, model, description) in rows {
+            let model_for_action = model.map(str::to_string);
+            items.push(SelectionItem {
+                name: name.to_string(),
+                description: Some(description.to_string()),
+                is_current: claude_active && self.claude_model.as_deref() == model,
+                actions: vec![Box::new(move |tx| {
+                    tx.send(AppEvent::SelectClaudeCodeModel(model_for_action.clone()));
+                })],
+                dismiss_on_select: true,
+                ..Default::default()
+            });
+        }
     }
 
     fn model_provider_route(&self) -> crate::branding::ProviderRoute {

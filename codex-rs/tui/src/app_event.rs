@@ -144,10 +144,12 @@ pub(crate) enum KeymapEditIntent {
     ReplaceOne { old_key: String },
 }
 
+/// Switches active turns back to Codex. Claude Code has no variant here: picking a
+/// Claude Code model goes through `AppEvent::SelectClaudeCodeModel` instead, which
+/// carries the chosen `--model` alias along with the switch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RuntimeSelection {
     Codex,
-    ClaudeCode,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -714,6 +716,10 @@ pub(crate) enum AppEvent {
 
     /// Switch which agent backend owns subsequent turns in this session.
     SwitchActiveRuntime(RuntimeSelection),
+
+    /// Select the `--model` alias (`"haiku"`/`"sonnet"`/`"opus"`, or `None` for account
+    /// default) Claude Code turns use, and switch to the Claude Code runtime.
+    SelectClaudeCodeModel(Option<String>),
 
     /// Suspend the Elpis TUI and run the real `claude` CLI interactively in this
     /// terminal (takeover mode), restoring the TUI when it exits.

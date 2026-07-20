@@ -1034,6 +1034,9 @@ impl App {
             AppEvent::SwitchActiveRuntime(runtime) => {
                 self.chat_widget.switch_active_runtime_selection(runtime);
             }
+            AppEvent::SelectClaudeCodeModel(model) => {
+                self.chat_widget.select_claude_code_model(model);
+            }
             AppEvent::UpdateModel(model) => {
                 self.chat_widget.set_model(&model);
                 self.sync_active_thread_model_setting(app_server, model)

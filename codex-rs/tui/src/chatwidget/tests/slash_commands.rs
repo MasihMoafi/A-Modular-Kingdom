@@ -2951,8 +2951,8 @@ async fn claude_code_slash_command_requests_takeover() {
 /// `codex-claude-bridge`'s subprocess path (a real spawned process, a fake `claude` binary
 /// standing in for the real CLI since CI has no authenticated session) rather than the
 /// normal Codex `AppServerClient` path. Also proves the ace pipeline runs: the turn is
-/// distilled into an outcome record (the fake binary answers the distillation call too)
-/// and the visible "context saved" metric renders.
+/// distilled into an outcome record (the fake binary answers the distillation call too),
+/// which feeds the session's `saved` total without printing a per-turn line.
 #[cfg(unix)]
 #[tokio::test]
 #[serial_test::serial(claude_bridge_binary_env)]
@@ -3034,7 +3034,7 @@ EOF
         "expected the fake Claude Code response to render, got {rendered:?}"
     );
     assert!(
-        rendered.contains("context saved:"),
-        "expected the per-turn context-saved metric to render, got {rendered:?}"
+        !rendered.contains("context saved:"),
+        "the per-turn context-saved line was removed; it crowded the transcript, got {rendered:?}"
     );
 }

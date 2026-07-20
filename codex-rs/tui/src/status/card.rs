@@ -852,9 +852,11 @@ impl HistoryCell for StatusHistoryCell {
                 source.name.clone(),
                 vec![
                     Span::from(source.path.display().to_string()),
+                    // Tokens, not bytes: this is the same estimate the context ledger
+                    // shows for the same source, so the two surfaces agree.
                     Span::from(format!(
-                        " ({} bytes; {}; {})",
-                        source.bytes, source.lifetime, source.reason
+                        " (\u{2248}{} tokens; {}; {})",
+                        source.estimated_tokens, source.lifetime, source.reason
                     ))
                     .dim(),
                 ],
