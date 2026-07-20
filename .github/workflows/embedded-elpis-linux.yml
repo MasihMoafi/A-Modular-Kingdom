@@ -231,7 +231,7 @@ jobs:
           cargo test -p codex-tui --lib --locked chatwidget::tests::slash_commands::rag_command_routes_
 
       - name: Build Elpis binary and Cargo timing report
-        run: cargo build -p codex-tui --bin elpis --locked --timings --release --release
+        run: cargo build -p codex-tui --bin elpis --locked --timings --release
 
       - name: Verify executable identity
         run: |
