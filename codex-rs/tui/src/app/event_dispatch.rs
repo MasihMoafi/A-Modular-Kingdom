@@ -2209,14 +2209,12 @@ impl App {
                 session_id,
                 error,
                 outcome_record,
-                raw_chars,
             } => {
                 self.chat_widget.handle_claude_code_turn_completed(
                     text,
                     session_id,
                     error,
                     outcome_record,
-                    raw_chars,
                 );
             }
             AppEvent::StatusLineBranchUpdated { cwd, branch } => {

@@ -1,15 +1,17 @@
 //! Routes a submitted message through `codex-claude-bridge` when
 //! `active_runtime == ActiveRuntime::ClaudeCode` — and implements the ace:
-//! per-turn context deletion by composition.
+//! deterministic per-turn context pruning, no model compression involved.
 //!
 //! Every turn is a FRESH `claude -p` call (no `--resume`), so the next request
-//! contains exactly what Elpis composes into it. After each turn, a cheap
-//! `--model haiku` call distills the turn into a compact outcome record; only
-//! those records are re-sent (via `--append-system-prompt`), so working context
-//! shrinks instead of growing. The raw transcript is appended to
-//! `<codex_home>/claude_turns.jsonl` as durable evidence, and the chars *not*
-//! re-sent accumulate into the `saved` field in the ELPIS status line (no
-//! per-turn line in the transcript — it crowded the chat history).
+//! contains exactly what Elpis composes into it. Completed turns are kept as raw
+//! records; once a record ages out of the most recent turn it's excerpted
+//! (head+tail, mirroring the deterministic cleaner in
+//! `core/src/context_cleaner.rs`) rather than summarized by a model — a model
+//! asked to compress tends to lose exactly the details that matter. The raw
+//! transcript is appended to `<codex_home>/claude_turns.jsonl` as durable
+//! evidence regardless, and the chars excerpted away accumulate into the `saved`
+//! field in the ELPIS status line (no per-turn line in the transcript — it
+//! crowded the chat history).
 //!
 //! Still whole-message text-in/text-out only: no incremental streaming render,
 //! and `tool_use`/`tool_result` events are not bridged onto Elpis's
@@ -19,7 +21,6 @@ use std::path::Path;
 
 use codex_claude_bridge::ClaudePrintOptions;
 use codex_claude_bridge::run_cancellable_print_turn;
-use codex_claude_bridge::run_print_turn;
 
 /// Sentinel `TurnOutcome::error_message` used by `codex-claude-bridge` when a turn is
 /// cancelled via `cancel_claude_code_turn`. Kept identical to the string literal in
@@ -27,10 +28,16 @@ use codex_claude_bridge::run_print_turn;
 /// a clear "cancelled" message instead of routing it through the generic error path.
 const CANCELLED_SENTINEL: &str = "cancelled";
 
-/// Max chars of raw assistant text kept as the fallback record when the haiku
-/// distillation call itself fails. ponytail: blunt truncation; smarter fallback
-/// only if distillation failures turn out to be common.
-const FALLBACK_RECORD_CHARS: usize = 400;
+/// How many of the newest turn records stay verbatim in the working set; anything
+/// older is excerpted. Mirrors `RECENT_TOOL_OUTPUTS_TO_KEEP` in
+/// `core/src/context_cleaner.rs`.
+const RECENT_TURNS_TO_KEEP: usize = 1;
+/// Records at or under this length are left untouched. Mirrors
+/// `MAX_INLINE_TOOL_OUTPUT_CHARS` in `core/src/context_cleaner.rs`.
+const MAX_INLINE_RECORD_CHARS: usize = 400;
+/// Head/tail chars kept from an excerpted record. Mirrors `RETAINED_EDGE_CHARS` in
+/// `core/src/context_cleaner.rs`.
+const RETAINED_EDGE_CHARS: usize = 150;
 
 impl super::ChatWidget {
     // pub(crate), not pub(super): `tui::app::event_dispatch` also needs this, to redirect
@@ -86,16 +93,11 @@ impl super::ChatWidget {
         tokio::spawn(async move {
             match run_cancellable_print_turn(options, cancel_rx).await {
                 Ok(outcome) => {
-                    let raw_chars = text.chars().count()
-                        + outcome
-                            .text
-                            .as_deref()
-                            .map_or(0, |reply| reply.chars().count());
                     let outcome_record = if outcome.is_error {
                         None
                     } else {
                         Some(match outcome.text.as_deref() {
-                            Some(reply) => distill_turn(&text, reply).await,
+                            Some(reply) => format!("User: {text}\nAssistant: {reply}"),
                             None => "outcome: turn completed with no text output".to_string(),
                         })
                     };
@@ -117,7 +119,6 @@ impl super::ChatWidget {
                             None
                         },
                         outcome_record,
-                        raw_chars,
                     });
                 }
                 Err(err) => {
@@ -126,7 +127,6 @@ impl super::ChatWidget {
                         session_id: None,
                         error: Some(format!("failed to run Claude Code: {err}")),
                         outcome_record: None,
-                        raw_chars: 0,
                     });
                 }
             }
@@ -140,7 +140,6 @@ impl super::ChatWidget {
         _session_id: Option<String>,
         error: Option<String>,
         outcome_record: Option<String>,
-        raw_chars: usize,
     ) {
         self.claude_code_turn_running = false;
         self.claude_code_turn_cancel = None;
@@ -162,14 +161,19 @@ impl super::ChatWidget {
             );
         }
         if let Some(record) = outcome_record {
-            let kept_chars = record.chars().count();
-            let saved = raw_chars.saturating_sub(kept_chars);
             self.claude_outcome_records.push(record);
-            self.claude_context_saved_chars = self.claude_context_saved_chars.saturating_add(saved);
-            // Not printed per-turn (it crowded the transcript); the running total feeds
-            // the `saved` field in the ELPIS status line instead, so it's visible without
-            // repeating on every message.
-            crate::branding::record_context_saved(saved as u64);
+            // Deterministic excerpting, not model compression: only the newest turn stays
+            // verbatim; anything older gets excerpted in place. Idempotent, so running this
+            // on every turn never double-counts a record already excerpted.
+            let saved = compact_aged_records(&mut self.claude_outcome_records);
+            if saved > 0 {
+                self.claude_context_saved_chars =
+                    self.claude_context_saved_chars.saturating_add(saved);
+                // Not printed per-turn (it crowded the transcript); the running total feeds
+                // the `saved` field in the ELPIS status line instead, so it's visible without
+                // repeating on every message.
+                crate::branding::record_context_saved(saved as u64);
+            }
         }
         self.request_redraw();
     }
@@ -182,9 +186,9 @@ fn compose_working_set(records: &[String]) -> Option<String> {
         return None;
     }
     let mut out = String::from(
-        "Elpis session continuity: earlier turns of this session were distilled into the \
-         outcome records below (newest last). Treat them as accurate history; raw \
-         transcripts remain on disk.\n",
+        "Elpis session continuity: earlier turns of this session are shown below (newest \
+         last), excerpted rather than summarized once they age out of the most recent turn. \
+         Raw transcripts remain on disk.\n",
     );
     for (index, record) in records.iter().enumerate() {
         out.push_str(&format!("--- turn {} ---\n{record}\n", index + 1));
@@ -192,37 +196,34 @@ fn compose_working_set(records: &[String]) -> Option<String> {
     Some(out)
 }
 
-/// Distills one raw turn into a compact outcome record via a cheap haiku call.
-/// Falls back to a truncated raw excerpt if the distillation call fails, so a
-/// flaky distiller can never lose the turn entirely.
-async fn distill_turn(user_text: &str, assistant_text: &str) -> String {
-    let options = ClaudePrintOptions {
-        prompt: format!("User said:\n{user_text}\n\nAssistant turn to distill:\n{assistant_text}"),
-        model: Some("haiku".to_string()),
-        append_system_prompt: Some(
-            "You compress one agent-conversation turn into a compact outcome record. \
-             Reply with ONLY the record, at most 6 short lines, in this format:\n\
-             outcome: what happened\n\
-             decisions: choices made, or none\n\
-             constraints: new constraints or facts worth remembering, or none\n\
-             paths: files or directories touched, or none\n\
-             Keep exact identifiers, paths, and numbers. No preamble."
-                .to_string(),
-        ),
-        ..Default::default()
-    };
-    match run_print_turn(options).await {
-        Ok(outcome) if !outcome.is_error => outcome
-            .text
-            .filter(|record| !record.trim().is_empty())
-            .unwrap_or_else(|| fallback_record(assistant_text)),
-        _ => fallback_record(assistant_text),
+/// Excerpts every record beyond the newest `RECENT_TURNS_TO_KEEP` in place
+/// (head+tail, pointing at the durable raw transcript on disk), returning the
+/// chars saved. Idempotent — an already-excerpted record is short enough that
+/// re-excerpting it is a no-op — so calling this every turn never double-counts.
+fn compact_aged_records(records: &mut [String]) -> usize {
+    let keep_from = records.len().saturating_sub(RECENT_TURNS_TO_KEEP);
+    let mut saved = 0usize;
+    for record in &mut records[..keep_from] {
+        let before = record.chars().count();
+        let excerpted = excerpt(record);
+        saved += before.saturating_sub(excerpted.chars().count());
+        *record = excerpted;
     }
+    saved
 }
 
-fn fallback_record(assistant_text: &str) -> String {
-    let excerpt: String = assistant_text.chars().take(FALLBACK_RECORD_CHARS).collect();
-    format!("outcome (undistilled excerpt): {excerpt}")
+/// Deterministic head+tail excerpt — no model call, nothing summarized. Chars in
+/// between are dropped with a pointer to `claude_turns.jsonl`, the durable raw
+/// archive every turn is already appended to regardless.
+fn excerpt(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() <= MAX_INLINE_RECORD_CHARS {
+        return text.to_string();
+    }
+    let head: String = chars[..RETAINED_EDGE_CHARS].iter().collect();
+    let tail: String = chars[chars.len() - RETAINED_EDGE_CHARS..].iter().collect();
+    let omitted = chars.len() - 2 * RETAINED_EDGE_CHARS;
+    format!("{head}\n… {omitted} chars omitted, see claude_turns.jsonl …\n{tail}")
 }
 
 /// One JSONL line per turn in `<codex_home>/claude_turns.jsonl` — the durable raw
@@ -274,10 +275,52 @@ mod tests {
     }
 
     #[test]
-    fn fallback_record_truncates() {
+    fn excerpt_leaves_short_text_untouched() {
+        let short = "outcome: a".to_string();
+        assert_eq!(excerpt(&short), short);
+    }
+
+    #[test]
+    fn excerpt_shrinks_long_text_and_keeps_head_and_tail() {
+        let long = format!("HEAD{}TAIL", "x".repeat(1_000));
+        let result = excerpt(&long);
+        assert!(result.chars().count() < long.chars().count());
+        assert!(result.starts_with("HEAD"));
+        assert!(result.ends_with("TAIL"));
+        assert!(result.contains("chars omitted, see claude_turns.jsonl"));
+    }
+
+    #[test]
+    fn excerpt_is_idempotent() {
         let long = "x".repeat(1_000);
-        let record = fallback_record(&long);
-        assert!(record.chars().count() <= FALLBACK_RECORD_CHARS + 40);
-        assert!(record.starts_with("outcome (undistilled excerpt): "));
+        let once = excerpt(&long);
+        let twice = excerpt(&once);
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn compact_aged_records_keeps_newest_verbatim_and_excerpts_the_rest() {
+        let newest = "x".repeat(1_000);
+        let mut records = vec!["y".repeat(1_000), newest.clone()];
+        let saved = compact_aged_records(&mut records);
+        assert!(saved > 0);
+        assert_eq!(records[1], newest, "newest record must stay verbatim");
+        assert!(
+            records[0].chars().count() < 1_000,
+            "aged-out record must be excerpted"
+        );
+    }
+
+    #[test]
+    fn compact_aged_records_never_double_counts_an_already_excerpted_record() {
+        let mut records = vec!["x".repeat(1_000), "y".repeat(1_000)];
+        let first_pass = compact_aged_records(&mut records);
+        assert!(first_pass > 0);
+        records.push("z".repeat(1_000));
+        let second_pass = compact_aged_records(&mut records);
+        // Index 0 was already excerpted by the first pass; re-compacting it (still
+        // aged-out) must save nothing further, only the newly-aged index 1 counts.
+        assert!(second_pass > 0);
+        assert!(second_pass < first_pass);
     }
 }

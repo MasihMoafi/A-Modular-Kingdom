@@ -1026,12 +1026,10 @@ pub(crate) enum AppEvent {
         text: Option<String>,
         session_id: Option<String>,
         error: Option<String>,
-        /// Haiku-distilled record of this turn — the ONLY part re-sent on future turns
-        /// (the ace: deletion by composition; the raw transcript stays on disk).
+        /// Raw record of this turn — the ace deterministically excerpts it once it ages
+        /// out of the most recent turn, rather than a model summarizing it; the raw
+        /// transcript stays on disk regardless (`claude_turns.jsonl`).
         outcome_record: Option<String>,
-        /// Size of the raw turn (user prompt + assistant text) in chars, for the
-        /// "context saved" metric.
-        raw_chars: usize,
     },
 
     /// Async update of the current git branch for status line rendering.
