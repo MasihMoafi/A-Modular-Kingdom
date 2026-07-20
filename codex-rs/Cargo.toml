@@ -89,7 +89,6 @@ members = [
     "otel",
     "tui",
     "tools",
-    "v8-poc",
     "websocket-client",
     "utils/absolute-path",
     "utils/path-uri",
@@ -261,7 +260,6 @@ codex-utils-sleep-inhibitor = { path = "utils/sleep-inhibitor" }
 codex-utils-stream-parser = { path = "utils/stream-parser" }
 codex-utils-string = { path = "utils/string" }
 codex-utils-template = { path = "utils/template" }
-codex-v8-poc = { path = "v8-poc" }
 codex-windows-sandbox = { path = "windows-sandbox-rs" }
 core_test_support = { path = "core/tests/common" }
 mcp_test_support = { path = "mcp-server/tests/common" }
@@ -514,7 +512,6 @@ unwrap_used = "deny"
 ignored = [
     "icu_provider",
     "openssl-sys",
-    "codex-v8-poc",
 ]
 
 [profile.dev]
@@ -529,21 +526,22 @@ debug = "none"
 strip = "symbols"
 
 [profile.release]
-lto = "thin"
+lto = true
 debug = "line-tables-only"
 split-debuginfo = "off"
 # Keep release binaries symbolicateable until packaging has archived the
 # sidecar symbols and stripped the binaries.
-strip = false
+strip = "symbols"
 
 # Balance parallel release code generation against binary size.
-codegen-units = 4
+codegen-units = 1
+opt-level = "z"
 
 [profile.profiling]
 inherits = "release"
 debug = "full"
 lto = false
-strip = false
+strip = "symbols"
 
 [profile.ci-test]
 # Reduce binary size to reduce disk pressure.
