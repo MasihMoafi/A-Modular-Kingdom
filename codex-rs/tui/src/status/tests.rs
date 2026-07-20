@@ -738,6 +738,9 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
         "<none>".to_string(),
         /*instruction_source_paths*/ &[],
         /*refreshing_rate_limits*/ false,
+        /*codex_pruning_evictions*/ 0,
+        /*codex_pruning_saved_chars*/ 0,
+        /*claude_pruning_saved_chars*/ 0,
     );
     let rendered = render_lines(&composite.display_lines(/*width*/ 120)).join("\n");
 
@@ -780,6 +783,9 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
         "<none>".to_string(),
         /*instruction_source_paths*/ &[],
         /*refreshing_rate_limits*/ false,
+        /*codex_pruning_evictions*/ 0,
+        /*codex_pruning_saved_chars*/ 0,
+        /*claude_pruning_saved_chars*/ 0,
     );
     let rendered = render_lines(&composite.display_lines(/*width*/ 120)).join("\n");
 
@@ -1591,6 +1597,9 @@ async fn status_snapshot_uses_default_reasoning_when_config_empty() {
         "<none>".to_string(),
         /*instruction_source_paths*/ &[],
         /*refreshing_rate_limits*/ false,
+        /*codex_pruning_evictions*/ 0,
+        /*codex_pruning_saved_chars*/ 0,
+        /*claude_pruning_saved_chars*/ 0,
     );
     let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     if cfg!(windows) {

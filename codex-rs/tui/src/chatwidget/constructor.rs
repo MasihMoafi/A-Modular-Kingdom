@@ -111,6 +111,7 @@ impl ChatWidget {
             active_runtime: ActiveRuntime::default(),
             claude_model: None,
             claude_code_turn_running: false,
+            claude_code_turn_cancel: None,
             claude_outcome_records: Vec::new(),
             claude_context_saved_chars: 0,
             config,

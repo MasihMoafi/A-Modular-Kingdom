@@ -411,8 +411,20 @@ impl App {
                 return Ok(AppRunControl::Exit(ExitReason::Fatal(message)));
             }
             AppEvent::CodexOp(op) => {
-                self.chat_widget.prepare_local_op_submission(&op);
-                self.submit_active_thread_op(app_server, op).await?;
+                // `Op::Interrupt` reaches here from more than one place (Ctrl+C is handled
+                // directly in `ChatWidget::on_ctrl_c` and never gets here; this is the
+                // Esc/`interrupt_turn` keymap path via `BottomPane`'s status-indicator
+                // interrupt hint, plus any other `AppEvent`-routed interrupt). None of those
+                // callers know whether a Claude Code turn — which has no app-server op at
+                // all — is what's actually running, so that check lives here instead.
+                if matches!(op, AppCommand::Interrupt)
+                    && self.chat_widget.is_claude_code_turn_running()
+                {
+                    self.chat_widget.cancel_claude_code_turn();
+                } else {
+                    self.chat_widget.prepare_local_op_submission(&op);
+                    self.submit_active_thread_op(app_server, op).await?;
+                }
             }
             AppEvent::RetrySafetyBufferedTurn {
                 thread_id,

@@ -401,9 +401,7 @@ impl ChatWidget {
                 self.quit_shortcut_expires_at = None;
                 self.quit_shortcut_key = None;
                 self.bottom_pane.clear_quit_shortcut_hint();
-                if self.submit_op(AppCommand::interrupt()) {
-                    self.pause_active_goal_for_interrupt();
-                }
+                self.interrupt_active_work();
             } else {
                 self.request_quit_without_confirmation();
             }
@@ -419,7 +417,18 @@ impl ChatWidget {
 
         self.arm_quit_shortcut(key);
 
-        if self.is_cancellable_work_active() && self.submit_op(AppCommand::interrupt()) {
+        if self.is_cancellable_work_active() {
+            self.interrupt_active_work();
+        }
+    }
+
+    /// Interrupts whatever cancellable work is active. A Claude Code turn has no
+    /// app-server `Op::Interrupt` to submit (there's no app-server op involved at
+    /// all), so it's cancelled directly; otherwise falls back to `Op::Interrupt`.
+    fn interrupt_active_work(&mut self) {
+        if self.is_claude_code_turn_running() {
+            self.cancel_claude_code_turn();
+        } else if self.submit_op(AppCommand::interrupt()) {
             self.pause_active_goal_for_interrupt();
         }
     }

@@ -122,6 +122,13 @@ struct StatusHistoryCell {
     forked_from: Option<String>,
     token_usage: StatusTokenUsageData,
     rate_limit_state: Arc<RwLock<StatusRateLimitState>>,
+    /// Codex runtime: count of deterministic tool-output prunings and cumulative chars
+    /// saved by them (`context_cleaner::eviction_count`/`saved_chars`).
+    codex_pruning_evictions: usize,
+    codex_pruning_saved_chars: usize,
+    /// Claude Code runtime: cumulative chars saved by per-turn outcome distillation
+    /// (`ChatWidget::claude_context_saved_chars`).
+    claude_pruning_saved_chars: usize,
 }
 
 #[cfg(test)]
@@ -197,6 +204,9 @@ pub(crate) fn new_status_output_with_rate_limits(
         "<none>".to_string(),
         /*instruction_source_paths*/ &[],
         refreshing_rate_limits,
+        /*codex_pruning_evictions*/ 0,
+        /*codex_pruning_saved_chars*/ 0,
+        /*claude_pruning_saved_chars*/ 0,
     )
     .0
 }
@@ -221,6 +231,9 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
     agents_summary: String,
     instruction_source_paths: &[std::path::PathBuf],
     refreshing_rate_limits: bool,
+    codex_pruning_evictions: usize,
+    codex_pruning_saved_chars: usize,
+    claude_pruning_saved_chars: usize,
 ) -> (CompositeHistoryCell, StatusHistoryHandle) {
     let command = PlainHistoryCell::new(vec!["/status".magenta().into()]);
     let (card, handle) = StatusHistoryCell::new(
@@ -242,6 +255,9 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
         agents_summary,
         instruction_source_paths,
         refreshing_rate_limits,
+        codex_pruning_evictions,
+        codex_pruning_saved_chars,
+        claude_pruning_saved_chars,
     );
 
     (
@@ -271,6 +287,9 @@ impl StatusHistoryCell {
         agents_summary: String,
         instruction_source_paths: &[std::path::PathBuf],
         refreshing_rate_limits: bool,
+        codex_pruning_evictions: usize,
+        codex_pruning_saved_chars: usize,
+        claude_pruning_saved_chars: usize,
     ) -> (Self, StatusHistoryHandle) {
         let approval_policy = AskForApproval::from(config.permissions.approval_policy.value());
         let permission_profile = config.permissions.effective_permission_profile();
@@ -381,6 +400,9 @@ impl StatusHistoryCell {
                 agents_summary,
                 continuity_sources,
                 rate_limit_state: rate_limit_state.clone(),
+                codex_pruning_evictions,
+                codex_pruning_saved_chars,
+                claude_pruning_saved_chars,
             },
             StatusHistoryHandle { rate_limit_state },
         )
@@ -784,6 +806,12 @@ impl HistoryCell for StatusHistoryCell {
         for source in &self.continuity_sources {
             push_label(&mut labels, &mut seen, &source.name);
         }
+        if self.codex_pruning_saved_chars > 0 {
+            push_label(&mut labels, &mut seen, "Context pruning (Codex)");
+        }
+        if self.claude_pruning_saved_chars > 0 {
+            push_label(&mut labels, &mut seen, "Context pruning (Claude Code)");
+        }
         push_label(&mut labels, &mut seen, "Token usage");
         if self.token_usage.context_window.is_some() {
             push_label(&mut labels, &mut seen, "Context window");
@@ -846,7 +874,13 @@ impl HistoryCell for StatusHistoryCell {
         }
         lines.push(formatter.line("Directory", vec![Span::from(directory_value)]));
         lines.push(formatter.line("Permissions", vec![Span::from(self.permissions.clone())]));
-        lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
+        // The per-source rows below already list every AGENTS.md file individually (with
+        // tokens, lifetime, and reason) whenever continuity sources are available — this
+        // summary line duplicated the same two files with less detail. Only shown as a
+        // fallback when there's nothing more detailed to show (e.g. memories unconfigured).
+        if self.continuity_sources.is_empty() {
+            lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
+        }
         for source in &self.continuity_sources {
             lines.push(formatter.line(
                 source.name.clone(),
@@ -860,6 +894,25 @@ impl HistoryCell for StatusHistoryCell {
                     ))
                     .dim(),
                 ],
+            ));
+        }
+        if self.codex_pruning_saved_chars > 0 {
+            lines.push(formatter.line(
+                "Context pruning (Codex)",
+                vec![Span::from(format!(
+                    "{} tool outputs compacted, ~{} saved",
+                    self.codex_pruning_evictions,
+                    format_tokens_compact(self.codex_pruning_saved_chars as i64)
+                ))],
+            ));
+        }
+        if self.claude_pruning_saved_chars > 0 {
+            lines.push(formatter.line(
+                "Context pruning (Claude Code)",
+                vec![Span::from(format!(
+                    "~{} saved",
+                    format_tokens_compact(self.claude_pruning_saved_chars as i64)
+                ))],
             ));
         }
 

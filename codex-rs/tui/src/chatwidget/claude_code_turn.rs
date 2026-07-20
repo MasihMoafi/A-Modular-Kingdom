@@ -18,7 +18,14 @@
 use std::path::Path;
 
 use codex_claude_bridge::ClaudePrintOptions;
+use codex_claude_bridge::run_cancellable_print_turn;
 use codex_claude_bridge::run_print_turn;
+
+/// Sentinel `TurnOutcome::error_message` used by `codex-claude-bridge` when a turn is
+/// cancelled via `cancel_claude_code_turn`. Kept identical to the string literal in
+/// `claude-bridge/src/lib.rs`'s `run_print_turn_with_timeout` — matched on below to show
+/// a clear "cancelled" message instead of routing it through the generic error path.
+const CANCELLED_SENTINEL: &str = "cancelled";
 
 /// Max chars of raw assistant text kept as the fallback record when the haiku
 /// distillation call itself fails. ponytail: blunt truncation; smarter fallback
@@ -26,8 +33,22 @@ use codex_claude_bridge::run_print_turn;
 const FALLBACK_RECORD_CHARS: usize = 400;
 
 impl super::ChatWidget {
-    pub(super) fn is_claude_code_turn_running(&self) -> bool {
+    // pub(crate), not pub(super): `tui::app::event_dispatch` also needs this, to redirect
+    // an Esc-triggered `Op::Interrupt` (which means nothing to a Claude Code turn) into
+    // `cancel_claude_code_turn` instead of forwarding it to the app-server.
+    pub(crate) fn is_claude_code_turn_running(&self) -> bool {
         self.claude_code_turn_running
+    }
+
+    /// Cancels the in-flight Claude Code turn, if any. Returns whether one was running.
+    pub(crate) fn cancel_claude_code_turn(&mut self) -> bool {
+        match self.claude_code_turn_cancel.take() {
+            Some(tx) => {
+                let _ = tx.send(());
+                true
+            }
+            None => false,
+        }
     }
 
     /// Entry point from `input_submission.rs` when the active runtime is Claude Code.
@@ -45,7 +66,11 @@ impl super::ChatWidget {
 
         self.add_info_message(format!("You: {text}"), None);
         self.claude_code_turn_running = true;
+        self.bottom_pane.set_task_running(true);
         self.request_redraw();
+
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel();
+        self.claude_code_turn_cancel = Some(cancel_tx);
 
         let options = ClaudePrintOptions {
             prompt: text.clone(),
@@ -59,7 +84,7 @@ impl super::ChatWidget {
         let transcript_path = self.config.codex_home.as_path().join("claude_turns.jsonl");
         let tx = self.app_event_tx.clone();
         tokio::spawn(async move {
-            match run_print_turn(options).await {
+            match run_cancellable_print_turn(options, cancel_rx).await {
                 Ok(outcome) => {
                     let raw_chars = text.chars().count()
                         + outcome
@@ -118,8 +143,14 @@ impl super::ChatWidget {
         raw_chars: usize,
     ) {
         self.claude_code_turn_running = false;
+        self.claude_code_turn_cancel = None;
+        self.bottom_pane.set_task_running(false);
         if let Some(error) = error {
-            self.add_error_message(format!("Claude Code turn failed: {error}"));
+            if error == CANCELLED_SENTINEL {
+                self.add_info_message("Claude Code turn cancelled.".to_string(), None);
+            } else {
+                self.add_error_message(format!("Claude Code turn failed: {error}"));
+            }
         } else if let Some(text) = text {
             self.add_info_message(format!("elpis: {text}"), None);
         } else {

@@ -222,14 +222,36 @@ const DEFAULT_TURN_TIMEOUT: Duration = Duration::from_secs(180);
 
 /// Runs one `claude -p` turn to completion and aggregates it into a [`TurnOutcome`].
 /// Convenience wrapper over [`spawn_and_stream_events`] for callers that don't need
-/// incremental events. Waits for the child process to exit.
+/// incremental events. Waits for the child process to exit. Not cancellable — used
+/// for the internal haiku distillation call, which must not be interruptible by the
+/// user. See [`run_cancellable_print_turn`] for the user-facing, cancellable turn.
 pub async fn run_print_turn(options: ClaudePrintOptions) -> Result<TurnOutcome, ClaudeBridgeError> {
-    run_print_turn_with_timeout(options, DEFAULT_TURN_TIMEOUT).await
+    run_print_turn_with_timeout(options, DEFAULT_TURN_TIMEOUT, None).await
+}
+
+/// Like [`run_print_turn`], but cancellable: if `cancel` fires before the turn
+/// completes or times out, the child process is killed and the returned
+/// [`TurnOutcome`] has `is_error: true` with `error_message: Some("cancelled")`
+/// (that exact sentinel string — callers match on it to show a clearer message than
+/// a generic failure).
+pub async fn run_cancellable_print_turn(
+    options: ClaudePrintOptions,
+    cancel: tokio::sync::oneshot::Receiver<()>,
+) -> Result<TurnOutcome, ClaudeBridgeError> {
+    run_print_turn_with_timeout(options, DEFAULT_TURN_TIMEOUT, Some(cancel)).await
+}
+
+/// Why the aggregation loop below stopped.
+enum StopReason {
+    Completed,
+    TimedOut,
+    Cancelled,
 }
 
 async fn run_print_turn_with_timeout(
     options: ClaudePrintOptions,
     timeout: Duration,
+    cancel: Option<tokio::sync::oneshot::Receiver<()>>,
 ) -> Result<TurnOutcome, ClaudeBridgeError> {
     let (mut child, mut rx) = spawn_and_stream_events(options).await?;
     // Drained concurrently, not after the fact: stderr is piped now (see `build_command`),
@@ -245,7 +267,7 @@ async fn run_print_turn_with_timeout(
     let mut text = String::new();
     let mut outcome = TurnOutcome::default();
 
-    let timed_out = tokio::time::timeout(timeout, async {
+    let aggregate = async {
         while let Some(parsed) = rx.recv().await {
             match parsed {
                 Ok(ClaudeStreamEvent::Assistant(message)) => {
@@ -273,11 +295,26 @@ async fn run_print_turn_with_timeout(
                 }
             }
         }
-    })
-    .await
-    .is_err();
+    };
 
-    if timed_out {
+    let stop_reason = match cancel {
+        Some(cancel_rx) => {
+            tokio::select! {
+                _ = aggregate => StopReason::Completed,
+                _ = tokio::time::sleep(timeout) => StopReason::TimedOut,
+                _ = cancel_rx => StopReason::Cancelled,
+            }
+        }
+        None => {
+            if tokio::time::timeout(timeout, aggregate).await.is_err() {
+                StopReason::TimedOut
+            } else {
+                StopReason::Completed
+            }
+        }
+    };
+
+    if !matches!(stop_reason, StopReason::Completed) {
         let _ = child.start_kill();
     }
     let exit_status = child.wait().await.ok();
@@ -288,23 +325,34 @@ async fn run_print_turn_with_timeout(
 
     outcome.text = if text.is_empty() { None } else { Some(text) };
 
-    if timed_out {
-        outcome.is_error = true;
-        outcome.error_message = Some(format!(
-            "claude did not respond within {}s{}",
-            timeout.as_secs(),
-            stderr_excerpt(&stderr_text)
-        ));
-    } else if outcome.error_message.is_none()
-        && (outcome.is_error
-            || (outcome.text.is_none() && !exit_status.is_some_and(|status| status.success())))
-    {
-        outcome.is_error = true;
-        outcome.error_message = Some(format!(
-            "claude exited with {}{}",
-            exit_status.map_or_else(|| "unknown status".to_string(), |status| status.to_string()),
-            stderr_excerpt(&stderr_text)
-        ));
+    match stop_reason {
+        StopReason::Cancelled => {
+            outcome.is_error = true;
+            outcome.error_message = Some("cancelled".to_string());
+        }
+        StopReason::TimedOut => {
+            outcome.is_error = true;
+            outcome.error_message = Some(format!(
+                "claude did not respond within {}s{}",
+                timeout.as_secs(),
+                stderr_excerpt(&stderr_text)
+            ));
+        }
+        StopReason::Completed => {
+            if outcome.error_message.is_none()
+                && (outcome.is_error
+                    || (outcome.text.is_none()
+                        && !exit_status.is_some_and(|status| status.success())))
+            {
+                outcome.is_error = true;
+                outcome.error_message = Some(format!(
+                    "claude exited with {}{}",
+                    exit_status
+                        .map_or_else(|| "unknown status".to_string(), |status| status.to_string()),
+                    stderr_excerpt(&stderr_text)
+                ));
+            }
+        }
     }
 
     Ok(outcome)
@@ -570,6 +618,7 @@ exit 1"#,
                 ..Default::default()
             },
             Duration::from_millis(200),
+            None,
         )
         .await;
 
@@ -581,5 +630,49 @@ exit 1"#,
         assert!(outcome.is_error);
         let message = outcome.error_message.expect("expected a timeout message");
         assert!(message.contains("did not respond within"), "{message}");
+    }
+
+    /// A turn cancelled mid-flight (e.g. the user hits Ctrl+C) must return promptly with
+    /// `is_error: true` and the `"cancelled"` sentinel, not wait for the child to finish on
+    /// its own — proving the cancel oneshot actually races the aggregation loop and kills
+    /// the child rather than being ignored.
+    #[cfg(unix)]
+    #[tokio::test]
+    #[serial_test::serial(claude_bridge_binary_env)]
+    async fn run_cancellable_print_turn_returns_quickly_when_cancelled() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let script = write_fake_claude_script(&dir, "sleep 5");
+
+        unsafe {
+            std::env::set_var(BINARY_OVERRIDE_ENV, &script);
+        }
+
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel();
+        let handle = tokio::spawn(run_cancellable_print_turn(
+            ClaudePrintOptions {
+                prompt: "hi".to_string(),
+                ..Default::default()
+            },
+            cancel_rx,
+        ));
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let start = std::time::Instant::now();
+        let _ = cancel_tx.send(());
+
+        let result = handle.await.expect("task should not panic");
+        let elapsed = start.elapsed();
+
+        unsafe {
+            std::env::remove_var(BINARY_OVERRIDE_ENV);
+        }
+
+        let outcome = result.expect("run_cancellable_print_turn should not itself error");
+        assert!(outcome.is_error);
+        assert_eq!(outcome.error_message.as_deref(), Some("cancelled"));
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "expected cancellation to return well before the 5s sleep, took {elapsed:?}"
+        );
     }
 }

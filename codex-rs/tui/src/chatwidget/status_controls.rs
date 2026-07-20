@@ -223,6 +223,8 @@ impl ChatWidget {
         let agents_summary =
             crate::status::compose_agents_summary(&self.config, &self.instruction_source_paths);
         let instruction_paths = self.instruction_source_paths_as_path_bufs();
+        let codex_pruning_evictions = crate::legacy_core::context_cleaner::eviction_count();
+        let codex_pruning_saved_chars = crate::legacy_core::context_cleaner::saved_chars();
         let (cell, handle) = crate::status::new_status_output_with_rate_limits_handle(
             &self.config,
             self.runtime_model_provider_base_url.as_deref(),
@@ -242,6 +244,9 @@ impl ChatWidget {
             agents_summary,
             &instruction_paths,
             refreshing_rate_limits,
+            codex_pruning_evictions,
+            codex_pruning_saved_chars,
+            self.claude_context_saved_chars,
         );
         if let Some(request_id) = request_id {
             self.refreshing_status_outputs.push((request_id, handle));

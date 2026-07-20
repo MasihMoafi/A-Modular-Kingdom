@@ -543,6 +543,9 @@ pub(crate) struct ChatWidget {
     /// for the CLI's account default.
     claude_model: Option<String>,
     claude_code_turn_running: bool,
+    /// Set while a Claude Code turn is in flight; sending on it cancels the turn
+    /// (kills the subprocess) instead of leaving the user stuck with no way out.
+    claude_code_turn_cancel: Option<tokio::sync::oneshot::Sender<()>>,
     /// The ace: distilled outcome records of prior Claude Code turns. These — not the
     /// raw transcript — are what gets re-sent, so context shrinks instead of growing.
     claude_outcome_records: Vec<String>,
