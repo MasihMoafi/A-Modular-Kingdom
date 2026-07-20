@@ -18,6 +18,7 @@
 use codex_protocol::models::FunctionCallOutputBody;
 use codex_protocol::models::ResponseItem;
 use codex_utils_output_truncation::approx_bytes_for_tokens;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -171,15 +172,32 @@ pub(crate) fn parse_prune_output(raw: &str, batch: &[(String, String)]) -> Optio
     })
 }
 
+/// Maps each `<id>: <content>` line in a record's text back to its call id, so the
+/// per-item receipt below can carry the actual conclusion instead of a generic marker.
+fn conclusions_by_call_id(record_text: &str) -> HashMap<&str, &str> {
+    record_text
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .map(|(id, rest)| (id.trim(), rest.trim()))
+        .collect()
+}
+
 /// Replaces every item in `input` covered by `record` with a tiny receipt pointing
 /// at the durable evidence, mirroring `context_cleaner.rs`'s existing style. Returns
 /// chars saved. Safe to call on an already-applied record: items too small to shrink
 /// further are left untouched rather than grown.
+///
+/// This is the step that actually delivers the model's judgment: an item that earned
+/// a conclusion line keeps that line (the "why it mattered"); an item that didn't gets
+/// a plain dead-end marker. Losing the conclusion here — carrying only a generic
+/// "covered" marker for everything — would make the pruning pass's model call pure
+/// waste, since nothing downstream would ever see what it decided mattered.
 pub(crate) fn apply_prune_record(input: &mut [ResponseItem], record: &PruneRecord) -> usize {
     if record.is_empty() {
         return 0;
     }
     let covered: HashSet<&str> = record.covered_call_ids.iter().map(String::as_str).collect();
+    let conclusions = conclusions_by_call_id(&record.text);
     let mut saved = 0usize;
     for item in input.iter_mut() {
         let (call_id, body) = match item {
@@ -198,9 +216,14 @@ pub(crate) fn apply_prune_record(input: &mut [ResponseItem], record: &PruneRecor
             continue;
         };
         let original_chars = text.chars().count();
-        let receipt = format!(
-            "[ELPIS CONTEXT UPDATE]\nreason=covered by agent-authored prune record\nevidence=rollout://tool-call/{call_id}\noriginal_chars={original_chars}"
-        );
+        let receipt = match conclusions.get(call_id) {
+            Some(conclusion) => format!(
+                "[ELPIS CONTEXT UPDATE]\nkept={conclusion}\nevidence=rollout://tool-call/{call_id}\noriginal_chars={original_chars}"
+            ),
+            None => format!(
+                "[ELPIS CONTEXT UPDATE]\nreason=dead end, dropped by agent-authored prune record\nevidence=rollout://tool-call/{call_id}\noriginal_chars={original_chars}"
+            ),
+        };
         let new_chars = receipt.chars().count();
         if new_chars >= original_chars {
             continue;
@@ -329,11 +352,36 @@ mod tests {
         };
         let text = output.text_content().expect("text");
         assert!(text.contains("evidence=rollout://tool-call/a"));
+        // The whole point of paying for the model pass: its conclusion must survive
+        // into the receipt, not just a generic "covered" marker.
+        assert!(text.contains("found X at foo.rs:1 — mattered because Y"));
 
         let ResponseItem::FunctionCallOutput { output, .. } = &input[1] else {
             panic!("function output");
         };
         assert_eq!(output.text_content(), Some(large.as_str()));
+    }
+
+    #[test]
+    fn apply_prune_record_marks_dead_ends_without_a_conclusion_line() {
+        let large = "x".repeat(2_000);
+        let mut input = vec![tool_output("a", &large), tool_output("b", &large)];
+        // "a" earned a line; "b" is covered (batch-wide NOTHING_TO_KEEP-style pass)
+        // but has no conclusion of its own — it was a dead end.
+        let record = PruneRecord {
+            covered_call_ids: vec!["a".to_string(), "b".to_string()],
+            text: "a: found X at foo.rs:1 — mattered because Y".to_string(),
+        };
+
+        apply_prune_record(&mut input, &record);
+
+        let ResponseItem::FunctionCallOutput { output, .. } = &input[1] else {
+            panic!("function output");
+        };
+        let text = output.text_content().expect("text");
+        assert!(!text.contains("found X"));
+        assert!(text.contains("dead end"));
+        assert!(text.contains("evidence=rollout://tool-call/b"));
     }
 
     #[test]
