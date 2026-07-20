@@ -217,7 +217,6 @@ impl ChatWidget {
             format!("{context}%").cyan(),
             " · location ".dim(),
             location.cyan(),
-            " · Tab Context Ledger".dim(),
         ])
         .render(area, buf);
     }

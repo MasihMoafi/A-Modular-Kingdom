@@ -1141,6 +1141,7 @@ impl ChatComposer {
             line.spans.push(" | ".dim());
             line.spans.push(vim_mode);
         }
+        line.spans.push(" · Tab Context Ledger".dim());
         line
     }
 
