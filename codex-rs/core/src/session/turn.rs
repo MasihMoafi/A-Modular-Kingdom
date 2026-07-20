@@ -347,6 +347,12 @@ pub(crate) async fn run_turn(
                     allow_auto_compact_fallback,
                 )
                 .await;
+                super::context_prune::maybe_run_context_prune(
+                    &sess,
+                    &turn_context,
+                    &mut client_session,
+                )
+                .await;
 
                 // as long as compaction works well in getting us way below the token limit, we shouldn't worry about being in an infinite loop.
                 if should_roll_over {

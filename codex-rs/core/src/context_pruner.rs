@@ -26,6 +26,11 @@ use std::sync::atomic::Ordering;
 /// fraction of the active model's context window.
 const PRUNE_TRIGGER_PERCENT: i64 = 10;
 
+/// Model used for the pruning pass — same model and `Medium` reasoning effort as the
+/// existing memory-consolidation pass (`memories/write/src/lib.rs`'s `stage_two`),
+/// reusing that precedent rather than picking a new pairing.
+pub(crate) const PRUNE_MODEL_SLUG: &str = "gpt-5.6-terra";
+
 /// Sentinel the model replies with when nothing in the batch is worth keeping.
 /// Kept identical to the instruction in `prompts/templates/context_prune/prompt.md`.
 const NOTHING_TO_KEEP: &str = "NOTHING_TO_KEEP";

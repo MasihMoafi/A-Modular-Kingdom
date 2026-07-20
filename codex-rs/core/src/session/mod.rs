@@ -200,6 +200,7 @@ use codex_protocol::exec_output::StreamOutput;
 
 mod code_mode_warning;
 mod config_lock;
+mod context_prune;
 pub(crate) mod context_window;
 mod handlers;
 mod inject;
