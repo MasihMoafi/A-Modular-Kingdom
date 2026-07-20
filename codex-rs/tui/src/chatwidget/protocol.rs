@@ -42,19 +42,13 @@ impl ChatWidget {
             custom_openai_base,
         );
         let current_model = self.current_model().to_string();
-        // Codex app-server notifications keep arriving even while Claude Code is the
-        // active runtime; skip the sync then so it can't stomp the Claude Code branding
-        // that `runtime_selection.rs` set (this was bug: status line stuck on the Codex
-        // model after switching runtimes).
-        if self.active_runtime == ActiveRuntime::Codex
-            && crate::branding::sync_runtime_identity(
-                thread_id.as_deref(),
-                &provider_name,
-                provider_route,
-                &current_model,
-                self.config.features.enabled(Feature::MemoryTool),
-            )
-        {
+        if crate::branding::sync_runtime_identity(
+            thread_id.as_deref(),
+            &provider_name,
+            provider_route,
+            &current_model,
+            self.config.features.enabled(Feature::MemoryTool),
+        ) {
             self.refresh_status_line();
         }
 

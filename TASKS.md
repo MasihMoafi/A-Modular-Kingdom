@@ -128,61 +128,28 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   source's inclusion reason. CI run `29682921080` passed; installed terminal render
   acceptance remains pending.
 
-### F8. Claude Code as a selectable runtime (R11) — text bridge verified live; takeover mode built, awaiting live acceptance
+### F8. Claude Code as a selectable runtime (R11) — removed 2026-07-20
 
-- `codex-rs/claude-bridge`: a subprocess bridge to the Claude Code CLI's `--print`
-  non-interactive mode (`claude -p --output-format stream-json`), with a typed event
-  parser built from an empirical capture (Claude Code 2.1.214), tested, CI-green.
-- `/claude-code` command and an `ActiveRuntime` (`Codex` | `ClaudeCode`) session enum
-  exist (`codex-rs/tui/src/chatwidget/runtime_selection.rs`) and switching prints a
-  confirmation in the transcript.
-- Live acceptance 2026-07-19 (tmux-driven, installed 11:54 binary): `/claude-code` then a
-  text prompt returned the exact reply `READY_E2E` rendered in the TUI. Text routing works
-  end to end on the installed build.
-- Why it looked broken to Masih: the installed binary predates commit `0084fcf` and still
-  prints the stale "full routing is not implemented yet" notice on switch; the header keeps
-  showing the Codex model (`gpt-5.5`) while Claude Code is active; and `/model` has no
-  Claude Code entry. Fixes: reinstall from a post-`0084fcf` build (triggered as run
-  `29681801846`); header must display the active runtime; picker entry is delegated
-  (LEDGER/PICKER worker branch).
-- Turn submission is actually routed through `claude-bridge` when the active runtime is
-  Claude Code (`codex-rs/tui/src/chatwidget/claude_code_turn.rs`), not just recorded:
-  whole-message text-in/text-out only — no incremental streaming render (unlike Codex's
-  `StreamController`), and `tool_use`/`tool_result` content blocks are not inspected or
-  bridged to Elpis's approval/diff/permission surfaces. A Claude Code turn that calls a
-  tool shows nothing in the TUI until the process exits, then only its final text (if
-  any). `codex-rs/claude-bridge`'s own parser doesn't decode those block shapes yet
-  either, so this is a source-level limitation, not just an integration gap.
-- Implemented in PR #55: `/model` shows a `CLAUDE CODE` provider/runtime group with an
-  honest `Account default` row because the CLI subscription chooses the actual model.
-  Selecting it reuses the existing `ActiveRuntime::ClaudeCode` switch path; selecting a
-  Codex model switches back to Codex. CI run `29682921080` passed; installed picker render
-  acceptance remains pending.
-- Claude Code authenticates via its own subscription login, separate from Codex/ChatGPT
-  and from the native/OpenRouter provider credentials in F5.
-- Direction change 2026-07-19 (Masih): the primary interactive path is now **takeover
-  mode** — `/claude-code` suspends the Elpis TUI and launches the user's real `claude`
-  CLI in the same terminal (exactly as if the user typed `claude`), restoring Elpis on
-  exit. This gives 100% genuine Claude Code UX with zero re-implementation; Elpis state
-  enters the session through Claude Code's own extension points (workspace CLAUDE.md /
-  `--append-system-prompt`, hooks, MCP). This is the Ollama pattern: Ollama never
-  re-implemented Claude Code's UI — Claude Code's backend is swappable via its
-  Anthropic-compatible API endpoint, and the real CLI does the rest. Fable-owned.
-- Takeover mode implemented 2026-07-19 (branch `agent/claude-code-takeover`):
-  `/claude-code` now sends `AppEvent::LaunchClaudeCodeTakeover`; the app layer reuses the
-  external-editor suspend machinery (`Tui::with_restored(RestoreMode::Full, ..)`) to
-  fully restore the terminal, run `claude` with inherited stdio in the workspace cwd,
-  and restore the TUI on exit. The runtime picker's `Account default` row keeps the
-  in-Elpis text bridge. Acceptance: Masih runs `/claude-code` on the fresh build and
-  lands in real Claude Code, exits, and is back in Elpis. Continuity injection via
-  Claude Code extension points (CLAUDE.md / `--append-system-prompt`) is the follow-up,
-  not part of this gate.
-- The existing text bridge remains for headless/scripted turns. Full
-  `tool_use`/`tool_result` bridging onto Elpis approval surfaces is deprioritized —
-  only worth building if takeover mode proves insufficient.
-- Forking Claude Code itself is not an option: it is closed-source (an obfuscated
-  JavaScript CLI), unlike Codex (Apache-2.0 Rust). The correct architecture is exactly
-  this bridge plus UX parity work (see the v0.2 Claude-parity item).
+- Confirmed by Masih 2026-07-18, reversed by Masih 2026-07-20: every turn spawned a fresh
+  `claude` CLI subprocess (no persistent session by design), which is structurally slower
+  than a native model call, with no available fix short of abandoning the
+  subscription-based CLI approach entirely. Rather than ship or keep maintaining a
+  feature with a known speed ceiling, it was removed rather than kept in a
+  known-degraded state.
+- Removed entirely: the `codex-rs/claude-bridge` crate (the `--print`/`stream-json`
+  subprocess bridge), the `/claude-code` command, the takeover mode that suspended the
+  Elpis TUI to run the real `claude` CLI in-terminal, the `ActiveRuntime`/`RuntimeSelection`
+  enums and every switch/picker/status-line surface built around them, and the
+  Claude-runtime-specific "ace" distillation path from PR #63 (fresh-per-turn `claude -p`
+  calls + haiku outcome-record distillation), which lived entirely inside the deleted
+  crate. The Codex-runtime "ace" (Layer 1 reasoning strip + Layer 2 `gpt-5.6-terra` prune
+  pass, PR #93 — see gate item 1) is unaffected; it never depended on claude-bridge.
+- The native Anthropic Messages API adapter (`--provider anthropic`, F5) is untouched and
+  remains the supported way to run Claude models in Elpis — this removal is scoped to the
+  CLI-subprocess runtime bridge only, not Claude model access in general.
+- `external-agent-migration`/`/import` (reading a Claude Code installation's config,
+  CLAUDE.md, and recent chats to bootstrap Elpis) is a separate, unrelated feature and was
+  not touched.
 
 ## Reduction campaign
 
@@ -320,26 +287,29 @@ and sol's grouped-ledger/picker branch merged; fresh binary from run `2968990548
 installed. Masih's live review of that build produced the list below. **v0.1 does not tag
 until every item here passes his test.**
 
-**Gate status (2026-07-20 evening):** 1 IMPLEMENTED end-to-end for both runtimes (Claude
-via #63, Codex via #93 — see below), CI-gated, not yet e2e-tested live; 2 MERGED (#87);
-3 MERGED (#88); 4 mostly present via the inherited Ratatui approval-cycle keybinding
-(Shift+Tab/`BackTab` in `chatwidget/interaction.rs`), open question on the 4th ("plan")
-preset — see below; 5 MERGED (#88). #89 (Claude Code runtime findings) and #92 (TUI
-ledger-hint placement) merged since. #90/#91 closed (superseded by the takeover-mode
-direction already in F8). #94 (Jules, build-profile + size regression) open, CI was
-red on a duplicate `--release` flag, fixed 2026-07-20 — rerun pending before merge.
-Next: merge #94 on green, confirm no other open PRs/stale branches remain, then Masih's
-live test of 1–6 is the only thing left before tagging `v0.1.0`.
+**Gate status (2026-07-20 evening):** 1 IMPLEMENTED via the Codex-runtime path (PR #93,
+see below) — the Claude-runtime path (PR #63) was removed along with the rest of the
+Claude Code CLI-bridge runtime (F8, reversed 2026-07-20); CI-gated, not yet e2e-tested
+live; 2 MERGED (#87); 3 MERGED (#88); 4 mostly present via the inherited Ratatui
+approval-cycle keybinding (Shift+Tab/`BackTab` in `chatwidget/interaction.rs`), open
+question on the 4th ("plan") preset — see below; 5 MERGED (#88). #89 (Claude Code
+runtime findings) and #92 (TUI ledger-hint placement) merged since, both now partly
+moot given the F8 removal. #90/#91 closed 2026-07-20 (redone cleanly against current
+main as the F8 removal above, since #91 was built off a stale base missing #89).
+#94 (Jules, build-profile + size regression) open, CI red twice on a duplicate
+`--release` flag getting reintroduced, fixed both times (last: commit `8d3bcaf`) —
+rerun pending before merge. Next: merge #94 on green, confirm no other open PRs/stale
+branches remain, then Masih's live test of 1–6 is the only thing left before tagging
+`v0.1.0`.
 
 1. **The ace — per-turn context deletion, visible (Fable-owned).** The deterministic
    cleaner is wired but invisible and positional. Required for v1: the agent-authored
    per-turn prune of the next request, plus the "context saved" metric and bar so the
    user watches context go *down*. This is the flagship; nothing ships without it.
-   **Claude-runtime path — IMPLEMENTED, PR #63** (`agent/ace-context-composition`,
-   2026-07-19 night): fresh-per-turn `claude -p` calls, haiku distillation with
-   raw-excerpt fallback, records-only re-send, raw transcript at
-   `<codex_home>/claude_turns.jsonl`. Unit + fake-binary pipeline tests pass in CI; not
-   yet e2e-tested against real Claude on an installed build.
+   **Claude-runtime path (PR #63) — removed 2026-07-20** along with the rest of the
+   Claude Code CLI-bridge runtime (see F8): it lived entirely inside the deleted
+   `codex-rs/claude-bridge` crate, so nothing else depended on it. The ace is now solely
+   the Codex-runtime path below, which never depended on claude-bridge and is unaffected.
    **Codex-runtime path — IMPLEMENTED, PR #93** (`feat: context pruning — the ace, end
    to end`, merged 2026-07-20, main `4b57fa8`): Layer 1 now unconditionally strips
    `ResponseItem::Reasoning` before every request (`context_cleaner::strip_reasoning_items`,
@@ -360,8 +330,6 @@ live test of 1–6 is the only thing left before tagging `v0.1.0`.
    actual conclusion line when one exists (`kept=...`), and a plain `dead end` marker
    when it doesn't; a regression test (`apply_prune_record_marks_dead_ends_without_a_conclusion_line`)
    covers the distinction. CI-gated; not yet e2e-tested against a real threshold crossing.
-   Follow-up, not gating v0.1: also compose rules/goal/admitted-ledger files into the
-   Claude working set (today PR #63's path carries outcome records only).
 2. **Context Ledger tells the whole truth — MERGED, PR #87.** Real admitted sources
    grouped as files/memory/instructions/evidence, row/section/total counts as estimated
    tokens, `g i`/`g e` toggle-all, `w` shows inclusion reason. Also fixed in #87:
