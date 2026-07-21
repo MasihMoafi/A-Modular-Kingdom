@@ -195,8 +195,14 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
 - Measured candidates are recorded in `docs/BUILD_AND_REDUCTION_AUDIT.md`.
 - New 2026-07-19: the installed binary is 356,440,368 bytes versus the 102,988,260-byte
   stripped baseline artifact — a 3.5× size regression despite `file` reporting it
-  stripped. Investigate what the build-cycle CI changes (incremental compilation, profile
-  edits) did to the release profile before any code deletion is credited or blamed.
+  stripped. Root cause found 2026-07-20 (PR #94, Jules): CI's "Build Elpis binary" step
+  built and shipped `target/debug/elpis`, not `target/release/elpis` — the profile edits
+  above (`lto`, `codegen-units`, `strip`) were never actually applied to the shipped
+  artifact. PR #94 switches CI to `--release`, sets `opt-level = "z"`, `codegen-units = 1`,
+  `lto = true`, `strip = "symbols"`, and removes the unreachable `v8-poc` Bazel-only POC
+  crate (no in-tree references outside its own directory). Its first CI run failed on a
+  duplicate `--release --release` flag in the build step (fixed 2026-07-20, commit
+  `2b2b210` on the same branch); rerun pending before merge.
 - Do not delete arbitrary workspace crates: first prove they are reachable from the Elpis
   binary and optional under the product requirements.
 
@@ -259,11 +265,8 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   when the cap applies, and state the workspace scope in the ledger header.
   PR #55 converts the rows and totals to explicitly estimated, admission-capped tokens;
   truncated-vs-full disclosure and an explicit workspace-scope label remain.
-- Context Ledger `/add` completion: `/add <path>` already admits single files
-  (`core/src/elpis_context.rs::add_continuity_source`), but the ledger shows no hint that
-  it exists. Required: a "use /add to add a file or directory" hint line in the ledger
-  panel, and directory support — `/add <dir>` opens a file chooser listing the directory's
-  files so the user picks which to admit as individual toggleable rows.
+- Context Ledger `/add` completion — done via PR #88 (`add_continuity_sources` admits every
+  file in a directory; the ledger hint line landed with it). See v1 gate item 3.
 - Claude Code UX parity, phase 1 (Masih explicitly wants Elpis to feel like Claude Code):
   the four permission modes cycled with one key (normal / auto-accept edits / plan /
   bypass) including an "auto" mode; composer mouse selection with Backspace deleting the
@@ -309,64 +312,80 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   Code's left-arrow agent panel), mid-turn message queuing, mobile remote control of a
   session, and opt-in telemetry. Large, multi-slice work; explicitly not v0.1/v0.2.
 
-## Current Action — the v1 gate list (2026-07-19, evening)
+## Current Action — the v1 gate list (updated 2026-07-20 evening; supersedes the
+2026-07-19 status below, which was left stale through several merges)
 
 Done today: takeover mode merged and tmux-verified (PR #56, main `e01e2a3`); terra PR #54
 and sol's grouped-ledger/picker branch merged; fresh binary from run `29689905487`
 installed. Masih's live review of that build produced the list below. **v0.1 does not tag
 until every item here passes his test.**
 
-**Gate status (2026-07-19 night):** 1 MERGED (#63); 4 MERGED (#59); 2 in PR #87 (CI);
-3+5 in PR #88 (CI); #85 pending CI. Jules PR sweep: merged #63 #59 #83 #64 #74 #81 #79
-#82 #58 #61 #72 #69 #71 #73 #75; closed #57 #60 #62 #66 #84 (test-only, per Masih),
-#65 #68 #76 #80 (duplicates), #70 (speculative abstraction), #67 (broke explicit
-out-of-workspace RAG paths — the drag-&-drop use case), #78 #86 (TODO preconditions
-unmet); #77 superseded by #87. Real fix in #87: build_continuity_prompt no longer
-re-injects rule files the server already sends natively (rules were double-sent every
-turn). Next: merge #85/#87/#88 on green → fresh main build → install → Masih tests.
+**Gate status (2026-07-20 evening):** 1 IMPLEMENTED end-to-end for both runtimes (Claude
+via #63, Codex via #93 — see below), CI-gated, not yet e2e-tested live; 2 MERGED (#87);
+3 MERGED (#88); 4 mostly present via the inherited Ratatui approval-cycle keybinding
+(Shift+Tab/`BackTab` in `chatwidget/interaction.rs`), open question on the 4th ("plan")
+preset — see below; 5 MERGED (#88). #89 (Claude Code runtime findings) and #92 (TUI
+ledger-hint placement) merged since. #90/#91 closed (superseded by the takeover-mode
+direction already in F8). #94 (Jules, build-profile + size regression) open, CI was
+red on a duplicate `--release` flag, fixed 2026-07-20 — rerun pending before merge.
+Next: merge #94 on green, confirm no other open PRs/stale branches remain, then Masih's
+live test of 1–6 is the only thing left before tagging `v0.1.0`.
 
 1. **The ace — per-turn context deletion, visible (Fable-owned).** The deterministic
    cleaner is wired but invisible and positional. Required for v1: the agent-authored
    per-turn prune of the next request, plus the "context saved" metric and bar so the
    user watches context go *down*. This is the flagship; nothing ships without it.
-   **Claude-subscription feasibility confirmed by live probe 2026-07-19** (single
-   `claude -p --model haiku --append-system-prompt ... --output-format json` call,
-   completed on Masih's sub, haiku honored): each turn is a fresh `claude -p` call, so
-   the next request contains exactly what Elpis composes — deletion is achieved by not
-   resending; nothing needs deleting *inside* Claude. Mechanism: turn ends → a cheap
-   `--model haiku` call (same sub) distills the turn into an outcome record (outcome,
-   decisions, constraints, changed paths, evidence pointers) → Elpis's working set for
-   the next turn = rules + goal + checkpoint + outcome records, injected via prompt/
-   `--append-system-prompt`; raw transcript stays on disk. The same composition
-   architecture applies to Codex-runtime turns via the existing request path. The
-   "context saved" number = bytes/tokens of raw turn output minus its outcome record.
-   **IMPLEMENTED — PR #63** (`agent/ace-context-composition`, 2026-07-19 night):
-   fresh-per-turn calls, haiku distillation with raw-excerpt fallback, records-only
-   re-send, raw transcript at `<codex_home>/claude_turns.jsonl`, per-turn
-   `context saved` line with percent bar + `saved` field in the ELPIS status line
-   (chars, labeled), Codex-runtime cleaner feeds the same counter. Unit + fake-binary
-   pipeline tests written but not run locally (no-compile rule) — CI is the gate,
-   pending at time of writing; NOT yet e2e-tested against real Claude (needs
-   installed build). Follow-up after gate 2
-   merges: also compose rules/goal/admitted-ledger files into the Claude working set
-   (today it carries outcome records only).
-2. **Context Ledger tells the whole truth (delegable).** The ledger pane must list every
-   admitted source exactly as `/status` does (global/project AGENTS.md, each dev/ file,
-   ES.md, manual adds) as individual toggleable rows — today it hides the dev group and
-   shows an empty FILES section under a non-zero total. Dedupe: a manually `/add`-ed file
-   that is already admitted as a rule must appear once (Masih's paste shows
-   `dev/AGENTS.md` twice). Theme/layout must match `design-prototype.png` (groups,
-   per-row tokens, INCLUDED/EXCLUDED, why-panel).
-3. **`/add` accepts directories and drag-and-drop (delegable).** `/add <dir>` admits each
-   contained file as its own row (`elpis_context.rs` currently rejects non-files).
-   Dropping a file onto the terminal pastes its path — accept that pasted path. Ledger
-   shows the "use /add to add a file or directory" hint.
-4. **Keybindings (delegable):** Tab opens the Context Ledger; Shift+Tab cycles the four
-   permission modes Claude-style, including auto mode.
-5. **Welcome screen identity (delegable):** the `/elpis` startup window must not look
-   like Codex. Until a real Elpis design exists, show the version and a few "what's new
-   in this version" lines at the top, Claude-Code-style.
+   **Claude-runtime path — IMPLEMENTED, PR #63** (`agent/ace-context-composition`,
+   2026-07-19 night): fresh-per-turn `claude -p` calls, haiku distillation with
+   raw-excerpt fallback, records-only re-send, raw transcript at
+   `<codex_home>/claude_turns.jsonl`. Unit + fake-binary pipeline tests pass in CI; not
+   yet e2e-tested against real Claude on an installed build.
+   **Codex-runtime path — IMPLEMENTED, PR #93** (`feat: context pruning — the ace, end
+   to end`, merged 2026-07-20, main `4b57fa8`): Layer 1 now unconditionally strips
+   `ResponseItem::Reasoning` before every request (`context_cleaner::strip_reasoning_items`,
+   `client.rs`) — hidden reasoning was previously never stripped at all. Layer 2
+   (`core/src/context_pruner.rs`) fires once per turn (`session/context_prune.rs`) when
+   uncovered turn-lifetime tool output crosses 10% of the active context window; a
+   `gpt-5.6-terra` pass (same model/effort as the existing memory-consolidation stage 2)
+   classifies each covered item as a dead end (dropped, no trace) or a finding (kept as
+   one evidence-pointer line). `/status` shows combined Layer 1 + Layer 2 savings: chars,
+   % of context window, pass counts. Any failure in the pass (model error, timeout,
+   unparseable reply) is swallowed — Layer 1's deterministic receipts remain the fallback,
+   nothing about a turn is ever blocked or delayed by it.
+   **Bug found and fixed 2026-07-20** (same day as merge): `apply_prune_record` computed
+   each item's conclusion line but then discarded it, writing an identical generic
+   "covered" receipt for every item regardless of whether it earned a finding — the
+   entire judgment the `gpt-5.6-terra` call paid for never reached the next request or
+   disk. Fixed in `context_pruner.rs`: the receipt for a covered item now carries its
+   actual conclusion line when one exists (`kept=...`), and a plain `dead end` marker
+   when it doesn't; a regression test (`apply_prune_record_marks_dead_ends_without_a_conclusion_line`)
+   covers the distinction. CI-gated; not yet e2e-tested against a real threshold crossing.
+   Follow-up, not gating v0.1: also compose rules/goal/admitted-ledger files into the
+   Claude working set (today PR #63's path carries outcome records only).
+2. **Context Ledger tells the whole truth — MERGED, PR #87.** Real admitted sources
+   grouped as files/memory/instructions/evidence, row/section/total counts as estimated
+   tokens, `g i`/`g e` toggle-all, `w` shows inclusion reason. Also fixed in #87:
+   `build_continuity_prompt` no longer double-sends rule files the server already sends
+   natively. Installed terminal render acceptance (matching `design-prototype.png`
+   pixel-for-pixel) still wants a live look, but the data/behavior gate is closed.
+3. **`/add` accepts directories and drag-and-drop — MERGED, PR #88.** `/add <dir>` admits
+   every contained file as its own row (`elpis_context::add_continuity_sources` walks the
+   directory; `core/src/elpis_context.rs` tests cover empty-dir rejection and
+   admit-every-file). Dropped/pasted paths are accepted the same way.
+4. **Keybindings — mostly already present; one gap.** Tab opens the Context Ledger.
+   Shift+Tab (`BackTab`) cycles approval presets via the inherited Ratatui
+   `cycle_approval_preset` (`codex-utils-approval-presets`), but that cycle only has
+   three built-in presets — Read Only, Default ("auto"), Full Access — not four; there is
+   no "plan" preset in the cycle. Elpis does have a separate `plan_mode` nudge concept
+   (`interaction.rs`: `should_show_plan_mode_nudge`/`dismiss_plan_mode_nudge`), but it is
+   not wired into this cycle. Verify with Masih whether the original "four modes
+   including plan" ask is satisfied by the 3-preset cycle as-is, or whether plan needs to
+   join the Shift+Tab rotation before this item counts as closed.
+5. **Welcome screen identity — MERGED, PR #88.** Version + "what's new" lines,
+   Claude-Code-style, replacing the Codex-identical startup window.
 6. Masih tests the rebuilt binary against 1–5; on his explicit okay, tag `v0.1.0` with
-   checksummed release assets. Then v0.2: Elpis data janitor (`/clean-up` for compounded
-   rollouts/archives/evidence), size regression (3.5×), startup speed, distribution
-   (plugin/marketplaces), Claude-parity UX phase 1.
+   checksummed release assets. **Status 2026-07-20: not yet run** — Masih's Claude
+   subscription hit its usage limit, deferring the live test a few days; code-level
+   review and CI are the interim signal. Then v0.2: Elpis data janitor (`/clean-up` for
+   compounded rollouts/archives/evidence), size regression (in flight, PR #94),
+   startup speed, distribution (plugin/marketplaces), Claude-parity UX phase 1.
