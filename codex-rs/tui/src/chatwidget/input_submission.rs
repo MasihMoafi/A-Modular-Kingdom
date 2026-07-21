@@ -101,13 +101,6 @@ impl ChatWidget {
         history_record: UserMessageHistoryRecord,
         shell_escape_policy: ShellEscapePolicy,
     ) -> (bool, Option<AppCommand>) {
-        // Claude Code turns bypass Codex's AppServerClient entirely, so they don't wait on
-        // Codex's session-configured gate or build Codex-specific UserInput items (images,
-        // skills, mentions — none of that is bridged yet, see claude_code_turn.rs).
-        if self.active_runtime == ActiveRuntime::ClaudeCode {
-            self.submit_user_message_to_claude_code(user_message.text);
-            return (true, None);
-        }
         if !self.is_session_configured() {
             tracing::warn!("cannot submit user message before session is configured; queueing");
             self.input_queue

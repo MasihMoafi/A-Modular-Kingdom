@@ -201,17 +201,6 @@ pub(crate) fn sync_context_eviction(count: usize, event: Option<&str>) -> bool {
     })
 }
 
-/// Adds chars removed from working context (e.g. a Claude turn distilled to an
-/// outcome record) to the session's visible "saved" total.
-pub(crate) fn record_context_saved(chars: u64) {
-    if chars == 0 {
-        return;
-    }
-    mutate_runtime_identity(|state| {
-        state.context_saved_chars = state.context_saved_chars.saturating_add(chars);
-    });
-}
-
 /// Folds the context cleaner's cumulative saved-chars counter into the visible
 /// total, delta-style (mirrors `sync_context_eviction`).
 pub(crate) fn sync_context_saved(cleaner_total: u64) {

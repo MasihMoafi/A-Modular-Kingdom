@@ -231,12 +231,12 @@ jobs:
           cargo test -p codex-tui --lib --locked chatwidget::tests::slash_commands::rag_command_routes_
 
       - name: Build Elpis binary and Cargo timing report
-        run: cargo build -p codex-tui --bin elpis --locked --timings
+        run: cargo build -p codex-tui --bin elpis --locked --timings --release
 
       - name: Verify executable identity
         run: |
-          target/debug/elpis --help
-          test "$(target/debug/elpis --version)" = "elpis 0.1.0"
+          target/release/elpis --help
+          test "$(target/release/elpis --version)" = "elpis 0.1.0"
 
       - name: Commit verified integration source
         if: github.event_name == 'pull_request' && github.head_ref == 'agent/product-integration' && hashFiles('.github/finalizer/chunk-00') != ''
@@ -260,14 +260,14 @@ jobs:
           git push origin HEAD:agent/product-integration
 
       - name: Reduce artifact size
-        run: strip target/debug/elpis
+        run: strip target/release/elpis
 
       - name: Upload Elpis binary
         if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: elpis-linux-x86_64
-          path: codex-rs/target/debug/elpis
+          path: codex-rs/target/release/elpis
           if-no-files-found: error
           retention-days: 7
 

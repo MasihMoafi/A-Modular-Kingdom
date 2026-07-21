@@ -29,8 +29,8 @@ ever-growing log:
   archived before reset — never silently lost.
 - **Runtime-agnostic.** The shell survives underneath whichever model performs the loop:
   ChatGPT/Codex subscription login, OpenRouter, native Anthropic and Gemini adapters,
-  Bedrock, Ollama, LM Studio — and a bridge to the Claude Code CLI (`/claude-code`).
-  Put a model into Elpis and it becomes Elpis: your goals, context, memory, and rules.
+  Bedrock, Ollama, LM Studio. Put a model into Elpis and it becomes Elpis: your goals,
+  context, memory, and rules.
 
 The execution foundation (terminal UI, patches, permissions, sandboxing, sessions) is a
 subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned here.
@@ -46,10 +46,6 @@ subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned he
 - ChatGPT subscription authentication; OpenRouter through `OPENROUTER_API_KEY`; native
   Anthropic Messages and Google Gemini adapters (`--provider anthropic`,
   `--provider google-gemini`; live vendor acceptance pending).
-- `/claude-code`: hands this terminal to your locally installed Claude Code CLI — the
-  real `claude`, your subscription, full UI — and returns you to Elpis when it exits.
-  The `/model` picker can instead keep you in Elpis and route turns through the CLI as
-  a text bridge.
 - One internal, read-only RAG service: `/rag <query>`, `/rag <path> -- <query>`, and
   autonomous retrieval.
 - Portable `GOAL.md` + `ES.md` continuity; exact resume or lean continuation.
@@ -77,11 +73,9 @@ flowchart LR
     memory["Bounded local memory"] --> control
     control --> runtime{"Select runtime"}
     runtime --> openai["OpenAI / Codex"]
-    runtime --> claude["Claude Code CLI"]
     runtime --> router["OpenRouter · Anthropic · Gemini"]
     runtime --> other["Bedrock / Ollama / LM Studio"]
     openai --> execution["Tools · edits · commands"]
-    claude --> execution
     router --> execution
     other --> execution
     execution --> evidence[("Workspace + exact evidence")]
@@ -223,10 +217,7 @@ elpis --provider google-gemini
 ```
 
 `elpis --provider claude|gemini|gemini-flash` are OpenRouter compatibility shortcuts,
-distinct from the native adapters above. Inside a session, `/claude-code` suspends
-Elpis and runs your locally installed, separately authenticated Claude Code CLI in the
-same terminal; exiting it brings Elpis back. Selecting Claude Code in the `/model`
-picker instead routes Elpis turns through the CLI as a text bridge.
+distinct from the native adapters above.
 
 ## Verification
 

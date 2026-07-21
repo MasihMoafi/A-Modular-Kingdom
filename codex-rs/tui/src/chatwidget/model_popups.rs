@@ -55,53 +55,6 @@ impl ChatWidget {
         }
     }
 
-    fn append_claude_code_group(&self, items: &mut Vec<SelectionItem>) {
-        items.push(SelectionItem {
-            name: "CLAUDE CODE".to_string(),
-            is_disabled: true,
-            ..Default::default()
-        });
-        let claude_active = self.active_runtime == ActiveRuntime::ClaudeCode;
-        // `--model` aliases the Claude Code CLI accepts, matching the Claude Code
-        // account's actual model lineup rather than Codex's model catalog.
-        let rows: [(&str, Option<&str>, &str); 5] = [
-            (
-                "Account default",
-                None,
-                "Claude Code CLI subscription chooses the model.",
-            ),
-            (
-                "Haiku 4.5",
-                Some("haiku"),
-                "Fastest and cheapest; good for quick turns.",
-            ),
-            ("Sonnet 5", Some("sonnet"), "Balanced speed and quality."),
-            (
-                "Opus 4.8",
-                Some("opus"),
-                "Most capable; slower and higher usage.",
-            ),
-            (
-                "Fable 5",
-                Some("claude-fable-5"),
-                "Most intelligent generally available Claude model.",
-            ),
-        ];
-        for (name, model, description) in rows {
-            let model_for_action = model.map(str::to_string);
-            items.push(SelectionItem {
-                name: name.to_string(),
-                description: Some(description.to_string()),
-                is_current: claude_active && self.claude_model.as_deref() == model,
-                actions: vec![Box::new(move |tx| {
-                    tx.send(AppEvent::SelectClaudeCodeModel(model_for_action.clone()));
-                })],
-                dismiss_on_select: true,
-                ..Default::default()
-            });
-        }
-    }
-
     fn model_provider_route(&self) -> crate::branding::ProviderRoute {
         crate::branding::ProviderRoute::for_provider(
             &self.config.model_provider_id,
@@ -183,9 +136,6 @@ impl ChatWidget {
             crate::style::status_symbol_style(),
         )));
         header.push(Line::from(
-            format!("Active runtime: {}", self.active_runtime.display_name()).bold(),
-        ));
-        header.push(Line::from(
             format!("Codex model: {}", self.current_model()).bold(),
         ));
         header.push(Line::from(subtitle.to_string().dim()));
@@ -248,7 +198,6 @@ impl ChatWidget {
         }
 
         auto_presets.sort_by_key(|preset| Self::auto_model_order(&preset.model));
-        let codex_is_active = self.active_runtime == ActiveRuntime::Codex;
         let mut items: Vec<SelectionItem> = auto_presets
             .into_iter()
             .map(|preset| {
@@ -282,7 +231,7 @@ impl ChatWidget {
                 SelectionItem {
                     name: model.clone(),
                     description,
-                    is_current: codex_is_active && model.as_str() == current_model,
+                    is_current: model.as_str() == current_model,
                     is_default: preset.is_default,
                     actions,
                     dismiss_on_select: !requires_advanced_selection,
@@ -300,7 +249,7 @@ impl ChatWidget {
                 });
             })];
 
-            let is_current = codex_is_active && !items.iter().any(|item| item.is_current);
+            let is_current = !items.iter().any(|item| item.is_current);
             let description = Some(format!(
                 "Browse this provider's full catalog (current: {current_label})"
             ));
@@ -316,7 +265,6 @@ impl ChatWidget {
         }
 
         items.insert(0, self.model_provider_group_item());
-        self.append_claude_code_group(&mut items);
 
         let header = self.model_menu_header(
             "Choose a mind",
@@ -344,11 +292,10 @@ impl ChatWidget {
     }
 
     pub(crate) fn open_all_models_popup(&mut self, presets: Vec<ModelPreset>) {
-        let codex_is_active = self.active_runtime == ActiveRuntime::Codex;
         let mut items: Vec<SelectionItem> = vec![self.model_provider_group_item()];
         for preset in presets.into_iter() {
             let description = Some(self.model_route_description(&preset.description));
-            let is_current = codex_is_active && preset.model.as_str() == self.current_model();
+            let is_current = preset.model.as_str() == self.current_model();
             let single_supported_effort = preset.supported_reasoning_efforts.len() == 1;
             let preset_for_action = preset.clone();
             let actions: Vec<SelectionAction> = vec![Box::new(move |tx| {
@@ -375,7 +322,6 @@ impl ChatWidget {
                 ..Default::default()
             });
         }
-        self.append_claude_code_group(&mut items);
 
         let header = self.model_menu_header(
             "Choose a mind and effort",
@@ -400,9 +346,6 @@ impl ChatWidget {
             .and_then(|effort| self.ultra_reasoning_concurrency_warning(effort));
         vec![Box::new(move |tx| {
             if effort_for_action == Some(ReasoningEffortConfig::Ultra) {
-                tx.send(AppEvent::SwitchActiveRuntime(
-                    crate::app_event::RuntimeSelection::Codex,
-                ));
                 tx.send(AppEvent::ApplyAdvancedReasoning {
                     model: model_for_action.clone(),
                     effort: ReasoningEffortConfig::Ultra,
@@ -413,9 +356,6 @@ impl ChatWidget {
                     effort: effort_for_action.clone(),
                 });
             } else {
-                tx.send(AppEvent::SwitchActiveRuntime(
-                    crate::app_event::RuntimeSelection::Codex,
-                ));
                 tx.send(AppEvent::UpdateModel(model_for_action.clone()));
                 tx.send(AppEvent::UpdateReasoningEffort(effort_for_action.clone()));
                 tx.send(AppEvent::PersistModelSelection {
@@ -503,9 +443,6 @@ impl ChatWidget {
             let effort = effort.clone();
             let warning = warning.clone();
             move |tx| {
-                tx.send(AppEvent::SwitchActiveRuntime(
-                    crate::app_event::RuntimeSelection::Codex,
-                ));
                 tx.send(AppEvent::UpdateModel(model.clone()));
                 tx.send(AppEvent::UpdatePlanModeReasoningEffort(effort.clone()));
                 tx.send(AppEvent::PersistPlanModeReasoningEffort(effort.clone()));
@@ -517,9 +454,6 @@ impl ChatWidget {
             }
         })];
         let all_modes_actions: Vec<SelectionAction> = vec![Box::new(move |tx| {
-            tx.send(AppEvent::SwitchActiveRuntime(
-                crate::app_event::RuntimeSelection::Codex,
-            ));
             tx.send(AppEvent::UpdateModel(model.clone()));
             tx.send(AppEvent::UpdateReasoningEffort(effort.clone()));
             tx.send(AppEvent::UpdatePlanModeReasoningEffort(effort.clone()));
@@ -862,9 +796,6 @@ impl ChatWidget {
         let warning = effort
             .as_ref()
             .and_then(|effort| self.ultra_reasoning_concurrency_warning(effort));
-        self.app_event_tx.send(AppEvent::SwitchActiveRuntime(
-            crate::app_event::RuntimeSelection::Codex,
-        ));
         self.app_event_tx.send(AppEvent::UpdateModel(model));
         self.app_event_tx
             .send(AppEvent::UpdateReasoningEffort(effort));
