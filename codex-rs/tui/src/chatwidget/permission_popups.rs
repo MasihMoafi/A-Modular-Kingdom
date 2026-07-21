@@ -360,14 +360,14 @@ impl ChatWidget {
         apply_actions()
     }
 
-
     pub(crate) fn cycle_approval_preset(&mut self) {
         if self.config.explicit_permission_profile_mode {
             return;
         }
 
         let include_read_only = cfg!(target_os = "windows");
-        let current_approval = AskForApproval::from(self.config.permissions.approval_policy.value());
+        let current_approval =
+            AskForApproval::from(self.config.permissions.approval_policy.value());
         let current_permission_profile = self.config.permissions.permission_profile().clone();
         let guardian_approval_enabled = self.config.features.enabled(Feature::GuardianApproval);
         let current_review_policy = self.config.approvals_reviewer;
@@ -395,12 +395,25 @@ impl ChatWidget {
                 preset.label.to_string()
             };
 
-            let approval_disabled_reason = self.config.permissions.approval_policy.can_set(&preset.approval).err();
+            let approval_disabled_reason = self
+                .config
+                .permissions
+                .approval_policy
+                .can_set(&preset.approval)
+                .err();
 
             if approval_disabled_reason.is_none() {
-                available_presets.push((preset.clone(), base_name.clone(), ApprovalsReviewer::User));
+                available_presets.push((
+                    preset.clone(),
+                    base_name.clone(),
+                    ApprovalsReviewer::User,
+                ));
                 if preset.id == "auto" && guardian_approval_enabled {
-                    available_presets.push((preset.clone(), APPROVE_FOR_ME_LABEL.to_string(), ApprovalsReviewer::AutoReview));
+                    available_presets.push((
+                        preset.clone(),
+                        APPROVE_FOR_ME_LABEL.to_string(),
+                        ApprovalsReviewer::AutoReview,
+                    ));
                 }
             }
         }
@@ -409,9 +422,18 @@ impl ChatWidget {
             return;
         }
 
-        let current_index = available_presets.iter().position(|(preset, _, reviewer)| {
-            *reviewer == current_review_policy && Self::preset_matches_current(current_approval, &current_permission_profile, self.config.cwd.as_path(), preset)
-        }).unwrap_or(0);
+        let current_index = available_presets
+            .iter()
+            .position(|(preset, _, reviewer)| {
+                *reviewer == current_review_policy
+                    && Self::preset_matches_current(
+                        current_approval,
+                        &current_permission_profile,
+                        self.config.cwd.as_path(),
+                        preset,
+                    )
+            })
+            .unwrap_or(0);
 
         let next_index = (current_index + 1) % available_presets.len();
         let (next_preset, next_label, next_reviewer) = available_presets[next_index].clone();

@@ -15,7 +15,6 @@ expression: sanitized
 │  Model:                  gpt-5.1-codex-max │
 │  Directory: [[workspace]]                  │
 │  Permissions:            Custom (workspace │
-│  Agents.md:              <none>            │
 │                                            │
 │  Token usage:            1.2K total  (800  │
 │  Context window:         100% left (1.2K u │

@@ -273,8 +273,7 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   code-level token/cost harness to bound runaway loops.
 - Messaging adapters (Telegram/Discord) using OpenClaw/Pi connection patterns, so Elpis can
   run as a daemon connected to channels.
-- A `/elpis` poetry easter egg: a cyan-themed display of stylized lyrics or poems
-  (implementation in flight on `agent/rag-ux-easter-egg`, PR #54).
+- ~~A `/elpis` poetry easter egg~~ — removed 2026-07-21 (Masih: "not what I ordered").
 - Claude Code UX parity, phase 2: managing running agents from the keyboard (Claude
   Code's left-arrow agent panel), mid-turn message queuing, mobile remote control of a
   session, and opt-in telemetry. Large, multi-slice work; explicitly not v0.1/v0.2.

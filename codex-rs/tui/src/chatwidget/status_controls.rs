@@ -220,8 +220,6 @@ impl ChatWidget {
             .values()
             .cloned()
             .collect();
-        let agents_summary =
-            crate::status::compose_agents_summary(&self.config, &self.instruction_source_paths);
         let instruction_paths = self.instruction_source_paths_as_path_bufs();
         let (cell, handle) = crate::status::new_status_output_with_rate_limits_handle(
             &self.config,
@@ -239,7 +237,6 @@ impl ChatWidget {
             self.model_display_name(),
             collaboration_mode,
             reasoning_effort_override,
-            agents_summary,
             &instruction_paths,
             refreshing_rate_limits,
             crate::legacy_core::context_cleaner::eviction_count(),

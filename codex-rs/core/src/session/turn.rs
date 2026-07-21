@@ -1976,13 +1976,17 @@ async fn stream_with_openrouter_fallback(
         Err(err) => err,
     };
 
-    let candidates =
-        codex_model_provider_info::openrouter_free_fallback_candidates(&turn_context.model_info.slug);
+    let candidates = codex_model_provider_info::openrouter_free_fallback_candidates(
+        &turn_context.model_info.slug,
+    );
     for candidate_slug in candidates {
         let model_info = sess
             .services
             .models_manager
-            .get_model_info(candidate_slug, &turn_context.config.to_models_manager_config())
+            .get_model_info(
+                candidate_slug,
+                &turn_context.config.to_models_manager_config(),
+            )
             .await;
         warn!(
             failed_model = %turn_context.model_info.slug,

@@ -36,7 +36,6 @@ const SIDE_SLASH_COMMAND_UNAVAILABLE_HINT: &str =
     "Press Ctrl+C to return to the main thread first.";
 const GOAL_USAGE_HINT: &str = "Example: /goal improve benchmark coverage";
 const RAG_USAGE: &str = "Usage: /rag <query> or /rag <path> -- <query>";
-const ELPIS_POEM: &str = "Elpis\n\nA cyan thread through changing minds—\nwhat matters stays,\nand hope keeps the way home.";
 
 fn rag_request(doc_path: &str, query: &str) -> String {
     format!(
@@ -62,7 +61,6 @@ fn clean_dropped_path(raw: &str) -> String {
     without_scheme.replace("\\ ", " ")
 }
 const RAW_USAGE: &str = "Usage: /raw [on|off]";
-const USAGE_CHATGPT_LOGIN_REQUIRED: &str = "Sign in with ChatGPT to use /usage.";
 
 impl ChatWidget {
     /// Dispatch a bare slash command and record its staged local-history entry.
@@ -453,7 +451,6 @@ impl ChatWidget {
             SlashCommand::Rag => {
                 self.add_error_message(RAG_USAGE.to_string());
             }
-            SlashCommand::Elpis => self.add_info_message(ELPIS_POEM.to_string(), None),
             SlashCommand::Import => {
                 self.app_event_tx
                     .send(AppEvent::OpenExternalAgentConfigMigration);
@@ -477,8 +474,18 @@ impl ChatWidget {
                 }
             }
             SlashCommand::Usage => {
-                if self.ensure_usage_command_available() {
-                    self.open_usage_menu();
+                if self.should_prefetch_rate_limits() {
+                    let request_id = self.next_status_refresh_request_id;
+                    self.next_status_refresh_request_id =
+                        self.next_status_refresh_request_id.wrapping_add(1);
+                    self.add_status_output(/*refreshing_rate_limits*/ true, Some(request_id));
+                    self.app_event_tx.send(AppEvent::RefreshRateLimits {
+                        origin: RateLimitRefreshOrigin::StatusCommand { request_id },
+                    });
+                } else {
+                    self.add_status_output(
+                        /*refreshing_rate_limits*/ false, /*request_id*/ None,
+                    );
                 }
             }
             SlashCommand::Ide => {
@@ -684,14 +691,9 @@ impl ChatWidget {
                 }
             }
             SlashCommand::Usage => {
-                if self.ensure_usage_command_available() {
-                    match tokens::TokenActivityView::parse(trimmed) {
-                        Some(view) => self.add_token_activity_output(view),
-                        None => self.add_error_message(
-                            "Usage: /usage [daily|weekly|cumulative]".to_string(),
-                        ),
-                    }
-                }
+                self.add_status_output(
+                    /*refreshing_rate_limits*/ false, /*request_id*/ None,
+                );
             }
             SlashCommand::Ide => {
                 self.handle_ide_command_args(trimmed);
@@ -736,13 +738,6 @@ impl ChatWidget {
                     ),
                 };
                 self.submit_user_message(UserMessage::from(request));
-            }
-            SlashCommand::Elpis => {
-                if trimmed.is_empty() {
-                    self.add_info_message(ELPIS_POEM.to_string(), None);
-                } else {
-                    self.add_error_message("Usage: /elpis".to_string());
-                }
             }
             SlashCommand::Raw => match trimmed.to_ascii_lowercase().as_str() {
                 "on" => {
@@ -1101,14 +1096,6 @@ impl ChatWidget {
         }
     }
 
-    fn ensure_usage_command_available(&mut self) -> bool {
-        if self.has_codex_backend_auth {
-            return true;
-        }
-        self.add_error_message(USAGE_CHATGPT_LOGIN_REQUIRED.to_string());
-        false
-    }
-
     fn queued_command_drain_result(&self, cmd: SlashCommand) -> QueueDrain {
         if self.is_user_turn_pending_or_running() || !self.bottom_pane.no_modal_or_popup_active() {
             return QueueDrain::Stop;
@@ -1120,7 +1107,6 @@ impl ChatWidget {
             | SlashCommand::DebugConfig
             | SlashCommand::Ps
             | SlashCommand::Stop
-            | SlashCommand::Elpis
             | SlashCommand::Mcp
             | SlashCommand::Apps
             | SlashCommand::Plugins

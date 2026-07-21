@@ -1224,5 +1224,8 @@ async fn test_cycle_approval_preset() {
 
     // Expect approval policy to have changed.
     let current_approval = chat.config_ref().permissions.approval_policy.value();
-    assert_ne!(initial_approval, current_approval, "Shift+Tab should cycle permission preset");
+    assert_ne!(
+        initial_approval, current_approval,
+        "Shift+Tab should cycle permission preset"
+    );
 }
