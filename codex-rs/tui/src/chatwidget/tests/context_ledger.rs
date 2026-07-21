@@ -39,7 +39,7 @@ fn configure_ledger_sources(
     chat.config.memories.root = Some(memories.clone().abs());
     chat.config.cwd = cwd.clone().abs();
     // The ledger reads instruction rows from the server-reported list, exactly as
-    // /status does. Mirror a real session by reporting the same files created above.
+    // /usage does. Mirror a real session by reporting the same files created above.
     chat.instruction_source_paths = vec![
         codex_utils_path_uri::PathUri::from_abs_path(&root.join(".codex/AGENTS.md").abs()),
         codex_utils_path_uri::PathUri::from_abs_path(&cwd.join("AGENTS.md").abs()),

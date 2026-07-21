@@ -49,7 +49,7 @@ subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned he
 - One internal, read-only RAG service: `/rag <query>`, `/rag <path> -- <query>`, and
   autonomous retrieval.
 - Portable `GOAL.md` + `ES.md` continuity; exact resume or lean continuation.
-- The Context Ledger with per-file rows and toggles; `/status` reporting every admitted
+- The Context Ledger with per-file rows and toggles; `/usage` reporting every admitted
   source with size, lifetime, and reason.
 - Bounded local memory with recall tracking, promotion, provenance, and a
   fail-closed archive.
@@ -83,7 +83,7 @@ flowchart LR
 
 ### Context management
 
-Elpis admits rules, the current request, portable state, and relevant memory into a small working set. The Context Ledger and `/status` expose why each source is present while full artifacts stay on disk.
+Elpis admits rules, the current request, portable state, and relevant memory into a small working set. The Context Ledger and `/usage` expose why each source is present while full artifacts stay on disk.
 
 The working context is not the transcript. Full conversations, terminal events, and artifacts
 remain available as evidence, but are retrieved only when a later task needs them — by exact
@@ -97,7 +97,7 @@ flowchart LR
     goal["GOAL.md ≤ 6,000 chars"] --> working
     checkpoint["ES.md ≤ 8,000 chars"] --> working
     memory["Relevant memory"] --> working
-    status["Context Ledger + /status"] -.-> working
+    status["Context Ledger + /usage"] -.-> working
     working --> runtime["Selected runtime request"]
     runtime --> results["Tool and function results"]
     results --> disk[("Full transcript + artifacts on disk")]

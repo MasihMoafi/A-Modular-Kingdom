@@ -30,22 +30,22 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   changed paths, command outcomes, and exact provider-transcript pointer.
 - Fresh threads admit the portable goal/checkpoint; exact resume retains the native thread.
 - Elpis syncs portable continuity before compaction and stops when that safety write fails.
-- `/status` reports admitted rules, goal, checkpoint, and memory summary with size, lifetime,
+- `/usage` reports admitted rules, goal, checkpoint, and memory summary with size, lifetime,
   and reason.
 - Remote verification: the focused continuity tests and Linux build passed in run
   `29534784054`.
 - Remaining acceptance: resume one real task exactly and one leanly without replaying
-  irrelevant work; verify `/status` against the actual next model request.
+  irrelevant work; verify `/usage` against the actual next model request.
 - The tool-output cleaner is lifecycle-aware (`core/src/context_cleaner.rs`): older outputs
   over 1,200 characters are reduced to bounded head/tail excerpts with a durable
   `rollout://tool-call/<id>` evidence pointer, the two newest outputs stay intact, evictions
-  surface in `/status`, and focused tests cover the behavior.
+  surface in `/usage`, and focused tests cover the behavior.
 - Remaining cleaner gap: the retained excerpt is positional (head/tail), not a semantic
   conclusion of the output.
 - Cleaner visibility gap (Masih, 2026-07-19: "I have not yet seen it work"): the cleaner
   is wired into the live request path (`client.rs` calls `clean_transient_tool_outputs`),
   but nothing in the TUI ever demonstrates it. Acceptance: a session with a long tool
-  output must show the eviction in `/status` and the user must be able to see the receipt
+  output must show the eviction in `/usage` and the user must be able to see the receipt
   replacing the raw output. Until a user can watch it happen, it does not count as done.
   Masih's concrete ask: a per-turn "context saved" metric — how many bytes/tokens the
   cleaner removed from the next request — visible as a number and bar in the header,
@@ -108,7 +108,7 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   `/model` naming (commit `bae7108`).
 - Not yet implemented: the signature continuity event (only a generic eviction notice
   exists, now naming what survived — commit `de4ed6f`, `"Survived: goal, checkpoint, and
-  admitted rules (see /status)."` — but not distinguishing resume/compaction/provider-change
+  admitted rules (see /usage)."` — but not distinguishing resume/compaction/provider-change
   events), the evidence-first completion hierarchy, and a render-verified
   context-accounting consistency check. GUIDE.md's UI Identity section is a contract, not
   proof.
@@ -317,7 +317,7 @@ branches remain, then Masih's live test of 1–6 is the only thing left before t
    uncovered turn-lifetime tool output crosses 10% of the active context window; a
    `gpt-5.6-terra` pass (same model/effort as the existing memory-consolidation stage 2)
    classifies each covered item as a dead end (dropped, no trace) or a finding (kept as
-   one evidence-pointer line). `/status` shows combined Layer 1 + Layer 2 savings: chars,
+   one evidence-pointer line). `/usage` shows combined Layer 1 + Layer 2 savings: chars,
    % of context window, pass counts. Any failure in the pass (model error, timeout,
    unparseable reply) is swallowed — Layer 1's deterministic receipts remain the fallback,
    nothing about a turn is ever blocked or delayed by it.

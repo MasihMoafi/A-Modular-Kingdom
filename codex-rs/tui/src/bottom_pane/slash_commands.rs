@@ -299,7 +299,7 @@ mod tests {
                 SlashCommand::Ide,
                 SlashCommand::Copy,
                 SlashCommand::Diff,
-                SlashCommand::Status,
+                SlashCommand::Usage,
             ]
         );
     }

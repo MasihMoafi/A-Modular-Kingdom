@@ -889,7 +889,7 @@ impl App {
                             );
                             tui.frame_requester().schedule_frame();
                         }
-                        RateLimitRefreshOrigin::StatusCommand { request_id } => {
+                        RateLimitRefreshOrigin::UsageCommand { request_id } => {
                             self.chat_widget
                                 .finish_status_rate_limit_refresh(request_id, snapshots);
                         }
@@ -934,7 +934,7 @@ impl App {
                                 Err(err),
                             );
                         }
-                        RateLimitRefreshOrigin::StatusCommand { request_id } => {
+                        RateLimitRefreshOrigin::UsageCommand { request_id } => {
                             self.chat_widget
                                 .finish_status_rate_limit_refresh(request_id, Vec::new());
                         }

@@ -2,7 +2,7 @@
 source: tui/src/status/tests.rs
 expression: sanitized
 ---
-/status
+/usage
 
 ╭──────────────────────────────────────────────────────────────────────────╮
 │  >_ OpenAI Codex (v0.0.0)                                                │

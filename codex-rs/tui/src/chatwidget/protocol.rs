@@ -332,7 +332,7 @@ impl ChatWidget {
                 } else {
                     self.add_warning_message(format!(
                         "Elpis evicted context: {}. Evidence: {}. Eviction count: {}. \
-                         Survived: goal, checkpoint, and admitted rules (see /status).",
+                         Survived: goal, checkpoint, and admitted rules (see /usage).",
                         notice.reason, notice.evidence, notice.count
                     ));
                 }

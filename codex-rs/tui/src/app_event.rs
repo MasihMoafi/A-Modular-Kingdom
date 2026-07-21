@@ -116,7 +116,7 @@ pub(crate) struct PluginRemoteSectionError {
 ///
 /// A `StartupPrefetch` fires once, concurrently with the rest of TUI init, and
 /// updates the cached snapshots and any available reset-credit notice (no
-/// status card to finalize). A `StatusCommand` is tied to a specific `/status`
+/// status card to finalize). A `UsageCommand` is tied to a specific `/usage`
 /// invocation and must call `finish_status_rate_limit_refresh` when done so the
 /// card stops showing a "refreshing" state. A `UsageMenu` refreshes a cached
 /// zero reset count so the disabled menu entry can become available without a
@@ -124,11 +124,11 @@ pub(crate) struct PluginRemoteSectionError {
 /// rows before showing redemption choices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RateLimitRefreshOrigin {
-    /// Eagerly fetched after bootstrap for `/status` data and reset availability.
+    /// Eagerly fetched after bootstrap for `/usage` data and reset availability.
     StartupPrefetch { reset_hint_request_id: u64 },
-    /// User-initiated via `/status`; the `request_id` correlates with the
+    /// User-initiated via `/usage`; the `request_id` correlates with the
     /// status card that should be updated when the fetch completes.
-    StatusCommand { request_id: u64 },
+    UsageCommand { request_id: u64 },
     /// User reopened `/usage` while the cached reset-credit count was zero.
     UsageMenu { request_id: u64 },
     /// User opened the reset-credit picker.

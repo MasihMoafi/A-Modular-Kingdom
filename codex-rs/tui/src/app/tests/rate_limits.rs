@@ -184,7 +184,7 @@ async fn stale_rate_limit_reads_preserve_newer_workspace_hard_stop_for_every_ori
                 let request_id = 7;
                 app.chat_widget
                     .add_status_output(/*refreshing_rate_limits*/ true, Some(request_id));
-                RateLimitRefreshOrigin::StatusCommand { request_id }
+                RateLimitRefreshOrigin::UsageCommand { request_id }
             }
             "usage" => {
                 let startup_request_id = app.chat_widget.start_rate_limit_reset_startup_check();
@@ -312,7 +312,7 @@ async fn stale_rate_limit_read_does_not_dismiss_visible_workspace_advisory() -> 
         &mut tui,
         &mut app_server,
         AppEvent::RateLimitsLoaded {
-            origin: RateLimitRefreshOrigin::StatusCommand { request_id },
+            origin: RateLimitRefreshOrigin::UsageCommand { request_id },
             hard_stop_generation: read_generation,
             result: Ok(account_rate_limits_response(rate_limit_snapshot(
                 /*used_percent*/ 0,
@@ -358,7 +358,7 @@ async fn post_hard_stop_rate_limit_read_clears_recovered_workspace_limit() -> Re
         &mut tui,
         &mut app_server,
         AppEvent::RateLimitsLoaded {
-            origin: RateLimitRefreshOrigin::StatusCommand { request_id },
+            origin: RateLimitRefreshOrigin::UsageCommand { request_id },
             hard_stop_generation: read_generation,
             result: Ok(account_rate_limits_response(rate_limit_snapshot(
                 /*used_percent*/ 0,

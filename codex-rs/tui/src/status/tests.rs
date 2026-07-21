@@ -746,15 +746,15 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
 
     assert!(
         rendered.contains(&format!("Amazon Bedrock - {runtime_base_url}")),
-        "expected /status to render runtime Bedrock URL, got: {rendered}"
+        "expected /usage to render runtime Bedrock URL, got: {rendered}"
     );
     assert!(
         !rendered.contains("bedrock-mantle.us-east-1"),
-        "expected /status to ignore configured Bedrock base URL, got: {rendered}"
+        "expected /usage to ignore configured Bedrock base URL, got: {rendered}"
     );
     assert!(
         !rendered.contains("https://chatgpt.com/codex/settings/usage"),
-        "expected /status to hide ChatGPT usage link for Bedrock, got: {rendered}"
+        "expected /usage to hide ChatGPT usage link for Bedrock, got: {rendered}"
     );
 
     config.model_provider_id = "openai-proxy".to_string();
@@ -791,7 +791,7 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
 
     assert!(
         rendered.contains("https://chatgpt.com/codex/settings/usage"),
-        "expected /status to show ChatGPT usage link for OpenAI-auth proxy, got: {rendered}"
+        "expected /usage to show ChatGPT usage link for OpenAI-auth proxy, got: {rendered}"
     );
 
     let wide_destinations: Vec<String> = composite

@@ -285,7 +285,7 @@ const OPENROUTER_FREE_MODEL_DISPLAY: &[(&str, u32)] = &[
 /// OpenRouter's live `/models` catalog doesn't map onto Codex's `ModelInfo` schema, so
 /// these three are surfaced directly rather than fetched (see TASKS.md's "full OpenRouter
 /// catalog" backlog item for the eventual live-catalog replacement).
-fn openrouter_free_model_catalog() -> ModelsResponse {
+pub fn openrouter_free_model_catalog() -> ModelsResponse {
     debug_assert_eq!(
         OPENROUTER_FREE_MODEL_GROUP.len(),
         OPENROUTER_FREE_MODEL_DISPLAY.len(),

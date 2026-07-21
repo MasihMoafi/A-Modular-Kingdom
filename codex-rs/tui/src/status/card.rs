@@ -235,7 +235,7 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
     context_pruner_passes: usize,
     context_pruner_saved_chars: usize,
 ) -> (CompositeHistoryCell, StatusHistoryHandle) {
-    let command = PlainHistoryCell::new(vec!["/status".magenta().into()]);
+    let command = PlainHistoryCell::new(vec!["/usage".magenta().into()]);
     let (card, handle) = StatusHistoryCell::new(
         config,
         runtime_model_provider_base_url,
@@ -496,7 +496,7 @@ impl StatusHistoryCell {
                 lines.push(formatter.line(
                     "Warning",
                     vec![Span::from(if state.refreshing_rate_limits {
-                        "limits may be stale - run /status again shortly."
+                        "limits may be stale - run /usage again shortly."
                     } else {
                         "limits may be stale - start new turn to refresh."
                     })
@@ -514,7 +514,7 @@ impl StatusHistoryCell {
                 vec![formatter.line(
                     "Limits",
                     vec![Span::from(if state.refreshing_rate_limits {
-                        "refresh requested; run /status again shortly."
+                        "refresh requested; run /usage again shortly."
                     } else {
                         "data not available yet"
                     })

@@ -71,7 +71,7 @@ impl App {
     ///
     /// The `origin` is forwarded to the completion handler so it can distinguish
     /// a startup prefetch (which updates cached snapshots and may surface a
-    /// reset-credit notice) from a `/status`-triggered refresh (which must
+    /// reset-credit notice) from a `/usage`-triggered refresh (which must
     /// finalize the corresponding status card).
     pub(super) fn refresh_rate_limits(
         &mut self,
@@ -92,7 +92,7 @@ impl App {
                         .and_then(|result| result.map_err(|err| err.to_string()))
                 }
                 RateLimitRefreshOrigin::StartupPrefetch { .. }
-                | RateLimitRefreshOrigin::StatusCommand { .. }
+                | RateLimitRefreshOrigin::UsageCommand { .. }
                 | RateLimitRefreshOrigin::UsageMenu { .. } => {
                     request.await.map_err(|err| err.to_string())
                 }

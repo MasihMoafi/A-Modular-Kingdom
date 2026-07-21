@@ -642,14 +642,14 @@ identity, admitted context, durable memory, continuity, permissions, and evidenc
 - The provider-aware **Choose a mind** naming for `/model`
   (`codex-rs/tui/src/chatwidget/model_popups.rs`, commit `bae7108`), surfacing
   provider, protocol, route, and credential labels.
-- `/status` context-source reporting.
+- `/usage` context-source reporting.
 
 ### Not yet implemented
 
 - A signature **continuity event** for resume, compaction, and provider switches. The
   only implemented notice is a context-eviction message that now also names what
   persisted (`"Elpis evicted context: {reason}. Evidence: {evidence}. Eviction count:
-  {count}. Survived: goal, checkpoint, and admitted rules (see /status)."`,
+  {count}. Survived: goal, checkpoint, and admitted rules (see /usage)."`,
   `codex-rs/tui/src/chatwidget/protocol.rs`, commit `de4ed6f`); it still does not
   distinguish resume, compaction, or provider-change events from each other.
 - An **evidence-first completion hierarchy** that visually separates a generated

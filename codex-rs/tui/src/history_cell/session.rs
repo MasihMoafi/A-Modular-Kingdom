@@ -145,7 +145,7 @@ pub(crate) fn new_session_info(
             ]),
             Line::from(vec![
                 "  ".into(),
-                "/status".into(),
+                "/usage".into(),
                 " - show current session configuration".dim(),
             ]),
             Line::from(vec![
