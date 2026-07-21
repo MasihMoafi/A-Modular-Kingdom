@@ -4,6 +4,7 @@
 //! into another, especially while Plan mode is active.
 
 use super::*;
+use codex_model_provider_info::OPENROUTER_BASE_URL;
 use ratatui::text::Span;
 
 const ULTRA_REASONING_CONCURRENCY_WARNING_THRESHOLD: usize = 8;
@@ -52,6 +53,53 @@ impl ChatWidget {
             name: self.model_provider_display_name().to_uppercase(),
             is_disabled: true,
             ..Default::default()
+        }
+    }
+
+    /// Whether the currently active provider is already OpenRouter -- if so, its free
+    /// models are already listed under the normal provider group above, and appending
+    /// a second OPENROUTER group would just duplicate them.
+    fn is_openrouter_active(&self) -> bool {
+        self.config.model_provider.base_url.as_deref() == Some(OPENROUTER_BASE_URL)
+    }
+
+    /// Appends an always-visible "OPENROUTER" group and its free models below whatever
+    /// the active provider's models are, mirroring how OPENAI's models are grouped.
+    /// Selecting one while a different provider is active can't take effect immediately --
+    /// provider selection is a launch-time choice (`--provider`), and switching providers
+    /// mid-session isn't wired at the protocol layer -- so the action tells the user how to
+    /// actually use it instead of silently no-op'ing.
+    fn push_openrouter_free_model_group(&self, items: &mut Vec<SelectionItem>) {
+        if self.is_openrouter_active() {
+            return;
+        }
+        items.push(SelectionItem {
+            name: "OPENROUTER".to_string(),
+            is_disabled: true,
+            ..Default::default()
+        });
+        for preset in codex_model_provider::openrouter_free_model_catalog().models {
+            let preset: ModelPreset = preset.into();
+            let model = preset.model.clone();
+            items.push(SelectionItem {
+                name: model.clone(),
+                description: Some(format!(
+                    "{} · restart with `elpis --provider openrouter` to use it",
+                    preset.description
+                )),
+                actions: vec![Box::new(move |tx| {
+                    tx.send(AppEvent::InsertHistoryCell(Box::new(
+                        history_cell::new_info_event(
+                            format!(
+                                "'{model}' is served via OpenRouter. Restart Elpis with `--provider openrouter` to use it."
+                            ),
+                            /*hint*/ None,
+                        ),
+                    )));
+                })],
+                dismiss_on_select: true,
+                ..Default::default()
+            });
         }
     }
 
@@ -264,6 +312,7 @@ impl ChatWidget {
             });
         }
 
+        self.push_openrouter_free_model_group(&mut items);
         items.insert(0, self.model_provider_group_item());
 
         let header = self.model_menu_header(
@@ -322,6 +371,7 @@ impl ChatWidget {
                 ..Default::default()
             });
         }
+        self.push_openrouter_free_model_group(&mut items);
 
         let header = self.model_menu_header(
             "Choose a mind and effort",
