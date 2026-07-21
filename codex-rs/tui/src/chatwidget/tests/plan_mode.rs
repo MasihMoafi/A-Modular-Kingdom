@@ -1345,8 +1345,6 @@ async fn enter_submits_when_plan_stream_is_not_active() {
     }
 }
 
-
-
 #[tokio::test]
 async fn mode_switch_surfaces_model_change_notification_when_effective_model_changes() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5")).await;

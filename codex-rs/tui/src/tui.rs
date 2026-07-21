@@ -319,7 +319,7 @@ pub fn restore_keep_raw() -> Result<()> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RestoreMode {
-    Full, // Fully restore the terminal (disables raw mode).
+    Full,    // Fully restore the terminal (disables raw mode).
     KeepRaw, // Restore the terminal but keep raw mode enabled.
 }
 

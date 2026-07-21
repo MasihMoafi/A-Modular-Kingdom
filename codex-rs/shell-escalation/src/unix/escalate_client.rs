@@ -24,7 +24,9 @@ static ESCALATE_CLIENT_CALLED: AtomicBool = AtomicBool::new(false);
 
 fn get_escalate_client() -> anyhow::Result<AsyncDatagramSocket> {
     if ESCALATE_CLIENT_CALLED.swap(true, Ordering::Relaxed) {
-        return Err(anyhow::anyhow!("get_escalate_client can only be called once"));
+        return Err(anyhow::anyhow!(
+            "get_escalate_client can only be called once"
+        ));
     }
 
     let client_fd = std::env::var(ESCALATE_SOCKET_ENV_VAR)?.parse::<i32>()?;
@@ -99,8 +101,7 @@ pub async fn run_shell_escalation_execve_wrapper(
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
             let mut sigterm =
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-            let mut sigquit =
-                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::quit())?;
+            let mut sigquit = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::quit())?;
             let mut sighup =
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())?;
 

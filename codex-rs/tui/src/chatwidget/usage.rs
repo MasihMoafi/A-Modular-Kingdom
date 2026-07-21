@@ -456,7 +456,7 @@ impl ChatWidget {
         }
         self.pending_rate_limit_reset_hint = Some(history_cell::new_info_event(
             format!(
-                "You have {available_count} {} available. Run /usage to use one.",
+                "You have {available_count} {} available.",
                 reset_label(available_count)
             ),
             /*hint*/ None,

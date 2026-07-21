@@ -9,6 +9,7 @@ use crate::build_skill_injections;
 use crate::client::ModelClientSession;
 use crate::client_common::Prompt;
 use crate::client_common::ResponseEvent;
+use crate::client_common::ResponseStream;
 use crate::collect_explicit_skill_mentions;
 use crate::compact::InitialContextInjection;
 use crate::compact::run_inline_auto_compact_task;
@@ -94,6 +95,7 @@ use codex_protocol::models::ContentItem;
 use codex_protocol::models::MessagePhase;
 use codex_protocol::models::ResponseInputItem;
 use codex_protocol::models::ResponseItem;
+use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::protocol::AgentMessageContentDeltaEvent;
 use codex_protocol::protocol::AgentReasoningSectionBreakEvent;
 use codex_protocol::protocol::CodexErrorInfo;
@@ -107,6 +109,7 @@ use codex_protocol::protocol::SafetyBufferingEvent;
 use codex_protocol::protocol::TurnDiffEvent;
 use codex_protocol::protocol::WarningEvent;
 use codex_protocol::user_input::UserInput;
+use codex_rollout_trace::InferenceTraceContext;
 use codex_tools::ToolName;
 use codex_tools::filter_request_plugin_install_discoverable_tools_for_client;
 use codex_utils_stream_parser::AssistantTextChunk;
@@ -1936,6 +1939,83 @@ fn assign_missing_streamed_response_item_id(
     Session::assign_missing_response_item_id(item);
 }
 
+/// Establishes the turn's model stream, retrying against the rest of the OpenRouter free
+/// fallback group (`codex_model_provider_info::OPENROUTER_FREE_MODEL_GROUP`) if the
+/// primary model's request fails for any reason. Every attempt reuses the exact same
+/// `prompt` value passed in by the caller -- no re-composition happens between attempts,
+/// so there is no context drift;
+/// only the target model's `ModelInfo` changes. A no-op (single attempt, primary model
+/// only) for every model outside that fallback group.
+#[allow(clippy::too_many_arguments)]
+async fn stream_with_openrouter_fallback(
+    sess: &Arc<Session>,
+    turn_context: &Arc<TurnContext>,
+    client_session: &mut ModelClientSession,
+    prompt: &Prompt,
+    responses_metadata: &CodexResponsesMetadata,
+    inference_trace: &InferenceTraceContext,
+    cancellation_token: &CancellationToken,
+) -> CodexResult<ResponseStream> {
+    let primary_result = client_session
+        .stream(
+            prompt,
+            &turn_context.model_info,
+            &turn_context.session_telemetry,
+            turn_context.reasoning_effort.clone(),
+            turn_context.reasoning_summary,
+            turn_context.config.service_tier.clone(),
+            responses_metadata,
+            inference_trace,
+        )
+        .instrument(trace_span!("stream_request"))
+        .or_cancel(cancellation_token)
+        .await?;
+
+    let mut last_err = match primary_result {
+        Ok(stream) => return Ok(stream),
+        Err(err) => err,
+    };
+
+    let candidates = codex_model_provider_info::openrouter_free_fallback_candidates(
+        &turn_context.model_info.slug,
+    );
+    for candidate_slug in candidates {
+        let model_info = sess
+            .services
+            .models_manager
+            .get_model_info(
+                candidate_slug,
+                &turn_context.config.to_models_manager_config(),
+            )
+            .await;
+        warn!(
+            failed_model = %turn_context.model_info.slug,
+            retry_model = candidate_slug,
+            error = ?last_err,
+            "OpenRouter free-tier model failed; retrying with next model in the fallback group"
+        );
+        let retry_result = client_session
+            .stream(
+                prompt,
+                &model_info,
+                &turn_context.session_telemetry,
+                turn_context.reasoning_effort.clone(),
+                turn_context.reasoning_summary,
+                turn_context.config.service_tier.clone(),
+                responses_metadata,
+                inference_trace,
+            )
+            .instrument(trace_span!("stream_request_fallback"))
+            .or_cancel(cancellation_token)
+            .await?;
+        match retry_result {
+            Ok(stream) => return Ok(stream),
+            Err(err) => last_err = err,
+        }
+    }
+    Err(last_err)
+}
+
 #[allow(clippy::too_many_arguments)]
 #[instrument(level = "trace",
     skip_all,
@@ -1974,20 +2054,16 @@ async fn try_run_sampling_request(
         .features
         .enabled(Feature::ConcurrentReasoningSummaries)
         && turn_context.provider.info().is_openai();
-    let mut stream = client_session
-        .stream(
-            prompt,
-            &turn_context.model_info,
-            &turn_context.session_telemetry,
-            turn_context.reasoning_effort.clone(),
-            turn_context.reasoning_summary,
-            turn_context.config.service_tier.clone(),
-            responses_metadata,
-            &inference_trace,
-        )
-        .instrument(trace_span!("stream_request"))
-        .or_cancel(&cancellation_token)
-        .await??;
+    let mut stream = stream_with_openrouter_fallback(
+        &sess,
+        &turn_context,
+        client_session,
+        prompt,
+        responses_metadata,
+        &inference_trace,
+        &cancellation_token,
+    )
+    .await?;
     let mut in_flight: FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>> =
         FuturesOrdered::new();
     let mut needs_follow_up = false;

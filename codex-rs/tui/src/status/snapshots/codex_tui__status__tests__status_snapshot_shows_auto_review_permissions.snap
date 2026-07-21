@@ -13,7 +13,6 @@ expression: sanitized
 │  Model:            gpt-5.1-codex-max (reasoning none, summaries auto) │
 │  Directory: [[workspace]]                                             │
 │  Permissions:      Workspace (Approve for me)                         │
-│  Agents.md:        <none>                                             │
 │                                                                       │
 │  Token usage:      0 total  (0 input + 0 output)                      │
 │  Context window:   100% left (0 used / 272K)                          │

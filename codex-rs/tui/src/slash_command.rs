@@ -30,7 +30,6 @@ pub enum SlashCommand {
     Add,
     Skills,
     Rag,
-    Elpis,
     Import,
     Hooks,
     Review,
@@ -99,11 +98,10 @@ impl SlashCommand {
             SlashCommand::Mention => "mention a file",
             SlashCommand::Skills => "use skills to improve how Elpis performs specific tasks",
             SlashCommand::Rag => "search files: /rag <query> or /rag <path> -- <query>",
-            SlashCommand::Elpis => "a small cyan moment",
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Status => "inspect current context, continuity, and token usage",
-            SlashCommand::Usage => "view account usage or use a usage limit reset",
+            SlashCommand::Usage => "inspect current context, continuity, and token usage",
             SlashCommand::DebugConfig => "show config layers and requirement sources for debugging",
             SlashCommand::Title => "configure which items appear in the terminal title",
             SlashCommand::Statusline => "configure which items appear in the status line",
@@ -153,7 +151,6 @@ impl SlashCommand {
             SlashCommand::Review
                 | SlashCommand::Add
                 | SlashCommand::Rag
-                | SlashCommand::Elpis
                 | SlashCommand::Rename
                 | SlashCommand::Plan
                 | SlashCommand::Goal
@@ -161,7 +158,6 @@ impl SlashCommand {
                 | SlashCommand::Keymap
                 | SlashCommand::Mcp
                 | SlashCommand::Raw
-                | SlashCommand::Usage
                 | SlashCommand::Pets
                 | SlashCommand::Side
                 | SlashCommand::Btw
@@ -176,7 +172,6 @@ impl SlashCommand {
             self,
             SlashCommand::Copy
                 | SlashCommand::Rag
-                | SlashCommand::Elpis
                 | SlashCommand::Raw
                 | SlashCommand::Diff
                 | SlashCommand::Mention
@@ -218,7 +213,6 @@ impl SlashCommand {
             | SlashCommand::Mention
             | SlashCommand::Skills
             | SlashCommand::Rag
-            | SlashCommand::Elpis
             | SlashCommand::Hooks
             | SlashCommand::Status
             | SlashCommand::Usage
@@ -254,7 +248,6 @@ impl SlashCommand {
             | SlashCommand::Add
             | SlashCommand::Skills
             | SlashCommand::Rag
-            | SlashCommand::Elpis
             | SlashCommand::Review
             | SlashCommand::New
             | SlashCommand::Resume
@@ -262,6 +255,7 @@ impl SlashCommand {
             | SlashCommand::Compact
             | SlashCommand::Diff
             | SlashCommand::Status
+            | SlashCommand::Usage
             | SlashCommand::Mcp
             | SlashCommand::Quit
             | SlashCommand::Clear => true,
@@ -288,7 +282,6 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Mention
             | SlashCommand::Raw
-            | SlashCommand::Usage
             | SlashCommand::DebugConfig
             | SlashCommand::Title
             | SlashCommand::Statusline
@@ -376,13 +369,13 @@ mod tests {
             "settings",
             "statusline",
             "title",
-            "usage",
             "vim",
         ] {
             assert!(!visible.contains(&removed), "{removed} should be removed");
         }
         assert!(visible.contains(&"memories"));
         assert!(visible.contains(&"add"));
+        assert!(visible.contains(&"usage"));
         assert!(SlashCommand::from_str("debug-m-drop").is_err());
         assert!(SlashCommand::from_str("debug-m-update").is_err());
     }

@@ -110,7 +110,6 @@ struct StatusHistoryCell {
     model_details: Vec<String>,
     directory: PathBuf,
     permissions: String,
-    agents_summary: Arc<RwLock<String>>,
     continuity_sources: Vec<crate::legacy_core::elpis_context::ContinuitySource>,
     collaboration_mode: Option<String>,
     model_provider: Option<String>,
@@ -202,7 +201,6 @@ pub(crate) fn new_status_output_with_rate_limits(
         model_name,
         collaboration_mode,
         reasoning_effort_override,
-        "<none>".to_string(),
         /*instruction_source_paths*/ &[],
         refreshing_rate_limits,
         /*context_cleaner_evictions*/ 0,
@@ -230,7 +228,6 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
     model_name: &str,
     collaboration_mode: Option<&str>,
     reasoning_effort_override: Option<Option<ReasoningEffort>>,
-    agents_summary: String,
     instruction_source_paths: &[std::path::PathBuf],
     refreshing_rate_limits: bool,
     context_cleaner_evictions: usize,
@@ -255,7 +252,6 @@ pub(crate) fn new_status_output_with_rate_limits_handle(
         model_name,
         collaboration_mode,
         reasoning_effort_override,
-        agents_summary,
         instruction_source_paths,
         refreshing_rate_limits,
         context_cleaner_evictions,
@@ -288,7 +284,6 @@ impl StatusHistoryCell {
         model_name: &str,
         collaboration_mode: Option<&str>,
         reasoning_effort_override: Option<Option<ReasoningEffort>>,
-        agents_summary: String,
         instruction_source_paths: &[std::path::PathBuf],
         refreshing_rate_limits: bool,
         context_cleaner_evictions: usize,
@@ -380,7 +375,6 @@ impl StatusHistoryCell {
             rate_limits,
             refreshing_rate_limits,
         }));
-        let agents_summary = Arc::new(RwLock::new(agents_summary));
         let continuity_sources = crate::legacy_core::elpis_context::continuity_sources(
             config.memories.root.as_ref().map(|root| root.as_path()),
             config.cwd.as_path(),
@@ -402,7 +396,6 @@ impl StatusHistoryCell {
                 session_id,
                 forked_from,
                 token_usage,
-                agents_summary,
                 continuity_sources,
                 rate_limit_state: rate_limit_state.clone(),
                 context_cleaner_evictions,
@@ -805,7 +798,7 @@ impl HistoryCell for StatusHistoryCell {
             }
         });
 
-        let mut labels: Vec<String> = vec!["Model", "Directory", "Permissions", "Agents.md"]
+        let mut labels: Vec<String> = vec!["Model", "Directory", "Permissions"]
             .into_iter()
             .map(str::to_string)
             .collect();
@@ -816,12 +809,6 @@ impl HistoryCell for StatusHistoryCell {
             .rate_limit_state
             .read()
             .expect("status history rate-limit state poisoned");
-        #[expect(clippy::expect_used)]
-        let agents_summary = self
-            .agents_summary
-            .read()
-            .expect("status history agents summary state poisoned")
-            .clone();
 
         if self.model_provider.is_some() {
             push_label(&mut labels, &mut seen, "Model provider");
@@ -909,7 +896,6 @@ impl HistoryCell for StatusHistoryCell {
         }
         lines.push(formatter.line("Directory", vec![Span::from(directory_value)]));
         lines.push(formatter.line("Permissions", vec![Span::from(self.permissions.clone())]));
-        lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
         for source in &self.continuity_sources {
             lines.push(formatter.line(
                 source.name.clone(),

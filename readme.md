@@ -201,6 +201,17 @@ scripts/install-elpis.sh
 
 The installer verifies the checksum and installs `elpis` into `~/.local/bin` atomically.
 
+The internal RAG service (`/rag`) is a separate Python sidecar, off by default. To enable
+it:
+
+```bash
+scripts/setup-rag.sh
+```
+
+This creates the venv and writes the `mcp_servers.elpis-rag` entry in `config.toml` with
+absolute paths computed from wherever the repo actually lives on this machine — never
+hand-edit those paths, and re-run this script after moving the repo or on a fresh device.
+
 OpenAI subscription login is the default. Other routes:
 
 ```bash

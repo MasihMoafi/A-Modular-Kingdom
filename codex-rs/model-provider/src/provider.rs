@@ -12,6 +12,8 @@ use codex_login::CodexAuth;
 use codex_model_provider_info::ANTHROPIC_DEFAULT_MODEL;
 use codex_model_provider_info::GOOGLE_GEMINI_DEFAULT_MODEL;
 use codex_model_provider_info::ModelProviderInfo;
+use codex_model_provider_info::OPENROUTER_BASE_URL;
+use codex_model_provider_info::OPENROUTER_FREE_MODEL_GROUP;
 use codex_model_provider_info::WireApi;
 use codex_models_manager::manager::OpenAiModelsManager;
 use codex_models_manager::manager::SharedModelsManager;
@@ -269,7 +271,70 @@ fn native_default_model(info: &ModelProviderInfo) -> Option<&'static str> {
     }
 }
 
+/// Display metadata for `OPENROUTER_FREE_MODEL_GROUP`, in the same order. Context windows
+/// verified against each model's OpenRouter listing 2026-07-21. Kept as a parallel array
+/// (rather than folded into the shared constant) because display copy is a picker-only
+/// concern, while the slug order itself is shared with the turn-loop fallback retry.
+const OPENROUTER_FREE_MODEL_DISPLAY: &[(&str, u32)] = &[
+    ("Tencent Hy3 (free)", 262_144),
+    ("NVIDIA Nemotron 3 Ultra (free)", 1_000_000),
+    ("Poolside Laguna M.1 (free)", 262_144),
+];
+
+/// Static picker catalog for Elpis's free OpenRouter model group (Masih, 2026-07-21).
+/// OpenRouter's live `/models` catalog doesn't map onto Codex's `ModelInfo` schema, so
+/// these three are surfaced directly rather than fetched (see TASKS.md's "full OpenRouter
+/// catalog" backlog item for the eventual live-catalog replacement).
+fn openrouter_free_model_catalog() -> ModelsResponse {
+    debug_assert_eq!(
+        OPENROUTER_FREE_MODEL_GROUP.len(),
+        OPENROUTER_FREE_MODEL_DISPLAY.len(),
+        "OPENROUTER_FREE_MODEL_GROUP and its display metadata drifted out of sync"
+    );
+    let models = OPENROUTER_FREE_MODEL_GROUP
+        .iter()
+        .copied()
+        .zip(OPENROUTER_FREE_MODEL_DISPLAY.iter().copied())
+        .enumerate()
+        .map(|(priority, (slug, (display_name, context_window)))| {
+            let slug: &str = slug;
+            let display_name: &str = display_name;
+            let context_window: u32 = context_window;
+            serde_json::from_value(serde_json::json!({
+                "slug": slug,
+                "display_name": display_name,
+                "description": "Free OpenRouter model",
+                "default_reasoning_level": null,
+                "supported_reasoning_levels": [],
+                "shell_type": "shell_command",
+                "visibility": "list",
+                "supported_in_api": true,
+                "priority": priority,
+                "availability_nux": null,
+                "upgrade": null,
+                "base_instructions": "",
+                "supports_reasoning_summary_parameter": false,
+                "support_verbosity": false,
+                "default_verbosity": null,
+                "apply_patch_tool_type": null,
+                "truncation_policy": {"mode": "bytes", "limit": 10000},
+                "supports_parallel_tool_calls": true,
+                "supports_image_detail_original": false,
+                "context_window": context_window,
+                "max_context_window": context_window,
+                "experimental_supported_tools": [],
+                "input_modalities": ["text"]
+            }))
+            .expect("openrouter free-tier model metadata must remain valid")
+        })
+        .collect();
+    ModelsResponse { models }
+}
+
 fn native_model_catalog(info: &ModelProviderInfo) -> Option<ModelsResponse> {
+    if info.base_url.as_deref() == Some(OPENROUTER_BASE_URL) {
+        return Some(openrouter_free_model_catalog());
+    }
     let model = native_default_model(info)?;
     let display_name = match info.wire_api {
         WireApi::AnthropicMessages => "Claude Sonnet 4.6",
@@ -465,6 +530,7 @@ mod tests {
     use codex_protocol::account::PlanType;
     use codex_protocol::config_types::ModelProviderAuthInfo;
     use codex_protocol::openai_models::ModelInfo;
+    use codex_protocol::openai_models::ModelVisibility;
     use codex_protocol::openai_models::ModelsResponse;
     use codex_protocol::protocol::SessionSource;
     use pretty_assertions::assert_eq;
@@ -935,5 +1001,37 @@ mod tests {
                 .iter()
                 .any(|model| model.slug == "provider-model")
         );
+    }
+
+    #[test]
+    fn openrouter_free_model_catalog_lists_all_three_in_group_order() {
+        let catalog = openrouter_free_model_catalog();
+        let slugs: Vec<&str> = catalog.models.iter().map(|m| m.slug.as_str()).collect();
+        assert_eq!(slugs, OPENROUTER_FREE_MODEL_GROUP);
+        for model in &catalog.models {
+            assert_eq!(model.visibility, ModelVisibility::List);
+            assert!(model.context_window.unwrap_or(0) > 0);
+        }
+    }
+
+    #[test]
+    fn native_model_catalog_uses_openrouter_free_group_for_openrouter_base_url() {
+        let info = ModelProviderInfo {
+            base_url: Some(OPENROUTER_BASE_URL.to_string()),
+            wire_api: WireApi::Responses,
+            ..Default::default()
+        };
+        let catalog = native_model_catalog(&info).expect("openrouter catalog");
+        assert_eq!(catalog.models.len(), OPENROUTER_FREE_MODEL_GROUP.len());
+    }
+
+    #[test]
+    fn native_model_catalog_is_none_for_plain_responses_provider() {
+        let info = ModelProviderInfo {
+            base_url: Some("https://api.openai.com/v1".to_string()),
+            wire_api: WireApi::Responses,
+            ..Default::default()
+        };
+        assert!(native_model_catalog(&info).is_none());
     }
 }

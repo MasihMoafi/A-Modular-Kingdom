@@ -48,6 +48,10 @@ impl ChatWidget {
         }
         flex.push(
             /*flex*/ 0,
+            RenderableItem::Owned(Box::new(IdentityLineRenderable { chat_widget: self })),
+        );
+        flex.push(
+            /*flex*/ 0,
             RenderableItem::Owned(Box::new(BottomPaneComposerReserveRenderable {
                 bottom_pane: &self.bottom_pane,
                 right_reserve: active_cell_right_reserve,
@@ -57,6 +61,23 @@ impl ChatWidget {
             )),
         );
         RenderableItem::Owned(Box::new(flex))
+    }
+}
+
+/// The cyan identity line (model, context used, location), positioned directly above the
+/// composer rather than at the very top of the screen -- close to where the user is about
+/// to type, not stuck against the transcript above it.
+struct IdentityLineRenderable<'a> {
+    chat_widget: &'a ChatWidget,
+}
+
+impl Renderable for IdentityLineRenderable<'_> {
+    fn render(&self, area: Rect, buf: &mut Buffer) {
+        self.chat_widget.render_identity_line(area, buf);
+    }
+
+    fn desired_height(&self, _width: u16) -> u16 {
+        1
     }
 }
 
@@ -132,29 +153,20 @@ impl TranscriptAreaRenderable<'_> {
 impl Renderable for ChatWidget {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let ledger_width = self.context_ledger_width(area.width);
-        let header_height = u16::from(!area.is_empty());
-        let header_area = Rect::new(area.x, area.y, area.width, header_height);
-        let content_area = Rect::new(
-            area.x,
-            area.y.saturating_add(header_height),
-            area.width,
-            area.height.saturating_sub(header_height),
-        );
-        self.render_identity_line(header_area, buf);
         let chat_area = Rect::new(
-            content_area.x,
-            content_area.y,
-            content_area.width.saturating_sub(ledger_width),
-            content_area.height,
+            area.x,
+            area.y,
+            area.width.saturating_sub(ledger_width),
+            area.height,
         );
         self.as_renderable().render(chat_area, buf);
         if ledger_width > 0 {
             self.render_context_ledger(
                 Rect::new(
                     chat_area.x.saturating_add(chat_area.width),
-                    content_area.y,
+                    area.y,
                     ledger_width,
-                    content_area.height,
+                    area.height,
                 ),
                 buf,
             );
@@ -166,8 +178,7 @@ impl Renderable for ChatWidget {
         let ledger_width = self.context_ledger_width(width);
         let content_height = self
             .as_renderable()
-            .desired_height(width.saturating_sub(ledger_width))
-            .saturating_add(1);
+            .desired_height(width.saturating_sub(ledger_width));
         if ledger_width > 0 {
             // Claim enough rows to read as a real sidebar rather than being clipped to
             // whatever the composer alone needs.
@@ -179,12 +190,11 @@ impl Renderable for ChatWidget {
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
         let ledger_width = self.context_ledger_width(area.width);
-        let header_height = u16::from(!area.is_empty());
         let content_area = Rect::new(
             area.x,
-            area.y.saturating_add(header_height),
+            area.y,
             area.width.saturating_sub(ledger_width),
-            area.height.saturating_sub(header_height),
+            area.height,
         );
         self.as_renderable().cursor_pos(content_area)
     }

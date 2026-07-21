@@ -409,9 +409,7 @@ pub(super) struct RawCompactionOutput {
     pub(super) token_usage: Option<TokenUsage>,
 }
 
-async fn collect_compaction_output(
-    mut stream: ResponseStream,
-) -> CodexResult<RawCompactionOutput> {
+async fn collect_compaction_output(mut stream: ResponseStream) -> CodexResult<RawCompactionOutput> {
     let mut output_item_count = 0usize;
     let mut compaction_count = 0usize;
     let mut compaction_output = None;
@@ -888,8 +886,8 @@ mod tests {
         let raw_output = collect_compaction_output(stream)
             .await
             .expect("compaction should be collected");
-        let output = validate_compaction_output(raw_output)
-            .expect("compaction output should be valid");
+        let output =
+            validate_compaction_output(raw_output).expect("compaction output should be valid");
 
         assert_eq!(output.compaction_output, compaction);
         assert_eq!(output.response_id, "resp-compact");
