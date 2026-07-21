@@ -283,7 +283,7 @@ impl ChatWidget {
     }
 
     /// The server-reported instruction sources, converted for `elpis_context` — the
-    /// same list `/status` renders, so the ledger cannot disagree with it.
+    /// same list `/usage` renders, so the ledger cannot disagree with it.
     pub(super) fn instruction_source_paths_as_path_bufs(&self) -> Vec<std::path::PathBuf> {
         self.instruction_source_paths
             .iter()

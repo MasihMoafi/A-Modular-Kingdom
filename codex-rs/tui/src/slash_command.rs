@@ -52,7 +52,6 @@ pub enum SlashCommand {
     Raw,
     Diff,
     Mention,
-    Status,
     Usage,
     DebugConfig,
     Title,
@@ -100,7 +99,6 @@ impl SlashCommand {
             SlashCommand::Rag => "search files: /rag <query> or /rag <path> -- <query>",
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
-            SlashCommand::Status => "inspect current context, continuity, and token usage",
             SlashCommand::Usage => "inspect current context, continuity, and token usage",
             SlashCommand::DebugConfig => "show config layers and requirement sources for debugging",
             SlashCommand::Title => "configure which items appear in the terminal title",
@@ -175,7 +173,6 @@ impl SlashCommand {
                 | SlashCommand::Raw
                 | SlashCommand::Diff
                 | SlashCommand::Mention
-                | SlashCommand::Status
                 | SlashCommand::Usage
                 | SlashCommand::Ide
         )
@@ -214,7 +211,6 @@ impl SlashCommand {
             | SlashCommand::Skills
             | SlashCommand::Rag
             | SlashCommand::Hooks
-            | SlashCommand::Status
             | SlashCommand::Usage
             | SlashCommand::DebugConfig
             | SlashCommand::Ps
@@ -254,7 +250,6 @@ impl SlashCommand {
             | SlashCommand::Init
             | SlashCommand::Compact
             | SlashCommand::Diff
-            | SlashCommand::Status
             | SlashCommand::Usage
             | SlashCommand::Mcp
             | SlashCommand::Quit
@@ -367,6 +362,7 @@ mod tests {
             "raw",
             "rename",
             "settings",
+            "status",
             "statusline",
             "title",
             "vim",

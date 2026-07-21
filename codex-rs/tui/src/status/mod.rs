@@ -1,6 +1,6 @@
 //! Status output formatting and display adapters for the TUI.
 //!
-//! This module turns protocol-level snapshots into stable display structures used by `/status`
+//! This module turns protocol-level snapshots into stable display structures used by `/usage`
 //! output and footer/status-line helpers, while keeping rendering concerns out of transport-facing
 //! code.
 //!

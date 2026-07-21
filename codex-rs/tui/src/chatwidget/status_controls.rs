@@ -2,7 +2,7 @@
 //!
 //! Rendering details live in `status_surfaces`; this module owns the mutable
 //! widget entrypoints that apply status state, open setup views, and update the
-//! history-facing `/status` surface.
+//! history-facing `/usage` surface.
 
 use super::*;
 

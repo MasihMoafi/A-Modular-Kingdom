@@ -145,11 +145,11 @@ async fn token_usage_update_uses_runtime_context_window() {
 
     assert!(
         context_line.contains("950K"),
-        "expected /status to use runtime context window, got: {context_line}"
+        "expected /usage to use runtime context window, got: {context_line}"
     );
     assert!(
         !context_line.contains("1M"),
-        "expected /status to avoid raw config context window, got: {context_line}"
+        "expected /usage to avoid raw config context window, got: {context_line}"
     );
 }
 
@@ -492,16 +492,16 @@ async fn rate_limit_warnings_emit_thresholds() {
         warnings,
         vec![
             String::from(
-                "Heads up, you have less than 25% of your 5h limit left. Run /status for a breakdown."
+                "Heads up, you have less than 25% of your 5h limit left. Run /usage for a breakdown."
             ),
             String::from(
-                "Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.",
+                "Heads up, you have less than 25% of your weekly limit left. Run /usage for a breakdown.",
             ),
             String::from(
-                "Heads up, you have less than 5% of your 5h limit left. Run /status for a breakdown."
+                "Heads up, you have less than 5% of your 5h limit left. Run /usage for a breakdown."
             ),
             String::from(
-                "Heads up, you have less than 5% of your weekly limit left. Run /status for a breakdown.",
+                "Heads up, you have less than 5% of your weekly limit left. Run /usage for a breakdown.",
             ),
         ],
         "expected one warning per limit for the highest crossed threshold"
@@ -522,7 +522,7 @@ async fn test_rate_limit_warnings_monthly() {
     assert_eq!(
         warnings,
         vec![String::from(
-            "Heads up, you have less than 25% of your monthly limit left. Run /status for a breakdown.",
+            "Heads up, you have less than 25% of your monthly limit left. Run /usage for a breakdown.",
         ),],
         "expected one warning per limit for the highest crossed threshold"
     );
@@ -551,10 +551,10 @@ async fn test_rate_limit_warnings_use_generic_fallback_labels() {
         ),
         vec![
             String::from(
-                "Heads up, you have less than 25% of your secondary usage limit left. Run /status for a breakdown.",
+                "Heads up, you have less than 25% of your secondary usage limit left. Run /usage for a breakdown.",
             ),
             String::from(
-                "Heads up, you have less than 25% of your usage limit left. Run /status for a breakdown.",
+                "Heads up, you have less than 25% of your usage limit left. Run /usage for a breakdown.",
             ),
         ],
     );
@@ -572,7 +572,7 @@ async fn test_rate_limit_warnings_use_secondary_fallback_for_unsupported_window(
             /*primary_window_minutes*/ None,
         ),
         vec![String::from(
-            "Heads up, you have less than 25% of your secondary usage limit left. Run /status for a breakdown.",
+            "Heads up, you have less than 25% of your secondary usage limit left. Run /usage for a breakdown.",
         )],
     );
 }

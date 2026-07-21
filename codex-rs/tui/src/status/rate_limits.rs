@@ -1,7 +1,7 @@
 //! Rate-limit and credits display shaping for status surfaces.
 //!
 //! This module maps `RateLimitSnapshot` protocol payloads into display-oriented rows that the TUI
-//! can render in `/status` and status-line contexts without duplicating formatting logic.
+//! can render in `/usage` and status-line contexts without duplicating formatting logic.
 //!
 //! The key contract is that time-sensitive values are interpreted relative to a caller-provided
 //! capture timestamp so stale detection and reset labels remain coherent for a given draw cycle.

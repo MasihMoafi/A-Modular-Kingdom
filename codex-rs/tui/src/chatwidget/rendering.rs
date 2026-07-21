@@ -48,10 +48,6 @@ impl ChatWidget {
         }
         flex.push(
             /*flex*/ 0,
-            RenderableItem::Owned(Box::new(IdentityLineRenderable { chat_widget: self })),
-        );
-        flex.push(
-            /*flex*/ 0,
             RenderableItem::Owned(Box::new(BottomPaneComposerReserveRenderable {
                 bottom_pane: &self.bottom_pane,
                 right_reserve: active_cell_right_reserve,
@@ -60,13 +56,21 @@ impl ChatWidget {
                 /*top*/ 1, /*left*/ 0, /*bottom*/ 0, /*right*/ 0,
             )),
         );
+        flex.push(
+            /*flex*/ 0,
+            RenderableItem::Owned(Box::new(IdentityLineRenderable { chat_widget: self })).inset(
+                Insets::tlbr(
+                    /*top*/ 1, /*left*/ 0, /*bottom*/ 0, /*right*/ 0,
+                ),
+            ),
+        );
         RenderableItem::Owned(Box::new(flex))
     }
 }
 
-/// The cyan identity line (model, context used, location), positioned directly above the
-/// composer rather than at the very top of the screen -- close to where the user is about
-/// to type, not stuck against the transcript above it.
+/// The cyan identity line (model, context used, location), positioned directly below the
+/// composer rather than at the very top of the screen -- separated from both the transcript
+/// above and the composer it follows, instead of stuck against the last chat message.
 struct IdentityLineRenderable<'a> {
     chat_widget: &'a ChatWidget,
 }
