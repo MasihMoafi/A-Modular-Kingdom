@@ -199,14 +199,7 @@ impl ChatWidget {
         if area.is_empty() {
             return;
         }
-        // `config.model` is always the Codex model; while Claude Code is the active
-        // runtime this header must reflect that instead (this was bug: it kept showing
-        // the stale Codex model after switching runtimes).
-        let model = if self.active_runtime == ActiveRuntime::ClaudeCode {
-            self.claude_model.as_deref().unwrap_or("account default")
-        } else {
-            self.config.model.as_deref().unwrap_or("select a model")
-        };
+        let model = self.config.model.as_deref().unwrap_or("select a model");
         let context = self.status_line_context_used_percent().unwrap_or(0);
         let location = format_directory_display(self.status_line_cwd(), /*max_width*/ None);
         Line::from(vec![

@@ -1031,12 +1031,6 @@ impl App {
                 self.sync_active_thread_reasoning_setting(app_server, effort)
                     .await;
             }
-            AppEvent::SwitchActiveRuntime(runtime) => {
-                self.chat_widget.switch_active_runtime_selection(runtime);
-            }
-            AppEvent::SelectClaudeCodeModel(model) => {
-                self.chat_widget.select_claude_code_model(model);
-            }
             AppEvent::UpdateModel(model) => {
                 self.chat_widget.set_model(&model);
                 self.sync_active_thread_model_setting(app_server, model)
@@ -1161,9 +1155,6 @@ impl App {
                 if self.chat_widget.external_editor_state() == ExternalEditorState::Active {
                     self.launch_external_editor(tui).await;
                 }
-            }
-            AppEvent::LaunchClaudeCodeTakeover => {
-                self.launch_claude_code_takeover(tui).await;
             }
             AppEvent::OpenWindowsSandboxEnablePrompt {
                 preset,
@@ -2191,21 +2182,6 @@ impl App {
                         ));
                     }
                 }
-            }
-            AppEvent::ClaudeCodeTurnCompleted {
-                text,
-                session_id,
-                error,
-                outcome_record,
-                raw_chars,
-            } => {
-                self.chat_widget.handle_claude_code_turn_completed(
-                    text,
-                    session_id,
-                    error,
-                    outcome_record,
-                    raw_chars,
-                );
             }
             AppEvent::StatusLineBranchUpdated { cwd, branch } => {
                 self.chat_widget.set_status_line_branch(cwd, branch);

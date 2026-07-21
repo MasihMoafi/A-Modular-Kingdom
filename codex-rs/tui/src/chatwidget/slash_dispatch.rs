@@ -298,9 +298,6 @@ impl ChatWidget {
                 self.open_model_popup();
                 self.defer_input_until_settings_applied();
             }
-            SlashCommand::ClaudeCode => {
-                self.app_event_tx.send(AppEvent::LaunchClaudeCodeTakeover);
-            }
             SlashCommand::Personality => {
                 self.open_personality_popup();
                 self.defer_input_until_settings_applied();
@@ -1123,7 +1120,6 @@ impl ChatWidget {
             | SlashCommand::DebugConfig
             | SlashCommand::Ps
             | SlashCommand::Stop
-            | SlashCommand::ClaudeCode
             | SlashCommand::Elpis
             | SlashCommand::Mcp
             | SlashCommand::Apps
