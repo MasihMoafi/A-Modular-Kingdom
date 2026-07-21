@@ -45,6 +45,62 @@ pub const OPENROUTER_GEMINI_COMPAT_ALIAS: &str = "gemini";
 pub const OPENROUTER_GEMINI_COMPAT_MODEL: &str = "~google/gemini-pro-latest";
 pub const OPENROUTER_GEMINI_FLASH_COMPAT_ALIAS: &str = "gemini-flash";
 pub const OPENROUTER_GEMINI_FLASH_COMPAT_MODEL: &str = "~google/gemini-flash-latest";
+
+/// Free-tier OpenRouter models Elpis surfaces directly in the `/model` picker's OPENROUTER
+/// group and rotates through as a single fallback group (Masih, 2026-07-21): if a request
+/// to one of these fails for any reason, retry the identical request against the next
+/// model in the list, in order, before giving up. Single source of truth for both the
+/// picker (`codex-model-provider`'s `native_model_catalog`) and the turn-loop retry
+/// (`codex-core`'s `stream_with_openrouter_fallback`) -- change the group here only.
+pub const OPENROUTER_FREE_MODEL_GROUP: &[&str] = &[
+    "tencent/hy3:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "poolside/laguna-m.1:free",
+];
+
+/// Returns the other members of `slug`'s fallback group, in retry order. Empty if `slug`
+/// isn't part of `OPENROUTER_FREE_MODEL_GROUP` (the common case for every other model).
+pub fn openrouter_free_fallback_candidates(slug: &str) -> Vec<&'static str> {
+    let Some(position) = OPENROUTER_FREE_MODEL_GROUP
+        .iter()
+        .position(|candidate| *candidate == slug)
+    else {
+        return Vec::new();
+    };
+    OPENROUTER_FREE_MODEL_GROUP
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index != position)
+        .map(|(_, candidate)| *candidate)
+        .collect()
+}
+
+#[cfg(test)]
+mod openrouter_free_fallback_tests {
+    use super::*;
+
+    #[test]
+    fn excludes_self_and_preserves_group_order() {
+        assert_eq!(
+            openrouter_free_fallback_candidates("tencent/hy3:free"),
+            vec![
+                "nvidia/nemotron-3-ultra-550b-a55b:free",
+                "poolside/laguna-m.1:free",
+            ]
+        );
+        assert_eq!(
+            openrouter_free_fallback_candidates("poolside/laguna-m.1:free"),
+            vec!["tencent/hy3:free", "nvidia/nemotron-3-ultra-550b-a55b:free"],
+        );
+    }
+
+    #[test]
+    fn empty_for_unrelated_model() {
+        assert!(openrouter_free_fallback_candidates("gpt-5.6-sol").is_empty());
+        assert!(openrouter_free_fallback_candidates("").is_empty());
+    }
+}
+
 pub const ANTHROPIC_PROVIDER_ID: &str = "anthropic";
 pub const ANTHROPIC_PROVIDER_NAME: &str = "Anthropic Claude";
 pub const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com/v1";
