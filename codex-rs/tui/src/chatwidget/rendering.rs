@@ -51,10 +51,7 @@ impl ChatWidget {
             RenderableItem::Owned(Box::new(BottomPaneComposerReserveRenderable {
                 bottom_pane: &self.bottom_pane,
                 right_reserve: active_cell_right_reserve,
-            }))
-            .inset(Insets::tlbr(
-                /*top*/ 1, /*left*/ 0, /*bottom*/ 0, /*right*/ 0,
-            )),
+            })),
         );
         flex.push(
             /*flex*/ 0,
@@ -213,7 +210,7 @@ impl ChatWidget {
         if area.is_empty() {
             return;
         }
-        let model = self.config.model.as_deref().unwrap_or("select a model");
+        let model = self.current_model();
         let context = self.status_line_context_used_percent().unwrap_or(0);
         let location = format_directory_display(self.status_line_cwd(), /*max_width*/ None);
         Line::from(vec![

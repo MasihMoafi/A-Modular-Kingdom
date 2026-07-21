@@ -828,9 +828,6 @@ impl HistoryCell for StatusHistoryCell {
         if self.collaboration_mode.is_some() {
             push_label(&mut labels, &mut seen, "Collaboration mode");
         }
-        for source in &self.continuity_sources {
-            push_label(&mut labels, &mut seen, &source.name);
-        }
         if self.context_cleaner_saved_chars > 0 || self.context_pruner_saved_chars > 0 {
             push_label(&mut labels, &mut seen, "Context pruning");
         }
@@ -896,21 +893,6 @@ impl HistoryCell for StatusHistoryCell {
         }
         lines.push(formatter.line("Directory", vec![Span::from(directory_value)]));
         lines.push(formatter.line("Permissions", vec![Span::from(self.permissions.clone())]));
-        for source in &self.continuity_sources {
-            lines.push(formatter.line(
-                source.name.clone(),
-                vec![
-                    Span::from(source.path.display().to_string()),
-                    // Tokens, not bytes: this is the same estimate the context ledger
-                    // shows for the same source, so the two surfaces agree.
-                    Span::from(format!(
-                        " (\u{2248}{} tokens; {}; {})",
-                        source.estimated_tokens, source.lifetime, source.reason
-                    ))
-                    .dim(),
-                ],
-            ));
-        }
 
         if let Some(account_value) = account_value {
             lines.push(formatter.line("Account", vec![Span::from(account_value)]));
