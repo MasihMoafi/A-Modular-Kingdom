@@ -524,15 +524,17 @@ debug = "none"
 strip = "symbols"
 
 [profile.release]
-lto = true
+# Thin LTO keeps most of fat LTO's size/perf win at a fraction of the build
+# time, and default codegen-units restores cross-crate parallelism -- fat LTO
+# + codegen-units = 1 was costing ~13 minutes of CI wall time for a CLI binary
+# where that trade-off doesn't pay for itself.
+lto = "thin"
 debug = "line-tables-only"
 split-debuginfo = "off"
 # Keep release binaries symbolicateable until packaging has archived the
 # sidecar symbols and stripped the binaries.
 strip = "symbols"
 
-# Balance parallel release code generation against binary size.
-codegen-units = 1
 opt-level = "z"
 
 [profile.profiling]
