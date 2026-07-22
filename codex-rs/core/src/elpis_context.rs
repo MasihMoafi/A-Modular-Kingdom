@@ -94,14 +94,14 @@ pub async fn build_continuity_prompt(memories_root: Option<&Path>, cwd: &Path) -
     let mut sections = Vec::new();
     // Global/project AGENTS.md are deliberately NOT injected here: the app server
     // already sends them natively as instructions, and re-reading them into this prompt
-    // double-sent every rule file on every turn. Passing an empty instruction list makes
-    // `continuity_sources` skip them entirely (it only turns server-reported paths into
-    // Global/Project AGENTS.md rows). `skills/dev/*.md` rows, by contrast, come from
-    // `continuity_sources`'s own on-disk discovery (the server never reports them), so
-    // they DO get read and injected below — that discovery is the only way they reach
-    // the model at all.
+    // double-sent every rule file on every turn. `continuity_sources` still auto-discovers
+    // them on disk when given an empty instruction list (other callers, like the Context
+    // Ledger, rely on that fallback), so they're skipped explicitly by name here instead.
+    // `skills/dev/*.md` rows, by contrast, come from `continuity_sources`'s own on-disk
+    // discovery (the server never reports them), so they DO get read and injected below —
+    // that discovery is the only way they reach the model at all.
     for source in continuity_sources(memories_root, cwd, &[]) {
-        if !source.admitted {
+        if !source.admitted || source.name == GLOBAL_RULES || source.name == PROJECT_RULES {
             continue;
         }
         let Ok(content) = tokio::fs::read_to_string(&source.path).await else {
