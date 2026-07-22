@@ -202,11 +202,17 @@ def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
     query_words = query.lower().split()
     
     # If no meaningful query, return first few indexable files
+    indexable_exts = (
+        '.rs', '.toml', '.yaml', '.yml', '.py', '.md', '.txt', '.json',
+        '.js', '.ts', '.tsx', '.jsx', '.c', '.h', '.cpp', '.hpp',
+        '.go', '.sh', '.bash', '.zsh', '.css', '.html', '.sql', '.java',
+        '.kt', '.proto', '.pdf', '.ipynb', '.rst', '.ini', '.cfg', '.conf'
+    )
     if not query_words:
         all_files = []
         for file in os.listdir(directory):
             file_path = os.path.join(directory, file)
-            if os.path.isfile(file_path) and file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+            if os.path.isfile(file_path) and file.lower().endswith(indexable_exts):
                 all_files.append(file_path)
         return all_files[:max_files]
     
@@ -216,7 +222,7 @@ def find_relevant_files(query: str, directory: str, max_files: int = 5) -> list:
         file_path = os.path.join(directory, file)
         if not os.path.isfile(file_path):
             continue
-        if not file.lower().endswith(('.pdf', '.txt', '.py', '.md')):
+        if not file.lower().endswith(indexable_exts):
             continue
         
         # Score based on filename match

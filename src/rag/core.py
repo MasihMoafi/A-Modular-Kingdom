@@ -322,8 +322,13 @@ class RAGPipelineV2:
 
             if os.path.isdir(path):
                 for file in os.listdir(path):
-                    file_path = os.path.join(path, file)
-                    if file.lower().endswith(('.pdf', '.txt', '.py', '.md', '.json', '.ipynb')):
+                    indexable_exts = (
+                        '.rs', '.toml', '.yaml', '.yml', '.py', '.md', '.txt', '.json',
+                        '.js', '.ts', '.tsx', '.jsx', '.c', '.h', '.cpp', '.hpp',
+                        '.go', '.sh', '.bash', '.zsh', '.css', '.html', '.sql', '.java',
+                        '.kt', '.proto', '.pdf', '.ipynb', '.rst', '.ini', '.cfg', '.conf'
+                    )
+                    if file.lower().endswith(indexable_exts):
                         files_to_process.append(file_path)
             else:
                 files_to_process.append(path)

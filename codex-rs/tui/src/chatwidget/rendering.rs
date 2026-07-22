@@ -73,11 +73,24 @@ struct IdentityLineRenderable<'a> {
 
 impl Renderable for IdentityLineRenderable<'_> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        self.chat_widget.render_identity_line(area, buf);
+        if area.height == 0 {
+            return;
+        }
+        let text_area = if area.height >= 2 {
+            Rect {
+                x: area.x,
+                y: area.y + 1,
+                width: area.width,
+                height: 1,
+            }
+        } else {
+            area
+        };
+        self.chat_widget.render_identity_line(text_area, buf);
     }
 
     fn desired_height(&self, _width: u16) -> u16 {
-        1
+        3
     }
 }
 
