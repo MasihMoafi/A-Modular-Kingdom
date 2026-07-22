@@ -1070,8 +1070,16 @@ impl App {
             AppEvent::ApplyAdvancedReasoning { model, effort } => {
                 let default_effort =
                     self.on_apply_advanced_reasoning(model.as_str(), effort.clone());
+                let provider_id = if model.contains('/')
+                    || model.contains(":free")
+                    || !codex_model_provider_info::openrouter_free_fallback_candidates(&model).is_empty()
+                {
+                    Some("openrouter".to_string())
+                } else {
+                    Some("openai".to_string())
+                };
                 if let Some(mut params) =
-                    self.active_thread_model_setting_update_params(model.clone())
+                    self.active_thread_model_setting_update_params(model.clone(), provider_id)
                 {
                     params.effort = Some(effort.clone());
                     self.send_thread_settings_update(app_server, params).await;

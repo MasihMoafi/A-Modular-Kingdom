@@ -87,7 +87,7 @@ impl ChatWidget {
                 actions: vec![Box::new(move |tx| {
                     tx.send(AppEvent::UpdateModel(model.clone()));
                     tx.send(AppEvent::PersistModelSelection {
-                        model,
+                        model: model.clone(),
                         effort: None,
                     });
                 })],
