@@ -215,14 +215,14 @@ impl ChatWidget {
         }
         let mut source_line_ranges = vec![0..0; sources.len()];
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
-            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory {
-                continue;
-            }
             let category_sources = sources
                 .iter()
                 .enumerate()
                 .filter(|(_, source)| source.category == category)
                 .collect::<Vec<_>>();
+            if category_sources.is_empty() {
+                continue;
+            }
             let admitted_tokens = category_sources
                 .iter()
                 .filter(|(_, source)| source.admitted)
@@ -237,16 +237,6 @@ impl ChatWidget {
                 ),
             ]));
             lines.push(Line::from(""));
-            if category_sources.is_empty() {
-                let empty_label = match category {
-                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Files => "  (no active files)".dim(),
-                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory => "  (no durable memory)".dim(),
-                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Instructions => "  (no instruction rules)".dim(),
-                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Evidence => "  (no tool evidence)".dim(),
-                };
-                lines.push(Line::from(empty_label));
-                lines.push(Line::from(""));
-            }
             for (index, source) in category_sources {
                 let source_line_start = lines.len();
                 let selected = self.context_ledger.focused && index == self.context_ledger.selected;
@@ -356,7 +346,8 @@ impl ChatWidget {
             lines.pop();
         }
 
-        let render_area = Rect::new(area.x, area.y, area.width, area.height);
+        let needed_height = u16::try_from(lines.len()).unwrap_or(area.height);
+        let render_area = Rect::new(area.x, area.y, area.width, needed_height.min(area.height));
 
         Paragraph::new(lines)
             .block(

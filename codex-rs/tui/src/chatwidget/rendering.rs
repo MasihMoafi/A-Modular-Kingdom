@@ -176,11 +176,8 @@ impl Renderable for ChatWidget {
 
     fn desired_height(&self, width: u16) -> u16 {
         let ledger_width = self.context_ledger_width(width);
-        let chat_height = self
-            .as_renderable()
-            .desired_height(width.saturating_sub(ledger_width));
-        let ledger_height = self.context_ledger_desired_height(ledger_width);
-        chat_height.max(ledger_height)
+        self.as_renderable()
+            .desired_height(width.saturating_sub(ledger_width))
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
