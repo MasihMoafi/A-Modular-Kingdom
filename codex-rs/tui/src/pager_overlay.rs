@@ -798,7 +798,6 @@ impl TranscriptOverlay {
                 })?;
                 Ok(())
             }
-            _ => Ok(()),
         }
     }
     pub(crate) fn is_done(&self) -> bool {
@@ -897,7 +896,6 @@ impl StaticOverlay {
                 })?;
                 Ok(())
             }
-            _ => Ok(()),
         }
     }
     pub(crate) fn is_done(&self) -> bool {

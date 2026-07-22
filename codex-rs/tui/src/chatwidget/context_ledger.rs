@@ -287,7 +287,7 @@ impl ChatWidget {
             .render(area, buf);
     }
 
-    pub(super) fn handle_context_ledger_mouse_click(&mut self, row: u16, col: u16) -> bool {
+    pub(crate) fn handle_context_ledger_mouse_click(&mut self, row: u16, col: u16) -> bool {
         let Some(area) = self.context_ledger.last_area.get() else {
             return false;
         };
