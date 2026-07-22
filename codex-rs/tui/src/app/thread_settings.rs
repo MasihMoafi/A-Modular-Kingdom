@@ -16,8 +16,9 @@ impl App {
         &mut self,
         app_server: &mut AppServerSession,
         model: String,
+        model_provider: Option<String>,
     ) {
-        let Some(params) = self.active_thread_model_setting_update_params(model) else {
+        let Some(params) = self.active_thread_model_setting_update_params(model, model_provider) else {
             return;
         };
         self.send_thread_settings_update(app_server, params).await;
@@ -26,11 +27,13 @@ impl App {
     pub(super) fn active_thread_model_setting_update_params(
         &self,
         model: String,
+        model_provider: Option<String>,
     ) -> Option<ThreadSettingsUpdateParams> {
         let thread_id = self.active_thread_id?;
         Some(ThreadSettingsUpdateParams {
             thread_id: thread_id.to_string(),
             model: Some(model),
+            model_provider,
             collaboration_mode: Some(self.chat_widget.effective_collaboration_mode()),
             ..ThreadSettingsUpdateParams::default()
         })

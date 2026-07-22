@@ -1032,8 +1032,16 @@ impl App {
                     .await;
             }
             AppEvent::UpdateModel(model) => {
+                let provider_id = if model.contains('/')
+                    || model.contains(":free")
+                    || !codex_model_provider_info::openrouter_free_fallback_candidates(&model).is_empty()
+                {
+                    Some("openrouter".to_string())
+                } else {
+                    Some("openai".to_string())
+                };
                 self.chat_widget.set_model(&model);
-                self.sync_active_thread_model_setting(app_server, model)
+                self.sync_active_thread_model_setting(app_server, model, provider_id)
                     .await;
                 self.sync_active_thread_service_tier_to_cached_session()
                     .await;

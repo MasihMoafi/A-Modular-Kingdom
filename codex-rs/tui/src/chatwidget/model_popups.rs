@@ -83,19 +83,13 @@ impl ChatWidget {
             let model = preset.model.clone();
             items.push(SelectionItem {
                 name: model.clone(),
-                description: Some(format!(
-                    "{} · restart with `elpis --provider openrouter` to use it",
-                    preset.description
-                )),
+                description: Some(preset.description.clone()),
                 actions: vec![Box::new(move |tx| {
-                    tx.send(AppEvent::InsertHistoryCell(Box::new(
-                        history_cell::new_info_event(
-                            format!(
-                                "'{model}' is served via OpenRouter. Restart Elpis with `--provider openrouter` to use it."
-                            ),
-                            /*hint*/ None,
-                        ),
-                    )));
+                    tx.send(AppEvent::UpdateModel(model.clone()));
+                    tx.send(AppEvent::PersistModelSelection {
+                        model,
+                        effort: None,
+                    });
                 })],
                 dismiss_on_select: true,
                 ..Default::default()
