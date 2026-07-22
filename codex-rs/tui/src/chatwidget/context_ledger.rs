@@ -46,6 +46,27 @@ impl ChatWidget {
         LEDGER_WIDTH.min(terminal_width * 2 / 5)
     }
 
+    pub(super) fn context_ledger_desired_height(&self, ledger_width: u16) -> u16 {
+        if !self.context_ledger.visible || ledger_width == 0 {
+            return 0;
+        }
+        let sources = self.continuity_sources();
+        let mut count: u16 = 3;
+        if sources.is_empty() {
+            count += 1;
+        }
+        for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
+            let cat_sources: Vec<_> = sources.iter().filter(|s| s.category == category).collect();
+            count += 2;
+            if cat_sources.is_empty() {
+                count += 2;
+            } else {
+                count += cat_sources.len() as u16 * 2;
+            }
+        }
+        count
+    }
+
     pub(super) fn handle_context_ledger_key_event(&mut self, key_event: KeyEvent) -> bool {
         if key_event.kind != KeyEventKind::Press {
             return false;
@@ -82,7 +103,9 @@ impl ChatWidget {
         let selectable = sources
             .iter()
             .enumerate()
-            .filter_map(|(index, source)| source.selectable.then_some(index))
+            .filter_map(|(index, source)| {
+                (source.selectable && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory).then_some(index)
+            })
             .collect::<Vec<_>>();
         if selectable.is_empty() {
             if matches!(key_event.code, KeyCode::Esc) {
@@ -166,7 +189,7 @@ impl ChatWidget {
         let sources = self.continuity_sources();
         let total_tokens = sources
             .iter()
-            .filter(|source| source.admitted)
+            .filter(|source| source.admitted && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory)
             .map(|source| source.estimated_tokens)
             .sum::<u64>();
         // Plain ANSI cyan so the ledger matches the teal used by the identity line,
@@ -192,6 +215,9 @@ impl ChatWidget {
         }
         let mut source_line_ranges = vec![0..0; sources.len()];
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
+            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory {
+                continue;
+            }
             let category_sources = sources
                 .iter()
                 .enumerate()

@@ -73,24 +73,11 @@ struct IdentityLineRenderable<'a> {
 
 impl Renderable for IdentityLineRenderable<'_> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        if area.height == 0 {
-            return;
-        }
-        let text_area = if area.height >= 2 {
-            Rect {
-                x: area.x,
-                y: area.y + 1,
-                width: area.width,
-                height: 1,
-            }
-        } else {
-            area
-        };
-        self.chat_widget.render_identity_line(text_area, buf);
+        self.chat_widget.render_identity_line(area, buf);
     }
 
     fn desired_height(&self, _width: u16) -> u16 {
-        2
+        1
     }
 }
 
@@ -188,12 +175,12 @@ impl Renderable for ChatWidget {
     }
 
     fn desired_height(&self, width: u16) -> u16 {
-        // No minimum sidebar claim: claiming extra rows forces the terminal to
-        // scroll on every redraw. The ledger renders within whatever height the
-        // composer area actually needs.
         let ledger_width = self.context_ledger_width(width);
-        self.as_renderable()
-            .desired_height(width.saturating_sub(ledger_width))
+        let chat_height = self
+            .as_renderable()
+            .desired_height(width.saturating_sub(ledger_width));
+        let ledger_height = self.context_ledger_desired_height(ledger_width);
+        chat_height.max(ledger_height)
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
