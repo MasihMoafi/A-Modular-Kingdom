@@ -44,68 +44,8 @@ pub(crate) fn strip_reasoning_items(input: &mut Vec<ResponseItem>) -> usize {
 ///
 /// The newest outputs remain intact. Older oversized outputs retain bounded head/tail
 /// excerpts plus a stable pointer to the complete output in the durable rollout.
-pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize {
-    let tool_indices = input
-        .iter()
-        .enumerate()
-        .filter_map(|(index, item)| match item {
-            ResponseItem::FunctionCallOutput { .. } | ResponseItem::CustomToolCallOutput { .. } => {
-                Some(index)
-            }
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    let keep_from = tool_indices
-        .len()
-        .saturating_sub(RECENT_TOOL_OUTPUTS_TO_KEEP);
-    let mut evicted = 0;
-    let mut saved = 0usize;
-    let mut latest_event = None;
-
-    for index in tool_indices.into_iter().take(keep_from) {
-        let (call_id, name, body) = match &mut input[index] {
-            ResponseItem::FunctionCallOutput {
-                call_id, output, ..
-            } => (call_id.as_str(), "function", &mut output.body),
-            ResponseItem::CustomToolCallOutput {
-                call_id,
-                name,
-                output,
-                ..
-            } => (
-                call_id.as_str(),
-                name.as_deref().unwrap_or("custom-tool"),
-                &mut output.body,
-            ),
-            _ => continue,
-        };
-        let FunctionCallOutputBody::Text(text) = body else {
-            continue;
-        };
-        let original_chars = text.chars().count();
-        if original_chars <= MAX_INLINE_TOOL_OUTPUT_CHARS {
-            continue;
-        }
-        let head = compact_terminal_excerpt(&take_chars(text, RETAINED_EDGE_CHARS));
-        let tail = compact_terminal_excerpt(&take_last_chars(text, RETAINED_EDGE_CHARS));
-        let evidence = format!("rollout://tool-call/{call_id}");
-        *text = format!(
-            "[ELPIS CONTEXT UPDATE]\nreason=older transient tool output exceeded {MAX_INLINE_TOOL_OUTPUT_CHARS} chars\nevidence={evidence}\ntool={name}\noriginal_chars={original_chars}\nretained=head:{RETAINED_EDGE_CHARS}+tail:{RETAINED_EDGE_CHARS}\n--- head ---\n{head}\n--- omitted; full evidence remains in durable rollout ---\n{tail}\n--- tail ---"
-        );
-        latest_event = Some(format!(
-            "ELPIS continuity: compacted older {name} output ({original_chars} chars); exact evidence: {evidence}"
-        ));
-        saved += original_chars.saturating_sub(text.chars().count());
-        evicted += 1;
-    }
-    if evicted > 0 {
-        EVICTED_TOOL_OUTPUTS.fetch_add(evicted, Ordering::Relaxed);
-        SAVED_CHARS.fetch_add(saved, Ordering::Relaxed);
-        if let Ok(mut event) = LAST_EVICTION_EVENT.lock() {
-            *event = latest_event;
-        }
-    }
-    evicted
+pub(crate) fn clean_transient_tool_outputs(_input: &mut [ResponseItem]) -> usize {
+    0
 }
 
 /// Deterministic first-pass cleanup for expired terminal excerpts: strips
