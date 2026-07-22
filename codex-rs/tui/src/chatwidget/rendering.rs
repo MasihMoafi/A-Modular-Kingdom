@@ -48,7 +48,10 @@ impl ChatWidget {
         }
         flex.push(
             /*flex*/ 0,
-            RenderableItem::Owned(Box::new(IdentityLineRenderable { chat_widget: self })),
+            RenderableItem::Owned(Box::new(IdentityLineRenderable { chat_widget: self }))
+                .inset(Insets::tlbr(
+                    /*top*/ 1, /*left*/ 0, /*bottom*/ 0, /*right*/ 0,
+                )),
         );
         flex.push(
             /*flex*/ 0,
