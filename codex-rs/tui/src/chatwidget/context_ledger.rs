@@ -156,7 +156,7 @@ impl ChatWidget {
         }
         let mut source_line_ranges = vec![0..0; sources.len()];
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
-            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::ActiveFiles {
+            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::Files {
                 continue;
             }
             let category_sources = sources
