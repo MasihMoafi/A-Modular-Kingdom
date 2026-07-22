@@ -41,15 +41,11 @@ impl TokenUsage {
     }
 
     pub(crate) fn percent_of_context_window_remaining(&self, context_window: i64) -> i64 {
-        if context_window <= BASELINE_TOKENS {
-            return 0;
+        if context_window <= 0 {
+            return 100;
         }
-        let effective_window = context_window - BASELINE_TOKENS;
-        let used = (self.tokens_in_context_window() - BASELINE_TOKENS).max(0);
-        let remaining = (effective_window - used).max(0);
-        ((remaining as f64 / effective_window as f64) * 100.0)
-            .clamp(0.0, 100.0)
-            .round() as i64
+        let used_pct = self.percent_of_context_window_used_exact(context_window);
+        (100.0 - used_pct).clamp(0.0, 100.0).round() as i64
     }
 
     pub(crate) fn percent_of_context_window_used_exact(&self, context_window: i64) -> f64 {
@@ -58,6 +54,13 @@ impl TokenUsage {
         }
         let used = self.tokens_in_context_window().max(0);
         ((used as f64 / context_window as f64) * 100.0).clamp(0.0, 100.0)
+    }
+
+    pub(crate) fn percent_of_context_window_remaining_exact(&self, context_window: i64) -> f64 {
+        if context_window <= 0 {
+            return 100.0;
+        }
+        (100.0 - self.percent_of_context_window_used_exact(context_window)).clamp(0.0, 100.0)
     }
 }
 
