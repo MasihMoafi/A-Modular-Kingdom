@@ -175,27 +175,15 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
 
 ## Important — after the first-release foundation (v0.2)
 
-- Agent-owned post-turn context pruning, full contract (Masih's ace in the hole; see
-  `docs/CONTEXT_AND_SESSIONS.md`): agent-authored compact turn outcome record, deterministic
-  validation and expiry of exploratory traces from the next request, fail-closed
-  preservation, plus the evidence-first completion hierarchy rendering that same record.
-  The deterministic first pass (1,200-char receipts, whitespace cleanup, evidence pointers)
-  is merged; the outcome-record engine is not. Fable-owned.
 - Default tool integration, evaluated 2026-07-19: `rtk` 0.43.0 (token-optimizing command
-  proxy — candidate engine for pruning's compact action receipts), `codebase-memory-mcp`
-  (already reachable through inherited `~/.codex/config.toml`; decide default-on wiring and
-  the SessionStart hint), and `ponytail` (minimal-code discipline; ship as a default
-  `skills/dev` rule). A fourth candidate — a fast codebase-indexing bash script Masih
-  linked in an earlier (lost) conversation — needs Masih to re-send the link before it can
-  be evaluated.
-- Context Ledger parity with `design-prototype.png` (kept in Masih's local files; not in the
-  repo): grouped sections (files/memory/instructions/evidence), per-row token counts,
-  include/exclude-all keys, and the "why included" panel are implemented in PR #55 and
-  CI-green; installed terminal render acceptance remains.
+  proxy — candidate engine for pruning's compact action receipts) and `ponytail`
+  (minimal-code discipline; ship as a default `skills/dev` rule). A fourth candidate — a
+  fast codebase-indexing bash script Masih linked in an earlier (lost) conversation —
+  needs Masih to re-send the link before it can be evaluated. `codebase-memory-mcp`
+  dropped 2026-07-22 (Masih: not pursuing it).
 - Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
   structured selectable prompt (question, options, multi-select) instead of silently
   assuming, and records the chosen answer in the session evidence.
-- Live vendor acceptance of the implemented native Anthropic and Google adapters (see F5).
 - Additional provider/runtime adapters using proven Pi/OpenClaw patterns.
 - Full OpenRouter model catalog, not a hand-picked subset (Masih, 2026-07-19): list
   (near-)all models OpenRouter exposes — including current GPT, Claude (Sonnet/Opus/
@@ -206,60 +194,30 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
 - Behavioral enforcement across runtimes.
 - Dictation with visible consent and editable, unsent text.
 - Further Codex subtraction, one measured capability at a time.
-- Workspace RAG enhancements: an interactive path prompt on `/rag` (Enter defaults to the
-  terminal's current working directory with a configurable folder-depth/token guardrail
-  against scanning something like `node_modules`), a natural-language RAG trigger so the
-  agent can invoke retrieval without an explicit `/rag` command, and keeping RAG defaults
-  from mixing active workspace source with the global memory `archive.md`.
-- `/deep-research`: an autonomous mode combining structured RAG, web search, and recursive
-  crawling to build reference context before proposing edits.
-- Provider-grouped `/model` picker: list models grouped by provider (OpenAI, native
-  Anthropic/Gemini, OpenRouter families) instead of a flat list.
+- Workspace RAG: an interactive path prompt on `/rag` (Enter defaults to the terminal's
+  current working directory with a configurable folder-depth/token guardrail against
+  scanning something like `node_modules`), and keeping RAG defaults from mixing active
+  workspace source with the global memory `archive.md`. The natural-language trigger is
+  already done: `query_knowledge_base` is a live MCP tool (`src/agent/host.py`) the agent
+  can call on its own judgment without an explicit `/rag` command.
 - LSP-backed code intelligence for the active runtime: real language-server queries
   (go-to-definition, precise references, live diagnostics) instead of grep/text search.
   No confirmed LSP client exists in any runtime currently bridged into Elpis; scope as its
   own investigation before committing.
-- A **Dynamic Context Files Panel** was proposed here in an earlier draft of this backlog;
-  it is already implemented as the Context Ledger (see F7) and is not a future item.
-
-- Context Ledger corrections, from Masih's 2026-07-19 session review (verified findings):
-  the displayed numbers are file sizes in bytes, not tokens, and carry no unit label
-  (`5.0k` for the 5,076-byte global `~/.codex/AGENTS.md` is accurate but unlabeled); the
-  total (`29.4k admitted`) is the byte sum of admitted sources and legitimately differs
-  per workspace because sources are per-project, but nothing explains that; a source
-  capped by the 8,000-character admission limit still displays its full on-disk size.
-  Required: label units (or convert to a token estimate), show the truncated-vs-full size
-  when the cap applies, and state the workspace scope in the ledger header.
-  PR #55 converts the rows and totals to explicitly estimated, admission-capped tokens;
-  truncated-vs-full disclosure and an explicit workspace-scope label remain.
-- Context Ledger `/add` completion — done via PR #88 (`add_continuity_sources` admits every
-  file in a directory; the ledger hint line landed with it). See v1 gate item 3.
-- Claude Code UX parity, phase 1 (Masih explicitly wants Elpis to feel like Claude Code):
-  the four permission modes cycled with one key (normal / auto-accept edits / plan /
-  bypass) including an "auto" mode; composer mouse selection with Backspace deleting the
-  selection; composer undo/redo (Ctrl+Z / Ctrl+Y). Investigate what the inherited Ratatui
-  composer already supports before writing anything new.
-- Distribution strategy ("publish everywhere", Masih 2026-07-19): package Elpis's
-  differentiators — durable memory and post-turn pruning — as a Claude Code plugin
-  (MCP server + hooks) and a Codex-compatible equivalent, publishable to their plugin
-  marketplaces, so Claude/Codex users get Elpis features without leaving their tool.
-  Separately: an Anthropic-API-compatible proxy endpoint served by Elpis, so the real
-  Claude Code CLI can run *any* Elpis-routed model (the same mechanism Ollama uses).
-  Release engineering: macOS and Windows binaries are built on GitHub Actions macOS/
-  Windows runners — owning a Mac is not required; publish .deb + tarball + checksums,
-  and report compressed download size per platform.
+- `/context` command (Masih, 2026-07-22; reference: another CLI's context screen): a
+  dedicated slash command rendering context usage as a colored dot/square grid by category
+  (user messages, agent responses, tool calls, system prompt, system tools, skills,
+  subagents, free space) with per-category token counts and percentages, a Checkpoints
+  section (`/rewind`, active checkpoint + step range, historical checkpoints summarized),
+  an Artifact files section (`/artifact`, path + token count), and a System files
+  (auto-loaded) section. Replaces the old Context Ledger unit-labeling/parity backlog
+  (dropped 2026-07-22) as the concrete spec for surfacing context accounting.
 - Startup speed: audit the elpis launch path (config, sqlite, auth, MCP host) for work
   that blocks the first frame, using the audit method in
   `docs/BUILD_AND_REDUCTION_AUDIT.md`; the binary must feel faster than a Node CLI or
   the Rust choice is being wasted. Related: the 3.5× size regression above.
-- `codebase-memory-mcp` heats Masih's CPU (~90°C) when indexing: it must not be wired
-  default-on; if integrated, index lazily/throttled and never at session start.
 - Spinner identity: replace inherited working-state words with Elpis language
   ("elpising…"), matching the cyan identity; small, delegable.
-- Ship `tmux` as a recommended (not required) package alongside the `.deb`
-  (`Recommends:` field), since tmux-driven render checks are the project's own acceptance
-  method. Fable's position, stated for the record: a hard dependency would be wrong —
-  Elpis runs fine without tmux; Masih can overrule.
 
 ## Nice-to-have (v0.3+)
 
