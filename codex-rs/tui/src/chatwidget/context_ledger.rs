@@ -82,9 +82,7 @@ impl ChatWidget {
         let selectable = sources
             .iter()
             .enumerate()
-            .filter_map(|(index, source)| {
-                (source.selectable && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory).then_some(index)
-            })
+            .filter_map(|(index, source)| source.selectable.then_some(index))
             .collect::<Vec<_>>();
         if selectable.is_empty() {
             if matches!(key_event.code, KeyCode::Esc) {
@@ -168,7 +166,7 @@ impl ChatWidget {
         let sources = self.continuity_sources();
         let total_tokens = sources
             .iter()
-            .filter(|source| source.admitted && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory)
+            .filter(|source| source.admitted)
             .map(|source| source.estimated_tokens)
             .sum::<u64>();
         // Plain ANSI cyan so the ledger matches the teal used by the identity line,
@@ -194,9 +192,6 @@ impl ChatWidget {
         }
         let mut source_line_ranges = vec![0..0; sources.len()];
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
-            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory {
-                continue;
-            }
             let category_sources = sources
                 .iter()
                 .enumerate()

@@ -90,7 +90,7 @@ impl Renderable for IdentityLineRenderable<'_> {
     }
 
     fn desired_height(&self, _width: u16) -> u16 {
-        3
+        2
     }
 }
 
