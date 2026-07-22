@@ -416,7 +416,7 @@ impl TextArea {
     }
 
     pub fn desired_height(&self, width: u16) -> u16 {
-        self.wrapped_lines(width).len() as u16
+        (self.wrapped_lines(width).len() as u16).max(3)
     }
 
     #[cfg_attr(not(test), allow(dead_code))]
