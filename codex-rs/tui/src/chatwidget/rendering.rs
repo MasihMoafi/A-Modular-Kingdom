@@ -5,6 +5,11 @@ use super::*;
 impl ChatWidget {
     pub(super) fn as_renderable(&self) -> RenderableItem<'_> {
         let active_cell_right_reserve = self.ambient_pet_wrap_reserved_cols();
+        let mut flex = FlexRenderable::new();
+        flex.push(
+            /*flex*/ 0,
+            RenderableItem::Owned(Box::new(IdentityLineRenderable { chat_widget: self })),
+        );
         let active_cell_renderable = match &self.transcript.active_cell {
             Some(cell) => RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                 child: cell.as_ref(),
@@ -23,7 +28,6 @@ impl ChatWidget {
             }
             _ => RenderableItem::Owned(Box::new(())),
         };
-        let mut flex = FlexRenderable::new();
         flex.push(/*flex*/ 1, active_cell_renderable);
         flex.push(/*flex*/ 0, active_hook_cell_renderable);
         if let Some(cell) = self.pending_token_activity_output() {
@@ -55,14 +59,6 @@ impl ChatWidget {
             .inset(Insets::tlbr(
                 /*top*/ 1, /*left*/ 0, /*bottom*/ 0, /*right*/ 0,
             )),
-        );
-        flex.push(
-            /*flex*/ 0,
-            RenderableItem::Owned(Box::new(IdentityLineRenderable { chat_widget: self })).inset(
-                Insets::tlbr(
-                    /*top*/ 0, /*left*/ 0, /*bottom*/ 0, /*right*/ 0,
-                ),
-            ),
         );
         RenderableItem::Owned(Box::new(flex))
     }

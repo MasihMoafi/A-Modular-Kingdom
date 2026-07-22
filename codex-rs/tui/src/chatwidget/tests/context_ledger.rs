@@ -65,7 +65,6 @@ async fn ledger_groups_real_sources_and_exposes_selected_reason() -> anyhow::Res
 
     for heading in [
         "ACTIVE FILES",
-        "DURABLE MEMORY",
         "INSTRUCTIONS",
         "TOOL EVIDENCE",
     ] {

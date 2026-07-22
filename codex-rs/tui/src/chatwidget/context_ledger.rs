@@ -82,7 +82,9 @@ impl ChatWidget {
         let selectable = sources
             .iter()
             .enumerate()
-            .filter_map(|(index, source)| source.selectable.then_some(index))
+            .filter_map(|(index, source)| {
+                (source.selectable && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory).then_some(index)
+            })
             .collect::<Vec<_>>();
         if selectable.is_empty() {
             if matches!(key_event.code, KeyCode::Esc) {
@@ -100,7 +102,13 @@ impl ChatWidget {
             self.context_ledger.pending_g = false;
             match key_event.code {
                 KeyCode::Char('i') => {
-                    self.set_all_context_sources_admitted(&sources, true);
+                    let selectable_sources = sources
+                        .iter()
+                        .filter(|source| source.selectable && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory)
+                        .collect::<Vec<_>>();
+                    let all_admitted = !selectable_sources.is_empty()
+                        && selectable_sources.iter().all(|source| source.admitted);
+                    self.set_all_context_sources_admitted(&sources, !all_admitted);
                     self.request_redraw();
                     return true;
                 }
@@ -116,6 +124,15 @@ impl ChatWidget {
         match key_event.code {
             KeyCode::Esc => {
                 self.context_ledger.focused = false;
+            }
+            KeyCode::Char('i') => {
+                let selectable_sources = sources
+                    .iter()
+                    .filter(|source| source.selectable && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory)
+                    .collect::<Vec<_>>();
+                let all_admitted = !selectable_sources.is_empty()
+                    && selectable_sources.iter().all(|source| source.admitted);
+                self.set_all_context_sources_admitted(&sources, !all_admitted);
             }
             KeyCode::Char('g') => {
                 self.context_ledger.pending_g = true;
@@ -151,7 +168,7 @@ impl ChatWidget {
         let sources = self.continuity_sources();
         let total_tokens = sources
             .iter()
-            .filter(|source| source.admitted)
+            .filter(|source| source.admitted && source.category != crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory)
             .map(|source| source.estimated_tokens)
             .sum::<u64>();
         // Plain ANSI cyan so the ledger matches the teal used by the identity line,
@@ -159,21 +176,27 @@ impl ChatWidget {
         let cyan = Style::default().fg(Color::Cyan);
         let amber = Style::default().fg(Color::Rgb(245, 158, 11));
         let muted = Style::default().fg(Color::Rgb(100, 116, 139));
-        let mut lines = vec![Line::from(vec![
-            Span::styled("CONTEXT LEDGER", cyan.bold()),
-            Span::raw("  "),
-            Span::styled(
-                format!("Total ≈{} tokens admitted", format_tokens(total_tokens)),
-                cyan,
-            ),
-        ])];
-        lines.push(Line::from(""));
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("CONTEXT LEDGER", cyan.bold()),
+                Span::raw("  "),
+                Span::styled(
+                    format!("Total ≈{} tokens admitted", format_tokens(total_tokens)),
+                    cyan,
+                ),
+            ]),
+            Line::from(Span::styled("i = select/deselect all", muted)),
+            Line::from(""),
+        ];
 
         if sources.is_empty() {
             lines.push(Line::from("No portable context is available.".dim()));
         }
         let mut source_line_ranges = vec![0..0; sources.len()];
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
+            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory {
+                continue;
+            }
             let category_sources = sources
                 .iter()
                 .enumerate()
@@ -192,6 +215,7 @@ impl ChatWidget {
                     muted,
                 ),
             ]));
+            lines.push(Line::from(""));
             if category_sources.is_empty() {
                 let empty_label = match category {
                     crate::legacy_core::elpis_context::ContinuitySourceCategory::Files => "  (no active files)".dim(),
@@ -200,6 +224,7 @@ impl ChatWidget {
                     crate::legacy_core::elpis_context::ContinuitySourceCategory::Evidence => "  (no tool evidence)".dim(),
                 };
                 lines.push(Line::from(empty_label));
+                lines.push(Line::from(""));
             }
             for (index, source) in category_sources {
                 let source_line_start = lines.len();
@@ -272,8 +297,8 @@ impl ChatWidget {
                         )
                         .dim(),
                     ));
-                    lines.push(Line::from(""));
                 }
+                lines.push(Line::from(""));
 
                 source_line_ranges[index] = source_line_start..lines.len();
             }
@@ -310,8 +335,7 @@ impl ChatWidget {
             lines.pop();
         }
 
-        let active_height = (lines.len() as u16).min(area.height);
-        let render_area = Rect::new(area.x, area.y, area.width, active_height);
+        let render_area = Rect::new(area.x, area.y, area.width, area.height);
 
         Paragraph::new(lines)
             .block(
