@@ -196,7 +196,9 @@ pub fn continuity_sources(
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or_default();
-        let is_dev_source = path.parent().is_some_and(|dir| dir.ends_with("skills/dev"));
+        let is_dev_source = path.to_string_lossy().contains("skills/dev")
+            || path.to_string_lossy().contains("/dev/")
+            || path.parent().is_some_and(|dir| dir.ends_with("skills/dev") || dir.ends_with("dev"));
         let (name, reason): (String, &'static str) = if is_dev_source {
             (
                 format!("{DEV_SOURCE_PREFIX}{file_name}"),
