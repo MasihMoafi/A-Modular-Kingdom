@@ -51,7 +51,10 @@ impl ChatWidget {
             RenderableItem::Owned(Box::new(BottomPaneComposerReserveRenderable {
                 bottom_pane: &self.bottom_pane,
                 right_reserve: active_cell_right_reserve,
-            })),
+            }))
+            .inset(Insets::tlbr(
+                /*top*/ 1, /*left*/ 0, /*bottom*/ 0, /*right*/ 0,
+            )),
         );
         flex.push(
             /*flex*/ 0,

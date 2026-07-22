@@ -6115,7 +6115,7 @@ async fn thread_setting_update_params_sync_model_and_default_reasoning() {
 
     app.chat_widget.set_model("gpt-5.4");
     let params = app
-        .active_thread_model_setting_update_params("gpt-5.4".to_string())
+        .active_thread_model_setting_update_params("gpt-5.4".to_string(), None)
         .expect("active thread should produce update params");
 
     assert_eq!(params.thread_id, thread_id.to_string());
