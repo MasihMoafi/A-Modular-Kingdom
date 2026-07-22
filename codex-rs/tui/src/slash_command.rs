@@ -252,10 +252,10 @@ impl SlashCommand {
             | SlashCommand::Usage
             | SlashCommand::Mcp
             | SlashCommand::Quit
-            | SlashCommand::Fork
             | SlashCommand::Hooks
             | SlashCommand::Clear => true,
-            SlashCommand::Keymap
+            SlashCommand::Fork
+            | SlashCommand::Keymap
             | SlashCommand::Memories
             | SlashCommand::Rename
             | SlashCommand::Delete
