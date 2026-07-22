@@ -193,7 +193,13 @@ impl ChatWidget {
                 ),
             ]));
             if category_sources.is_empty() {
-                lines.push(Line::from("  No sources available.".dim()));
+                let empty_label = match category {
+                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Files => "  (no active files)".dim(),
+                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Memory => "  (no durable memory)".dim(),
+                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Instructions => "  (no instruction rules)".dim(),
+                    crate::legacy_core::elpis_context::ContinuitySourceCategory::Evidence => "  (no tool evidence)".dim(),
+                };
+                lines.push(Line::from(empty_label));
             }
             for (index, source) in category_sources {
                 let source_line_start = lines.len();

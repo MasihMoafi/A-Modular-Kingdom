@@ -4462,7 +4462,6 @@ impl ChatComposer {
         Block::default()
             .borders(Borders::ALL)
             .border_style(composer_border_style())
-            .style(style)
             .render_ref(composer_rect, buf);
         if !remote_images_rect.is_empty() {
             Paragraph::new(self.attachments.remote_image_lines())

@@ -452,15 +452,6 @@ impl StatusHistoryCell {
             .map(|context| (saved_tokens.saturating_mul(100)) / context.window)
             .unwrap_or(0);
 
-        let archive_span = if let Some(session_id) = &self.session_id {
-            let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/home/masih"));
-            let full_path = home.join(format!(".elpis/sessions/{session_id}/rollout.jsonl"));
-            let url = format!("file://{}", full_path.display());
-            format!(" · archive: \x1b]8;;{url}\x1b\\~/.elpis/sessions/{session_id}/rollout.jsonl\x1b]8;;\x1b\\")
-        } else {
-            " · archive: ~/.elpis/sessions/".to_string()
-        };
-
         Some(vec![
             Span::from(format!("~{saved_fmt} tokens saved")),
             Span::from(format!(" ({percent}% of context window)")).dim(),
@@ -469,7 +460,6 @@ impl StatusHistoryCell {
                 self.context_cleaner_evictions, self.context_pruner_passes
             ))
             .dim(),
-            Span::from(archive_span).cyan(),
         ])
     }
 
