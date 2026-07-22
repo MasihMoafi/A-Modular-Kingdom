@@ -345,7 +345,10 @@ impl StatusHistoryCell {
             workspace_root_suffix.as_deref(),
         );
         let model_provider = format_model_provider(config, runtime_model_provider_base_url);
-        let show_chatgpt_usage_link = config.model_provider.requires_openai_auth;
+        let show_chatgpt_usage_link = config.model_provider.requires_openai_auth
+            && config.model_provider_id == "openai"
+            && !config.model.contains('/')
+            && !config.model.contains(":free");
         let account = compose_account_display(account_display);
         let session_id = session_id.as_ref().map(std::string::ToString::to_string);
         let forked_from = forked_from.map(|id| id.to_string());
