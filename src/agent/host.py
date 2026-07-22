@@ -32,20 +32,42 @@ _SERVER_VERSION = "0.1.0"
 _use_content_length_framing = False
 _initialized = False
 _INDEXABLE_EXTENSIONS = {
-    ".pdf",
-    ".txt",
+    ".rs",
+    ".toml",
+    ".yaml",
+    ".yml",
     ".py",
     ".md",
-    ".ipynb",
+    ".txt",
+    ".json",
     ".js",
     ".ts",
     ".tsx",
     ".jsx",
-    ".json",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".go",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".css",
+    ".html",
+    ".sql",
+    ".java",
+    ".kt",
+    ".proto",
+    ".pdf",
+    ".ipynb",
+    ".rst",
+    ".ini",
+    ".cfg",
+    ".conf",
 }
-_UNSAFE_PATH_COMPONENTS = {"node_modules", ".git", ".venv", "venv", "dist", "build"}
-_DEFAULT_MAX_DEPTH = 5
-_DEFAULT_MAX_TOKENS = 120_000
+_UNSAFE_PATH_COMPONENTS = {"node_modules", ".git", ".venv", "venv", "dist", "build", "target", "__pycache__"}
+_DEFAULT_MAX_DEPTH = 20
+_DEFAULT_MAX_TOKENS = 2_000_000
 
 _TOOL = {
     "name": "query_knowledge_base",

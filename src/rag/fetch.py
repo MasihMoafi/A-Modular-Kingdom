@@ -123,8 +123,13 @@ def find_all_indexable_files(
     if not os.path.isdir(directory):
         return []
 
-    indexable_extensions = ('.pdf', '.txt', '.py', '.md', '.ipynb', '.js', '.ts', '.tsx', '.jsx')
-    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build', '.ipynb_checkpoints', 'migrations'}
+    indexable_extensions = (
+        '.rs', '.toml', '.yaml', '.yml', '.py', '.md', '.txt', '.json',
+        '.js', '.ts', '.tsx', '.jsx', '.c', '.h', '.cpp', '.hpp',
+        '.go', '.sh', '.bash', '.zsh', '.css', '.html', '.sql', '.java',
+        '.kt', '.proto', '.pdf', '.ipynb', '.rst', '.ini', '.cfg', '.conf'
+    )
+    exclude_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build', 'target', '.ipynb_checkpoints', 'migrations'}
 
     all_files = []
 
@@ -247,13 +252,13 @@ def fetchExternalKnowledgeV2(
                     excluded_paths.add(os.path.realpath(os.path.expanduser("~/.elpis/memories/archive.md")))
                 all_files = find_all_indexable_files(
                     resolved_path,
-                    max_files=100,
+                    max_files=500,
                     exclude_patterns=['test_*.py', '*_test.py', '*__pycache__*', '*.pyc'],
                     excluded_paths=excluded_paths,
                 )
 
                 if not all_files:
-                    return f"No indexable files (.pdf, .txt, .py, .md) found in {resolved_path}"
+                    return f"No indexable files found in {resolved_path}"
 
                 print(f"[RAG V2] Indexing {len(all_files)} files from {resolved_path}")
 
