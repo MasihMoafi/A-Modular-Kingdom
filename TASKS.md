@@ -184,14 +184,13 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
 - Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
   structured selectable prompt (question, options, multi-select) instead of silently
   assuming, and records the chosen answer in the session evidence.
-- Additional provider/runtime adapters using proven Pi/OpenClaw patterns.
-- Full OpenRouter model catalog, not a hand-picked subset (Masih, 2026-07-19): list
-  (near-)all models OpenRouter exposes — including current GPT, Claude (Sonnet/Opus/
-  Fable-family), and Gemini IDs — via the OpenRouter models API rather than hardcoding
-  names that go stale as vendors update. Pi already implements this pattern (and also
-  supports Gemini directly); fetch its repo for reference before building. OpenClaw noted
-  as another reference/target. Deliberately deferred — backlog is already long.
-- Behavioral enforcement across runtimes.
+- Add providers: additional adapters via proven Pi/OpenClaw patterns, plus the full
+  OpenRouter model catalog — (near-)all models it exposes — including current GPT, Claude
+  (Sonnet/Opus/Fable-family), and Gemini IDs — via the OpenRouter models API rather than
+  a hand-picked, hardcoded subset that goes stale as vendors update. Pi already implements
+  this pattern (and also supports Gemini directly); fetch its repo for reference before
+  building. OpenClaw noted as another reference/target. Deliberately deferred — backlog is
+  already long.
 - Dictation with visible consent and editable, unsent text.
 - Further Codex subtraction, one measured capability at a time.
 - Workspace RAG: an interactive path prompt on `/rag` (Enter defaults to the terminal's

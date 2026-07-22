@@ -271,6 +271,21 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Package .deb
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cargo install cargo-deb --locked
+          cargo deb --no-build -p codex-tui
+
+      - name: Upload Elpis .deb
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: elpis-deb
+          path: codex-rs/target/debian/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload Cargo timing report
         if: ${{ always() && github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -294,15 +309,26 @@ jobs:
           name: elpis-linux-x86_64
           path: dist
 
+      - name: Download Elpis .deb
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: elpis-deb
+          path: dist
+
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mv dist/elpis dist/elpis-linux-x86_64
           sha256sum dist/elpis-linux-x86_64 > dist/elpis-linux-x86_64.sha256
+          for deb in dist/*.deb; do
+            sha256sum "$deb" > "$deb.sha256"
+          done
           gh release create "$GITHUB_REF_NAME" \
             dist/elpis-linux-x86_64 \
             dist/elpis-linux-x86_64.sha256 \
+            dist/*.deb \
+            dist/*.deb.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --generate-notes \
             --title "Elpis $GITHUB_REF_NAME"
