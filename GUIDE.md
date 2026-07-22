@@ -776,6 +776,9 @@ non-TUI consumers retain the inherited Codex-home fallback for compatibility.
 
 ## Verification
 
-Use `.github/workflows/embedded-elpis-linux.yml` for Rust formatting, focused tests,
-build, executable identity, and artifact verification. Do not compile Rust locally on
-Masih's workstation. Run only narrow non-Rust checks locally.
+For fast local binary build and verification (~15s), run:
+```bash
+CODEX_SKIP_BWRAP_BUILD=1 cargo build --manifest-path codex-rs/Cargo.toml --bin elpis && install -m 755 codex-rs/target/debug/elpis /home/masih/.local/bin/elpis
+```
+
+Use `.github/workflows/embedded-elpis-linux.yml` for CI Rust formatting, focused tests, release build, executable identity, and artifact verification.

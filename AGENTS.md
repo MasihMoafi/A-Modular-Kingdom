@@ -9,7 +9,7 @@
 - Obey the global rules in `/home/masih/.codex/AGENTS.md`. The development-harness
   mirror is `/home/masih/Desktop/f/p/skills/dev/`.
 - Verify the repository state before editing; preserve unrelated user changes.
-- **NEVER run cargo build or local release compilation on the user's machine.** Local builds put a severe strain on the CPU and heat up the machine. Always rely on GitHub Actions for compilation checks, runs, and obtaining binary artifacts.
+- **Local incremental build & install command:** For fast local binary verification (~15s), run `CODEX_SKIP_BWRAP_BUILD=1 cargo build --manifest-path codex-rs/Cargo.toml --bin elpis && install -m 755 codex-rs/target/debug/elpis /home/masih/.local/bin/elpis`. Full workspace release compilations remain reserved for CI.
 - Challenge unclear or solution-first requirements with `$challenge-requirements`
   before planning implementation.
 

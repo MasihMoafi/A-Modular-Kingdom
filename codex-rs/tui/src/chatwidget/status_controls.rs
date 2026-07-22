@@ -358,13 +358,6 @@ impl ChatWidget {
     }
 
     pub(super) fn status_line_context_remaining_percent(&self) -> Option<i64> {
-        if let Some(info) = self.token_info.as_ref() {
-            if let Some(cw) = info.last_token_usage.context_window.as_ref()
-                .or(info.total_token_usage.context_window.as_ref())
-            {
-                return Some(cw.percent_remaining.clamp(0, 100));
-            }
-        }
         let context_window = self.status_line_context_window_size().unwrap_or(200_000);
         let default_usage = TokenUsage::default();
         let usage = self
@@ -372,16 +365,7 @@ impl ChatWidget {
             .as_ref()
             .map(|info| &info.last_token_usage)
             .unwrap_or(&default_usage);
-        let admitted_tokens: u64 = self
-            .continuity_sources()
-            .iter()
-            .filter(|s| s.admitted)
-            .map(|s| s.estimated_tokens)
-            .sum();
-        let total_used = (usage.total_tokens as u64).saturating_add(admitted_tokens);
-        let remaining_tokens = (context_window as u64).saturating_sub(total_used);
-        let pct = (remaining_tokens * 100) / (context_window as u64).max(1);
-        Some((pct as i64).clamp(0, 100))
+        Some(usage.percent_of_context_window_remaining(context_window))
     }
 
     pub(super) fn status_line_context_used_percent(&self) -> Option<i64> {
