@@ -459,6 +459,12 @@ impl StatusHistoryCell {
             .map(|context| (saved_tokens.saturating_mul(100)) / context.window)
             .unwrap_or(0);
 
+        let archive_span = if let Some(session_id) = &self.session_id {
+            format!(" · archive: ~/.elpis/sessions/{session_id}/rollout.jsonl")
+        } else {
+            " · archive: ~/.elpis/sessions/".to_string()
+        };
+
         Some(vec![
             Span::from(format!("~{saved_fmt} tokens saved")),
             Span::from(format!(" ({percent}% of context window)")).dim(),
@@ -467,6 +473,7 @@ impl StatusHistoryCell {
                 self.context_cleaner_evictions, self.context_pruner_passes
             ))
             .dim(),
+            Span::from(archive_span).cyan(),
         ])
     }
 
