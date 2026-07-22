@@ -125,8 +125,9 @@ impl ChatWidget {
             .filter(|source| source.admitted)
             .map(|source| source.estimated_tokens)
             .sum::<u64>();
-        let cyan = Style::default().fg(Color::Cyan);
-        let muted = Style::default().dim();
+        let cyan = Style::default().fg(Color::Rgb(56, 189, 248));
+        let amber = Style::default().fg(Color::Rgb(245, 158, 11));
+        let muted = Style::default().fg(Color::Rgb(100, 116, 139));
         let mut lines = vec![Line::from(vec![
             Span::styled("CONTEXT LEDGER", cyan.bold()),
             Span::raw("  "),
@@ -186,6 +187,7 @@ impl ChatWidget {
                 } else {
                     "EXCLUDED"
                 };
+                let state_style = if source.admitted { cyan } else { amber };
                 let marker_style = if source.admitted { cyan } else { muted };
                 let prefix = if selected { "› " } else { "  " };
                 let left = format!("{prefix}{marker} {}", source.name);
@@ -207,7 +209,8 @@ impl ChatWidget {
                         },
                     ),
                     Span::raw(" ".repeat(pad)),
-                    Span::styled(right, marker_style),
+                    Span::styled(format!("≈{} ", format_tokens(source.estimated_tokens)), muted),
+                    Span::styled(state, state_style),
                 ]));
 
                 if selected && self.context_ledger.why_visible {
