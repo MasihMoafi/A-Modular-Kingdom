@@ -1707,7 +1707,7 @@ impl BottomPane {
                 /*flex*/ 1,
                 RenderableItem::Borrowed(&self.pending_input_preview),
             );
-            if !has_inline_previews && has_status_or_footer {
+            if !has_inline_previews && !self.unified_exec_footer.is_empty() {
                 flex.push(/*flex*/ 0, RenderableItem::Owned("".into()));
             }
             let mut flex2 = FlexRenderable::new();
