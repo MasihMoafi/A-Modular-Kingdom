@@ -265,6 +265,7 @@ impl ChatWidget {
                     })
                     .unwrap_or(0)
             })
+            .unwrap_or(0);
         self.context_ledger.last_area.set(Some(area));
         self.context_ledger.last_scroll.set(scroll_lines);
         let tracked_ranges = source_line_ranges
