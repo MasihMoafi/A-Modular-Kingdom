@@ -112,7 +112,12 @@ impl ChatWidget {
                 let source = &sources[self.context_ledger.selected];
                 self.set_context_source_admitted(source, !source.admitted);
             }
-            _ => return false,
+            _ => {
+                if matches!(key_event.code, KeyCode::Char(_)) {
+                    self.context_ledger.focused = false;
+                }
+                return false;
+            }
         }
         self.request_redraw();
         true

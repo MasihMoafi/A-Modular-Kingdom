@@ -170,7 +170,7 @@ pub fn continuity_sources(
         dirs::home_dir().map(|home| home.join(".codex/skills/dev")),
     ];
 
-    let already_listed: std::collections::HashSet<PathBuf> = instruction_paths
+    let mut already_listed: std::collections::HashSet<PathBuf> = instruction_paths
         .iter()
         .filter_map(|path| path.canonicalize().ok())
         .collect();
@@ -182,8 +182,11 @@ pub fn continuity_sources(
                 .map(|entry| entry.path())
                 .filter(|path| path.extension().is_some_and(|ext| ext == "md"))
                 .filter(|path| {
-                    path.canonicalize()
-                        .is_ok_and(|canonical| !already_listed.contains(&canonical))
+                    if let Ok(canonical) = path.canonicalize() {
+                        already_listed.insert(canonical)
+                    } else {
+                        false
+                    }
                 })
                 .collect();
             dev_files.sort();
