@@ -298,19 +298,24 @@ impl ChatWidget {
         let scroll = self.context_ledger.last_scroll.get();
         let relative_line = (row.saturating_sub(area.y).saturating_sub(1) + scroll) as usize;
 
-        let ranges = self.context_ledger.last_source_ranges.borrow();
-        for &(index, ref range) in ranges.iter() {
-            if range.contains(&relative_line) {
-                let sources = self.continuity_sources();
-                if let Some(source) = sources.get(index) {
-                    if source.selectable {
-                        self.context_ledger.focused = true;
-                        self.context_ledger.selected = index;
-                        let new_state = !source.admitted;
-                        self.set_context_source_admitted(source, new_state);
-                        self.request_redraw();
-                        return true;
-                    }
+        let target_index = {
+            let ranges = self.context_ledger.last_source_ranges.borrow();
+            ranges
+                .iter()
+                .find(|(_, range)| range.contains(&relative_line))
+                .map(|&(index, _)| index)
+        };
+
+        if let Some(index) = target_index {
+            let sources = self.continuity_sources();
+            if let Some(source) = sources.get(index) {
+                if source.selectable {
+                    self.context_ledger.focused = true;
+                    self.context_ledger.selected = index;
+                    let new_state = !source.admitted;
+                    self.set_context_source_admitted(source, new_state);
+                    self.request_redraw();
+                    return true;
                 }
             }
         }

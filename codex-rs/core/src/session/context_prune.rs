@@ -72,12 +72,13 @@ async fn run_prune_pass(
     client_session: &mut ModelClientSession,
     batch: &[(String, String)],
 ) -> Option<String> {
-    let prune_model_slug =
-        if turn_context.config.model_provider_id == codex_model_provider_info::OPENROUTER_PROVIDER_ID {
-            turn_context.model_info.slug.as_str()
-        } else {
-            context_pruner::PRUNE_MODEL_SLUG
-        };
+    let prune_model_slug = if turn_context.config.model_provider_id
+        == codex_model_provider_info::OPENROUTER_PROVIDER_ID
+    {
+        turn_context.model_info.slug.as_str()
+    } else {
+        context_pruner::PRUNE_MODEL_SLUG
+    };
 
     let model_info = sess
         .services
