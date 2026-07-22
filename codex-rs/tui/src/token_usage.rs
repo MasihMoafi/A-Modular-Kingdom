@@ -51,6 +51,14 @@ impl TokenUsage {
             .clamp(0.0, 100.0)
             .round() as i64
     }
+
+    pub(crate) fn percent_of_context_window_used_exact(&self, context_window: i64) -> f64 {
+        if context_window <= 0 {
+            return 0.0;
+        }
+        let used = self.tokens_in_context_window().max(0);
+        ((used as f64 / context_window as f64) * 100.0).clamp(0.0, 100.0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -214,14 +214,14 @@ impl ChatWidget {
             return;
         }
         let model = self.current_model();
-        let context = self.status_line_context_used_percent().unwrap_or(0);
+        let context = self.status_line_context_used_display();
         let location = format_directory_display(self.status_line_cwd(), /*max_width*/ None);
         Line::from(vec![
             " Elpis ".cyan().bold(),
             "· model ".dim(),
             model.cyan(),
             " · context ".dim(),
-            format!("{context}%").cyan(),
+            context.cyan(),
             " · location ".dim(),
             location.cyan(),
         ])

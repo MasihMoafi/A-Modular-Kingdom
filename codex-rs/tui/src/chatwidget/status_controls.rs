@@ -379,6 +379,28 @@ impl ChatWidget {
         Some((100 - remaining).clamp(0, 100))
     }
 
+    pub(super) fn status_line_context_used_display(&self) -> String {
+        let Some(context_window) = self.status_line_context_window_size() else {
+            return "0%".to_string();
+        };
+        let default_usage = TokenUsage::default();
+        let usage = self
+            .token_info
+            .as_ref()
+            .map(|info| &info.last_token_usage)
+            .unwrap_or(&default_usage);
+        let pct = usage.percent_of_context_window_used_exact(context_window);
+        if pct == 0.0 {
+            "0%".to_string()
+        } else if pct < 1.0 {
+            format!("{pct:.1}%")
+        } else if (pct - pct.round()).abs() < 0.05 {
+            format!("{:.0}%", pct)
+        } else {
+            format!("{pct:.1}%")
+        }
+    }
+
     pub(super) fn status_line_total_usage(&self) -> TokenUsage {
         self.token_info
             .as_ref()

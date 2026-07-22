@@ -446,9 +446,6 @@ impl StatusHistoryCell {
     /// watch, not a claim you have to trust.
     fn context_pruning_spans(&self) -> Option<Vec<Span<'static>>> {
         let total_saved_chars = self.context_cleaner_saved_chars + self.context_pruner_saved_chars;
-        if total_saved_chars == 0 {
-            return None;
-        }
         let saved_tokens = i64::try_from(codex_utils_string::approx_tokens_from_byte_count(
             total_saved_chars,
         ))
