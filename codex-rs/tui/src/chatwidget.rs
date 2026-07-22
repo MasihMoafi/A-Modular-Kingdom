@@ -68,7 +68,6 @@ use crate::status::RateLimitWindowDisplay;
 use crate::status::StatusAccountDisplay;
 use crate::status::StatusHistoryHandle;
 use crate::status::format_directory_display;
-use crate::status::format_tokens_compact;
 use crate::status::rate_limit_snapshot_display_for_limit;
 use crate::terminal_hyperlinks::HyperlinkLine;
 use crate::terminal_title::SetTerminalTitleResult;
@@ -124,7 +123,6 @@ use codex_config::types::Notifications;
 use codex_config::types::WindowsSandboxModeToml;
 use codex_connectors::AppInfo;
 use codex_core_skills::model::SkillMetadata;
-use codex_features::FEATURES;
 use codex_features::Feature;
 #[cfg(test)]
 use codex_git_utils::CommitLogEntry;
@@ -1134,25 +1132,17 @@ impl ChatWidget {
     }
 
     fn apply_token_info(&mut self, info: TokenUsageInfo) {
-        let percent = self.context_remaining_percent(&info);
-        let used_tokens = self.context_used_tokens(&info, percent.is_some());
-        self.bottom_pane.set_context_window(percent, used_tokens);
         self.token_info = Some(info);
+        self.refresh_context_window_display();
     }
 
-    fn context_remaining_percent(&self, info: &TokenUsageInfo) -> Option<i64> {
-        info.model_context_window.map(|window| {
-            info.last_token_usage
-                .percent_of_context_window_remaining(window)
-        })
-    }
-
-    fn context_used_tokens(&self, info: &TokenUsageInfo, percent_known: bool) -> Option<i64> {
-        if percent_known {
-            return None;
-        }
-
-        Some(info.total_token_usage.tokens_in_context_window())
+    /// Pushes the ledger-aware remaining-context percent into the composer footer.
+    /// Call after anything that changes token usage or admitted ledger sources so
+    /// "N% context left" is never stale.
+    pub(crate) fn refresh_context_window_display(&mut self) {
+        let percent = self.status_line_context_remaining_percent();
+        self.bottom_pane
+            .set_context_window(percent, /*used_tokens*/ None);
     }
 
     fn restore_pre_review_token_info(&mut self) {

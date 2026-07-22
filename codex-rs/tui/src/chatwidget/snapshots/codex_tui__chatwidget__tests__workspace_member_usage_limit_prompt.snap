@@ -2,10 +2,13 @@
 source: tui/src/chatwidget/tests/status_and_layout.rs
 expression: popup
 ---
-  Usage limit reached
-  Request a limit increase from your owner to continue using codex. Request increase?
-
-  1. Yes (y)
-› 2. No (default) (n)
-
-  Press enter to confirm or esc to go back
+┌──────────────────────────────────────────────────────────┐│CONTEXT LEDGER  Total ≈0 tokens
+│ Usage limit reached                                      ││admitted
+│ Request a limit increase from your owner to continue usi ││
+│                                                          ││No portable context is available.
+  1. Yes (y)                                               ││ACTIVE FILES  ≈0 tokens admitted
+› 2. No (default) (n)                                      ││No sources available.
+└──────────────────────────────────────────────────────────┘│
+  Press enter to confirm or esc to go back                  │DURABLE MEMORY  ≈0 tokens admitted
+                                                            │No sources available.
+ Elpis · model gpt-5.6-sol · location /tmp/project          │

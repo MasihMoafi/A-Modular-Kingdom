@@ -8,7 +8,7 @@ impl ChatWidget {
         let active_cell_renderable = match &self.transcript.active_cell {
             Some(cell) => RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                 child: cell.as_ref(),
-                top: 1,
+                top: 0,
                 right: active_cell_right_reserve,
             })),
             None => RenderableItem::Owned(Box::new(())),
@@ -17,7 +17,7 @@ impl ChatWidget {
             Some(cell) if cell.should_render() => {
                 RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                     child: cell,
-                    top: 1,
+                    top: 0,
                     right: active_cell_right_reserve,
                 }))
             }
@@ -31,7 +31,7 @@ impl ChatWidget {
                 /*flex*/ 1,
                 RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                     child: cell,
-                    top: 1,
+                    top: 0,
                     right: active_cell_right_reserve,
                 })),
             );
@@ -41,7 +41,7 @@ impl ChatWidget {
                 /*flex*/ 1,
                 RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                     child: cell,
-                    top: 1,
+                    top: 0,
                     right: active_cell_right_reserve,
                 })),
             );
@@ -179,17 +179,12 @@ impl Renderable for ChatWidget {
     }
 
     fn desired_height(&self, width: u16) -> u16 {
+        // No minimum sidebar claim: claiming extra rows forces the terminal to
+        // scroll on every redraw. The ledger renders within whatever height the
+        // composer area actually needs.
         let ledger_width = self.context_ledger_width(width);
-        let content_height = self
-            .as_renderable()
-            .desired_height(width.saturating_sub(ledger_width));
-        if ledger_width > 0 {
-            // Claim enough rows to read as a real sidebar rather than being clipped to
-            // whatever the composer alone needs.
-            content_height.max(super::context_ledger::LEDGER_MIN_HEIGHT)
-        } else {
-            content_height
-        }
+        self.as_renderable()
+            .desired_height(width.saturating_sub(ledger_width))
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
@@ -214,14 +209,11 @@ impl ChatWidget {
             return;
         }
         let model = self.current_model();
-        let context = self.status_line_context_used_display();
         let location = format_directory_display(self.status_line_cwd(), /*max_width*/ None);
         Line::from(vec![
             " Elpis ".cyan().bold(),
             "· model ".dim(),
             model.cyan(),
-            " · context ".dim(),
-            context.cyan(),
             " · location ".dim(),
             location.cyan(),
         ])

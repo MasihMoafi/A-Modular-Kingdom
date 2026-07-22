@@ -240,7 +240,6 @@ impl SlashCommand {
             // part of the public Elpis command contract.
             SlashCommand::Model
             | SlashCommand::Permissions
-            | SlashCommand::Memories
             | SlashCommand::Add
             | SlashCommand::Skills
             | SlashCommand::Rag
@@ -253,12 +252,13 @@ impl SlashCommand {
             | SlashCommand::Usage
             | SlashCommand::Mcp
             | SlashCommand::Quit
+            | SlashCommand::Fork
+            | SlashCommand::Hooks
             | SlashCommand::Clear => true,
             SlashCommand::Keymap
-            | SlashCommand::Hooks
+            | SlashCommand::Memories
             | SlashCommand::Rename
             | SlashCommand::Delete
-            | SlashCommand::Fork
             | SlashCommand::Goal
             | SlashCommand::Agent
             | SlashCommand::Side

@@ -5,17 +5,11 @@ use ratatui::text::Span;
 use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 
-const LEDGER_MIN_TERMINAL_WIDTH: u16 = 100;
+const LEDGER_MIN_TERMINAL_WIDTH: u16 = 80;
 const LEDGER_WIDTH: u16 = 52;
-/// Rows the widget claims whenever the ledger is showing, so it reads as the tall,
-/// always-visible sidebar of the design prototype instead of being clipped to the
-/// bottom pane's normal few-row height. Elpis has no alt-screen mode (chat history is
-/// terminal scrollback, so `ChatWidget` only ever renders the bottom viewport) — this
-/// is the compromise until that changes.
-pub(super) const LEDGER_MIN_HEIGHT: u16 = 38;
 
-#[derive(Default)]
 pub(super) struct ContextLedgerState {
+    visible: bool,
     focused: bool,
     selected: usize,
     pending_g: bool,
@@ -25,14 +19,31 @@ pub(super) struct ContextLedgerState {
     last_source_ranges: std::cell::RefCell<Vec<(usize, std::ops::Range<usize>)>>,
 }
 
+impl Default for ContextLedgerState {
+    fn default() -> Self {
+        Self {
+            // Open by default; Tab hides it.
+            visible: true,
+            focused: false,
+            selected: 0,
+            pending_g: false,
+            why_visible: false,
+            last_area: std::cell::Cell::new(None),
+            last_scroll: std::cell::Cell::new(0),
+            last_source_ranges: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+}
+
 impl ChatWidget {
-    /// The ledger is always visible as a sidebar once the terminal is wide enough —
-    /// it's meant to be transparent, not something you have to remember to open.
-    /// Tab still focuses it for keyboard control (select/toggle/why).
+    /// The ledger is a sidebar shown by default and toggled with Tab: one press
+    /// hides it, the next shows and focuses it. On narrower terminals it takes a
+    /// proportional slice instead of a fixed 52 columns so the composer keeps room.
     pub(super) fn context_ledger_width(&self, terminal_width: u16) -> u16 {
-        (terminal_width >= LEDGER_MIN_TERMINAL_WIDTH)
-            .then_some(LEDGER_WIDTH)
-            .unwrap_or(0)
+        if !self.context_ledger.visible || terminal_width < LEDGER_MIN_TERMINAL_WIDTH {
+            return 0;
+        }
+        LEDGER_WIDTH.min(terminal_width * 2 / 5)
     }
 
     pub(super) fn handle_context_ledger_key_event(&mut self, key_event: KeyEvent) -> bool {
@@ -48,7 +59,17 @@ impl ChatWidget {
                 .get()
                 .is_some_and(|width| width >= LEDGER_MIN_TERMINAL_WIDTH as usize)
         {
-            self.context_ledger.focused = !self.context_ledger.focused;
+            // Visible-but-unfocused → focus; focused → hide; hidden → show + focus.
+            if !self.context_ledger.visible {
+                self.context_ledger.visible = true;
+                self.context_ledger.focused = true;
+            } else if self.context_ledger.focused {
+                self.context_ledger.visible = false;
+                self.context_ledger.focused = false;
+                self.context_ledger.last_area.set(None);
+            } else {
+                self.context_ledger.focused = true;
+            }
             self.context_ledger.pending_g = false;
             self.request_redraw();
             return true;
@@ -133,7 +154,9 @@ impl ChatWidget {
             .filter(|source| source.admitted)
             .map(|source| source.estimated_tokens)
             .sum::<u64>();
-        let cyan = Style::default().fg(Color::Rgb(56, 189, 248));
+        // Plain ANSI cyan so the ledger matches the teal used by the identity line,
+        // composer accents, and the rest of the UI in the user's terminal theme.
+        let cyan = Style::default().fg(Color::Cyan);
         let amber = Style::default().fg(Color::Rgb(245, 158, 11));
         let muted = Style::default().fg(Color::Rgb(100, 116, 139));
         let mut lines = vec![Line::from(vec![
@@ -144,16 +167,6 @@ impl ChatWidget {
                 cyan,
             ),
         ])];
-        if self.context_ledger.focused {
-            let sequence_hint = if self.context_ledger.pending_g {
-                "g … then i include all / e exclude all"
-            } else {
-                "Space/Enter toggle · g i all in · g e all out"
-            };
-            lines.push(Line::from(sequence_hint.dim()));
-            lines.push(Line::from("w why · ↑↓ select · Tab close".dim()));
-            lines.push(Line::from("use /add to add a file or directory".dim()));
-        }
         lines.push(Line::from(""));
 
         if sources.is_empty() {
@@ -161,9 +174,6 @@ impl ChatWidget {
         }
         let mut source_line_ranges = vec![0..0; sources.len()];
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
-            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::Files {
-                continue;
-            }
             let category_sources = sources
                 .iter()
                 .enumerate()
@@ -201,10 +211,23 @@ impl ChatWidget {
                 let state_style = if source.admitted { cyan } else { amber };
                 let marker_style = if source.admitted { cyan } else { muted };
                 let prefix = if selected { "› " } else { "  " };
-                let left = format!("{prefix}{marker} {}", source.name);
                 let right = format!("≈{} {state}", format_tokens(source.estimated_tokens));
+                // "› " + "[x]" + " " ahead of the name; truncate long names from the
+                // left with '…' so the token count and state stay right-aligned.
+                let fixed = prefix.chars().count() + marker.chars().count() + 1;
+                let name_budget = content_width
+                    .saturating_sub(fixed + right.chars().count() + 1)
+                    .max(1);
+                let name_chars = source.name.chars().count();
+                let shown_name = if name_chars > name_budget {
+                    let tail_start = name_chars - name_budget.saturating_sub(1);
+                    let tail: String = source.name.chars().skip(tail_start).collect();
+                    format!("…{tail}")
+                } else {
+                    source.name.clone()
+                };
                 let pad = content_width
-                    .saturating_sub(left.chars().count())
+                    .saturating_sub(fixed + shown_name.chars().count())
                     .saturating_sub(right.chars().count())
                     .max(1);
                 lines.push(Line::from(vec![
@@ -212,7 +235,7 @@ impl ChatWidget {
                     Span::styled(marker, marker_style),
                     Span::raw(" "),
                     Span::styled(
-                        source.name.as_str(),
+                        shown_name,
                         if selected {
                             cyan.bold()
                         } else {
@@ -250,9 +273,6 @@ impl ChatWidget {
             }
             lines.push(Line::from(""));
         }
-        if self.context_ledger.focused {
-            lines.push(Line::from("Esc returns to the command composer.".dim()));
-        }
 
         let scroll_lines = self
             .context_ledger
@@ -280,16 +300,22 @@ impl ChatWidget {
             .collect();
         *self.context_ledger.last_source_ranges.borrow_mut() = tracked_ranges;
 
+        while lines.last().map(|l| l.spans.is_empty() || (l.spans.len() == 1 && l.spans[0].content.trim().is_empty())).unwrap_or(false) {
+            lines.pop();
+        }
+
+        let active_height = (lines.len() as u16).min(area.height);
+        let render_area = Rect::new(area.x, area.y, area.width, active_height);
+
         Paragraph::new(lines)
             .block(
                 Block::default()
                     .borders(Borders::LEFT)
-                    .border_style(cyan)
-                    .title(" CONTEXT "),
+                    .border_style(cyan),
             )
             .wrap(Wrap { trim: true })
             .scroll((scroll_lines, 0))
-            .render(area, buf);
+            .render(render_area, buf);
     }
 
     pub(crate) fn handle_context_ledger_mouse_click(&mut self, row: u16, col: u16) -> bool {
@@ -327,7 +353,7 @@ impl ChatWidget {
         false
     }
 
-    fn continuity_sources(&self) -> Vec<crate::legacy_core::elpis_context::ContinuitySource> {
+    pub(super) fn continuity_sources(&self) -> Vec<crate::legacy_core::elpis_context::ContinuitySource> {
         crate::legacy_core::elpis_context::continuity_sources(
             self.config
                 .memories
@@ -385,7 +411,10 @@ impl ChatWidget {
             &source.name,
             admitted,
         ) {
-            Ok(()) => true,
+            Ok(()) => {
+                self.refresh_context_window_display();
+                true
+            }
             Err(error) => {
                 self.add_error_message(format!("Could not update context admission: {error}"));
                 false

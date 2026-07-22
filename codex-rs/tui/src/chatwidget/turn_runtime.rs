@@ -269,25 +269,13 @@ impl ChatWidget {
     /// explicit. A fully fresh or unknown context window returns no label so
     /// the clear-context option does not imply urgency without evidence.
     pub(super) fn plan_implementation_context_usage_label(&self) -> Option<String> {
-        let info = self.token_info.as_ref()?;
-        let percent = self.context_remaining_percent(info);
-
-        let used_tokens = self.context_used_tokens(info, percent.is_some());
-        if let Some(percent) = percent {
-            let used_percent = 100 - percent.clamp(0, 100);
-            if used_percent <= 0 {
-                return None;
-            }
-            return Some(format!("{used_percent}% used"));
+        self.token_info.as_ref()?;
+        let percent = self.status_line_context_remaining_percent()?;
+        let used_percent = 100 - percent.clamp(0, 100);
+        if used_percent <= 0 {
+            return None;
         }
-
-        if let Some(tokens) = used_tokens
-            && tokens > 0
-        {
-            return Some(format!("{} used", format_tokens_compact(tokens)));
-        }
-
-        None
+        Some(format!("{used_percent}% used"))
     }
 
     pub(super) fn has_queued_follow_up_messages(&self) -> bool {

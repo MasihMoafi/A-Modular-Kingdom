@@ -36,6 +36,7 @@ use crate::tui;
 use crate::tui::TuiEvent;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
+use crossterm::event::MouseEventKind;
 use ratatui::buffer::Buffer;
 use ratatui::buffer::Cell;
 use ratatui::layout::Rect;
@@ -248,6 +249,20 @@ impl PagerView {
         Span::from(pct_text)
             .dim()
             .render_ref(Rect::new(pct_x, sep_rect.y, pct_w, 1), buf);
+    }
+
+    /// Mouse-wheel scroll: one notch moves 3 lines, matching typical terminal convention.
+    fn scroll_by_wheel(&mut self, kind: MouseEventKind) {
+        const WHEEL_LINES: usize = 3;
+        match kind {
+            MouseEventKind::ScrollUp => {
+                self.scroll_offset = self.scroll_offset.saturating_sub(WHEEL_LINES);
+            }
+            MouseEventKind::ScrollDown => {
+                self.scroll_offset = self.scroll_offset.saturating_add(WHEEL_LINES);
+            }
+            _ => {}
+        }
     }
 
     fn handle_key_event(&mut self, tui: &mut tui::Tui, key_event: KeyEvent) -> Result<()> {
@@ -791,7 +806,11 @@ impl TranscriptOverlay {
                 }
                 other => self.view.handle_key_event(tui, other),
             },
-            TuiEvent::Mouse(_) | TuiEvent::Paste(_) => Ok(()),
+            TuiEvent::Mouse(mouse_event) => {
+                self.view.scroll_by_wheel(mouse_event.kind);
+                Ok(())
+            }
+            TuiEvent::Paste(_) => Ok(()),
             TuiEvent::Draw | TuiEvent::Resize => {
                 tui.draw(u16::MAX, |frame| {
                     self.render(frame.area(), frame.buffer);
@@ -889,7 +908,11 @@ impl StaticOverlay {
                 }
                 other => self.view.handle_key_event(tui, other),
             },
-            TuiEvent::Mouse(_) | TuiEvent::Paste(_) => Ok(()),
+            TuiEvent::Mouse(mouse_event) => {
+                self.view.scroll_by_wheel(mouse_event.kind);
+                Ok(())
+            }
+            TuiEvent::Paste(_) => Ok(()),
             TuiEvent::Draw | TuiEvent::Resize => {
                 tui.draw(u16::MAX, |frame| {
                     self.render(frame.area(), frame.buffer);

@@ -429,12 +429,12 @@ pub enum ExitReason {
 }
 
 fn session_summary(
-    token_usage: TokenUsage,
+    _token_usage: TokenUsage,
     thread_id: Option<ThreadId>,
     thread_name: Option<String>,
     rollout_path: Option<&Path>,
 ) -> Option<SessionSummary> {
-    let usage_line = (!token_usage.is_zero()).then(|| token_usage.to_string());
+    let usage_line = None;
     let resume_hint = resume_hint_for_resumable_thread(thread_id, thread_name, rollout_path);
 
     if usage_line.is_none() && resume_hint.is_none() {
@@ -702,7 +702,7 @@ fn session_start_error(
 fn archived_session_guidance(err: &color_eyre::eyre::Report) -> Option<String> {
     let err = err.to_string();
     let message = &err[err.find("session ")?..];
-    if !message.contains(" is archived. Run `codex unarchive ") {
+    if !message.contains(" is archived. Run `elpis unarchive ") {
         return None;
     }
     let message = message
@@ -1020,7 +1020,7 @@ impl App {
             color_eyre::eyre::eyre!(
                 "Invalid `tui.keymap` configuration: {err}\n\
 Fix the config and retry.\n\
-See the Codex keymap documentation for supported actions and examples."
+See the Elpis keymap documentation for supported actions and examples."
             )
         })?;
         #[cfg(not(debug_assertions))]
@@ -1294,8 +1294,16 @@ See the Codex keymap documentation for supported actions and examples."
                     self.handle_key_event(tui, app_server, key_event).await;
                 }
                 TuiEvent::Mouse(mouse_event) => {
-                    if matches!(mouse_event.kind, crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)) {
-                        self.chat_widget.handle_context_ledger_mouse_click(mouse_event.row, mouse_event.column);
+                    match mouse_event.kind {
+                        crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                            self.chat_widget.handle_context_ledger_mouse_click(mouse_event.row, mouse_event.column);
+                        }
+                        crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Middle) => {
+                            if let Some(pasted) = crate::clipboard_paste::read_primary_selection() {
+                                self.chat_widget.handle_paste(pasted.replace('\r', "\n"));
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 TuiEvent::Paste(pasted) => {

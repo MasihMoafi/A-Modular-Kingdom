@@ -2,8 +2,9 @@
 source: tui/src/chatwidget/tests/side.rs
 expression: terminal.backend()
 ---
-"                                                                                "
-"                                                                                "
-"› Check recently modified functions for compatibility                           "
-"                                                                                "
-"  gpt-5.6-sol def… Side from main thread · main needs input · Ctrl+C to return  "
+"┌──────────────────────────────────────────────┐│CONTEXT LEDGER  Total ≈0 tokens"
+"› Check recently modified functions for compati││admitted                       "
+"└──────────────────────────────────────────────┘│                               "
+"  Side from main thread · main needs input · Ctr│No portable context is         "
+"                                                │available.                     "
+" Elpis · model gpt-5.6-sol · location /tmp/proje│ACTIVE FILES  ≈0 tokens        "

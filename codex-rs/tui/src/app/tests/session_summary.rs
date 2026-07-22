@@ -52,13 +52,11 @@ async fn session_summary_includes_resume_hint_for_persisted_rollout() {
         Some(&rollout_path),
     )
     .expect("summary");
-    assert_eq!(
-        summary.usage_line,
-        Some("Token usage: total=12 input=10 output=2".to_string())
-    );
+    // Token usage stays out of the session-end summary; it lives in /usage.
+    assert_eq!(summary.usage_line, None);
     assert_eq!(
         summary.resume_hint,
-        Some("codex resume 123e4567-e89b-12d3-a456-426614174000".to_string())
+        Some("elpis resume 123e4567-e89b-12d3-a456-426614174000".to_string())
     );
 }
 
@@ -85,7 +83,7 @@ async fn session_summary_names_picker_item_when_thread_has_name() {
     assert_eq!(
         summary.resume_hint,
         Some(
-            "codex resume, then select my-session (123e4567-e89b-12d3-a456-426614174000)"
+            "elpis resume, then select my-session (123e4567-e89b-12d3-a456-426614174000)"
                 .to_string()
         )
     );

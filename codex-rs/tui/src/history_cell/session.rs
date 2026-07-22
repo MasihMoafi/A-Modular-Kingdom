@@ -8,10 +8,7 @@ pub(crate) const SESSION_HEADER_MAX_INNER_WIDTH: usize = 56; // Just an eyeballe
 
 /// This release's headline changes, shown in the welcome card so Elpis opens as
 /// itself — not as a Codex look-alike. Update alongside each release.
-const WHATS_NEW_LINES: [&str; 2] = [
-    "context saved per turn — watch it go down",
-    "/add dirs · Tab ledger · Shift+Tab modes",
-];
+const WHATS_NEW_LINES: [&str; 0] = [];
 
 pub(crate) fn card_inner_width(width: u16, max_inner_width: usize) -> Option<usize> {
     if width < 4 {

@@ -2,10 +2,11 @@
 source: tui/src/chatwidget/tests/status_and_layout.rs
 expression: normalized_backend_snapshot(terminal.backend())
 ---
-"                                                                                "
-"• Analyzing (0s • esc to interrupt)                                             "
-"                                                                                "
-"                                                                                "
-"› Ask Codex to do anything                                                      "
-"                                                                                "
-"  gpt-5.6-sol default · /tmp/project                                            "
+"• Analyzing (0s • esc to interrupt)             │CONTEXT LEDGER  Total ≈0 tokens"
+"                                                │admitted                       "
+"┌──────────────────────────────────────────────┐│                               "
+"› Ask Codex to do anything                     ││No portable context is         "
+"└──────────────────────────────────────────────┘│available.                     "
+"        100% context left · Tab Context Ledger  │ACTIVE FILES  ≈0 tokens        "
+"                                                │admitted                       "
+" Elpis · model gpt-5.6-sol · location /tmp/proje│No sources available.          "

@@ -280,6 +280,7 @@ impl ChatWidget {
             .bottom_pane
             .set_token_activity_command_enabled(widget.has_codex_backend_auth);
         widget.refresh_status_surfaces();
+        widget.refresh_context_window_display();
 
         widget
     }

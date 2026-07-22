@@ -18,10 +18,8 @@ use crossterm::SynchronizedUpdate;
 use crossterm::cursor::SetCursorStyle;
 use crossterm::event::DisableBracketedPaste;
 use ratatui::crossterm::event::DisableFocusChange;
-use ratatui::crossterm::event::DisableMouseCapture;
 use ratatui::crossterm::event::EnableBracketedPaste;
 use ratatui::crossterm::event::EnableFocusChange;
-use ratatui::crossterm::event::EnableMouseCapture;
 use ratatui::crossterm::event::KeyEvent;
 pub use ratatui::crossterm::event::MouseEvent;
 use crossterm::terminal::EnterAlternateScreen;
@@ -190,7 +188,6 @@ pub fn set_modes() -> Result<()> {
     keyboard_modes::enable_keyboard_enhancement();
 
     let _ = execute!(stdout(), EnableFocusChange);
-    let _ = execute!(stdout(), EnableMouseCapture);
     Ok(())
 }
 
@@ -263,7 +260,6 @@ fn restore_common(
         first_error.get_or_insert(err);
     }
     let _ = execute!(stdout(), DisableFocusChange);
-    let _ = execute!(stdout(), DisableMouseCapture);
     if matches!(raw_mode_restore, RawModeRestore::Disable)
         && let Err(err) = disable_raw_mode()
     {

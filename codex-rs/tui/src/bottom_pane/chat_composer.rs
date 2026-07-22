@@ -777,6 +777,12 @@ impl ChatComposer {
         };
         let [composer_rect, popup_rect] =
             Layout::vertical([Constraint::Min(3), popup_constraint]).areas(area);
+        let composer_rect = Rect::new(
+            composer_rect.x,
+            composer_rect.y,
+            composer_rect.width.saturating_sub(textarea_right_reserve),
+            composer_rect.height,
+        );
         let mut textarea_rect = composer_rect.inset(Insets::tlbr(
             /*top*/ 1,
             LIVE_PREFIX_COLS,

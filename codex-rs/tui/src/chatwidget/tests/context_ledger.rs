@@ -75,10 +75,6 @@ async fn ledger_groups_real_sources_and_exposes_selected_reason() -> anyhow::Res
     assert!(rendered.contains("WHY INCLUDED"));
     assert!(rendered.contains("applicable global rules"));
     assert!(
-        rendered.contains("use /add to add a file or directory"),
-        "missing /add hint:\n{rendered}"
-    );
-    assert!(
         rendered.contains("dev/SKILL.md"),
         "server-reported dev rule must render as its own row:\n{rendered}"
     );

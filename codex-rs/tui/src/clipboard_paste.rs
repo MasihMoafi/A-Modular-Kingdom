@@ -108,6 +108,43 @@ pub fn paste_image_as_png() -> Result<(Vec<u8>, PastedImageInfo), PasteImageErro
     ))
 }
 
+/// Reads the X11/Wayland PRIMARY selection (the "select to copy, middle-click to
+/// paste" buffer distinct from the regular clipboard). Returns `None` when
+/// unavailable or empty rather than surfacing an error — middle-click paste is a
+/// convenience, not a path with a user-visible failure mode.
+#[cfg(target_os = "linux")]
+pub(crate) fn read_primary_selection() -> Option<String> {
+    use arboard::Clipboard;
+    use arboard::GetExtLinux;
+    use arboard::LinuxClipboardKind;
+    if let Ok(mut cb) = Clipboard::new() {
+        if let Ok(text) = cb.get().clipboard(LinuxClipboardKind::Primary).text() {
+            if !text.trim().is_empty() {
+                return Some(text);
+            }
+        }
+        if let Ok(text) = cb.get_text() {
+            if !text.trim().is_empty() {
+                return Some(text);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn read_primary_selection() -> Option<String> {
+    use arboard::Clipboard;
+    if let Ok(mut cb) = Clipboard::new() {
+        if let Ok(text) = cb.get_text() {
+            if !text.trim().is_empty() {
+                return Some(text);
+            }
+        }
+    }
+    None
+}
+
 /// Android/Termux does not support arboard; return a clear error.
 #[cfg(target_os = "android")]
 pub fn paste_image_as_png() -> Result<(Vec<u8>, PastedImageInfo), PasteImageError> {
