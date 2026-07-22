@@ -467,7 +467,10 @@ impl StatusHistoryCell {
             .unwrap_or(0);
 
         let archive_span = if let Some(session_id) = &self.session_id {
-            format!(" · archive: ~/.elpis/sessions/{session_id}/rollout.jsonl")
+            let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/home/masih"));
+            let full_path = home.join(format!(".elpis/sessions/{session_id}/rollout.jsonl"));
+            let url = format!("file://{}", full_path.display());
+            format!(" · archive: \x1b]8;;{url}\x1b\\~/.elpis/sessions/{session_id}/rollout.jsonl\x1b]8;;\x1b\\")
         } else {
             " · archive: ~/.elpis/sessions/".to_string()
         };

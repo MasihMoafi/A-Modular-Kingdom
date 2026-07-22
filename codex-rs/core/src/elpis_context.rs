@@ -150,18 +150,32 @@ pub fn continuity_sources(
     let mut canonical_paths = std::collections::HashSet::new();
 
     let mut instruction_paths: Vec<PathBuf> = instruction_source_paths.to_vec();
-    // The app server only sends global/project AGENTS.md natively; `skills/dev/*.md`
-    // files are Elpis-specific and it never learns about them. They used to reach the
-    // ledger and the prompt only via a continuity-prompt injection that read this same
-    // directory — removing that injection (to fix a genuine global/project double-send)
-    // silently dropped dev files entirely. Discovering them here, once, keeps both the
-    // ledger (called with the server's real list) and `build_continuity_prompt` (called
-    // with an empty list, since server-sent rules must not be re-injected) in sync.
-    if let Some(dev_dir) = cwd.parent().map(|parent| parent.join("skills/dev")) {
-        let already_listed: std::collections::HashSet<PathBuf> = instruction_paths
-            .iter()
-            .filter_map(|path| path.canonicalize().ok())
-            .collect();
+    if instruction_paths.is_empty() {
+        if let Some(home) = dirs::home_dir() {
+            let global_agents = home.join(".codex/AGENTS.md");
+            if global_agents.exists() {
+                instruction_paths.push(global_agents);
+            }
+        }
+        let proj_agents = cwd.join("AGENTS.md");
+        if proj_agents.exists() {
+            instruction_paths.push(proj_agents);
+        }
+    }
+
+    let dev_dirs = vec![
+        cwd.parent().map(|parent| parent.join("skills/dev")),
+        dirs::home_dir().map(|home| home.join("Desktop/p/skills/dev")),
+        dirs::home_dir().map(|home| home.join("Desktop/f/p/skills/dev")),
+        dirs::home_dir().map(|home| home.join(".codex/skills/dev")),
+    ];
+
+    let already_listed: std::collections::HashSet<PathBuf> = instruction_paths
+        .iter()
+        .filter_map(|path| path.canonicalize().ok())
+        .collect();
+
+    for dev_dir in dev_dirs.into_iter().flatten() {
         if let Ok(entries) = std::fs::read_dir(&dev_dir) {
             let mut dev_files: Vec<PathBuf> = entries
                 .filter_map(|entry| entry.ok())

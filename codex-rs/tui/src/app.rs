@@ -1293,6 +1293,11 @@ See the Codex keymap documentation for supported actions and examples."
                 TuiEvent::Key(key_event) => {
                     self.handle_key_event(tui, app_server, key_event).await;
                 }
+                TuiEvent::Mouse(mouse_event) => {
+                    if matches!(mouse_event.kind, crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)) {
+                        self.chat_widget.handle_context_ledger_mouse_click(mouse_event.row, mouse_event.column);
+                    }
+                }
                 TuiEvent::Paste(pasted) => {
                     // Many terminals convert newlines to \r when pasting (e.g., iTerm2),
                     // but tui-textarea expects \n. Normalize CR to LF.

@@ -20,6 +20,9 @@ pub(super) struct ContextLedgerState {
     selected: usize,
     pending_g: bool,
     why_visible: bool,
+    last_area: std::cell::Cell<Option<Rect>>,
+    last_scroll: std::cell::Cell<u16>,
+    last_source_ranges: std::cell::RefCell<Vec<(usize, std::ops::Range<usize>)>>,
 }
 
 impl ChatWidget {
@@ -153,6 +156,9 @@ impl ChatWidget {
         }
         let mut source_line_ranges = vec![0..0; sources.len()];
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
+            if category == crate::legacy_core::elpis_context::ContinuitySourceCategory::ActiveFiles {
+                continue;
+            }
             let category_sources = sources
                 .iter()
                 .enumerate()
@@ -259,7 +265,14 @@ impl ChatWidget {
                     })
                     .unwrap_or(0)
             })
-            .unwrap_or(0);
+        self.context_ledger.last_area.set(Some(area));
+        self.context_ledger.last_scroll.set(scroll_lines);
+        let tracked_ranges = source_line_ranges
+            .into_iter()
+            .enumerate()
+            .filter(|(_, r)| !r.is_empty())
+            .collect();
+        *self.context_ledger.last_source_ranges.borrow_mut() = tracked_ranges;
 
         Paragraph::new(lines)
             .block(
@@ -271,6 +284,36 @@ impl ChatWidget {
             .wrap(Wrap { trim: true })
             .scroll((scroll_lines, 0))
             .render(area, buf);
+    }
+
+    pub(super) fn handle_context_ledger_mouse_click(&mut self, row: u16, col: u16) -> bool {
+        let Some(area) = self.context_ledger.last_area.get() else {
+            return false;
+        };
+        if col < area.x || col >= area.x + area.width || row < area.y || row >= area.y + area.height {
+            return false;
+        }
+
+        let scroll = self.context_ledger.last_scroll.get();
+        let relative_line = (row.saturating_sub(area.y).saturating_sub(1) + scroll) as usize;
+
+        let ranges = self.context_ledger.last_source_ranges.borrow();
+        for &(index, ref range) in ranges.iter() {
+            if range.contains(&relative_line) {
+                let sources = self.continuity_sources();
+                if let Some(source) = sources.get(index) {
+                    if source.selectable {
+                        self.context_ledger.focused = true;
+                        self.context_ledger.selected = index;
+                        let new_state = !source.admitted;
+                        self.set_context_source_admitted(source, new_state);
+                        self.request_redraw();
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     fn continuity_sources(&self) -> Vec<crate::legacy_core::elpis_context::ContinuitySource> {

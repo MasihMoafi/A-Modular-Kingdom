@@ -17,10 +17,13 @@ use crossterm::Command;
 use crossterm::SynchronizedUpdate;
 use crossterm::cursor::SetCursorStyle;
 use crossterm::event::DisableBracketedPaste;
-use crossterm::event::DisableFocusChange;
-use crossterm::event::EnableBracketedPaste;
-use crossterm::event::EnableFocusChange;
-use crossterm::event::KeyEvent;
+use ratatui::crossterm::event::DisableFocusChange;
+use ratatui::crossterm::event::DisableMouseCapture;
+use ratatui::crossterm::event::EnableBracketedPaste;
+use ratatui::crossterm::event::EnableFocusChange;
+use ratatui::crossterm::event::EnableMouseCapture;
+use ratatui::crossterm::event::KeyEvent;
+pub use ratatui::crossterm::event::MouseEvent;
 use crossterm::terminal::EnterAlternateScreen;
 use crossterm::terminal::LeaveAlternateScreen;
 #[cfg(not(unix))]
@@ -187,6 +190,7 @@ pub fn set_modes() -> Result<()> {
     keyboard_modes::enable_keyboard_enhancement();
 
     let _ = execute!(stdout(), EnableFocusChange);
+    let _ = execute!(stdout(), EnableMouseCapture);
     Ok(())
 }
 
@@ -259,6 +263,7 @@ fn restore_common(
         first_error.get_or_insert(err);
     }
     let _ = execute!(stdout(), DisableFocusChange);
+    let _ = execute!(stdout(), DisableMouseCapture);
     if matches!(raw_mode_restore, RawModeRestore::Disable)
         && let Err(err) = disable_raw_mode()
     {
@@ -512,6 +517,8 @@ fn set_panic_hook() {
 pub enum TuiEvent {
     /// A terminal key event after focus, paste, and protocol bookkeeping has been handled.
     Key(KeyEvent),
+    /// A terminal mouse event for interactive panel clicks.
+    Mouse(MouseEvent),
     /// A bracketed paste payload normalized by the app layer before it reaches the composer.
     Paste(String),
     /// A terminal size notification that should be handled as resize-sensitive draw work.
