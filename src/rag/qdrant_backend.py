@@ -162,11 +162,21 @@ class QdrantVectorDB:
         """Vector similarity search."""
         query_vector = self._embed_single(query)
 
-        results = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_vector,
-            limit=top_k
-        )
+        if hasattr(self.client, "search"):
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector,
+                limit=top_k
+            )
+        elif hasattr(self.client, "query_points"):
+            response = self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                limit=top_k
+            )
+            results = getattr(response, "points", response)
+        else:
+            raise AttributeError("QdrantClient has neither 'search' nor 'query_points' method")
 
         # Convert to standard format
         formatted = []
