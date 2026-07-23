@@ -164,12 +164,17 @@ impl Renderable for ChatWidget {
         );
         self.as_renderable().render(chat_area, buf);
         if ledger_width > 0 {
+            // Bottom-anchor the ledger against the composer instead of the top of the
+            // screen, so a short ledger doesn't sit alongside the chat transcript.
+            let ledger_height = self
+                .context_ledger_desired_height(ledger_width)
+                .min(area.height);
             self.render_context_ledger(
                 Rect::new(
                     chat_area.x.saturating_add(chat_area.width),
-                    area.y,
+                    area.y.saturating_add(area.height.saturating_sub(ledger_height)),
                     ledger_width,
-                    area.height,
+                    ledger_height,
                 ),
                 buf,
             );
