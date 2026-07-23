@@ -139,7 +139,7 @@ async fn try_stream_prune_pass(
         CodexResponsesRequestKind::ContextPrune,
     );
 
-    let mut stream = client_session
+    let mut stream = match client_session
         .stream(
             &prompt,
             &model_info,
@@ -151,7 +151,13 @@ async fn try_stream_prune_pass(
             &InferenceTraceContext::disabled(),
         )
         .await
-        .ok()?;
+    {
+        Ok(stream) => stream,
+        Err(err) => {
+            tracing::warn!("Context prune stream failed for model {prune_model_slug}: {err}");
+            return None;
+        }
+    };
 
     let mut collected: Vec<ResponseItem> = Vec::new();
     loop {
@@ -159,8 +165,18 @@ async fn try_stream_prune_pass(
             Some(Ok(ResponseEvent::OutputItemDone(item))) => collected.push(item),
             Some(Ok(ResponseEvent::Completed { .. })) => break,
             Some(Ok(_)) => continue,
-            Some(Err(_)) | None => return None,
+            Some(Err(err)) => {
+                tracing::warn!("Context prune stream error for model {prune_model_slug}: {err}");
+                return None;
+            }
+            None => break,
         }
     }
-    super::turn::get_last_assistant_message_from_turn(&collected)
+    let result = super::turn::get_last_assistant_message_from_turn(&collected);
+    if let Some(ref text) = result {
+        tracing::info!("Context prune LLM response received ({prune_model_slug}): {text}");
+    } else {
+        tracing::warn!("Context prune LLM stream returned no assistant text ({prune_model_slug})");
+    }
+    result
 }
