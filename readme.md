@@ -13,52 +13,28 @@ you're paying for.
 Elpis is a terminal agent shell that treats context as a managed asset, not an
 ever-growing log:
 
-- **Post-turn context pruning.** After a turn delivers its answer, raw exploration —
-  command dumps, file reads, failed probes — is replaced in the *next* request by compact
-  receipts with exact evidence pointers. The full transcript stays on disk, retrievable on
-  demand; it just stops being resent by default. No other open agent does this per-turn.
-- **The Context Ledger.** A visible, scrollable panel showing *exactly* what enters your
-  next model request — every rule file, goal, checkpoint, and added file as its own row,
-  each one toggleable. You decide what the model sees. `/add` a file of your own.
-- **Portable continuity.** The active goal (`GOAL.md`) and a lean checkpoint (`ES.md`)
-  survive compaction, session death, and even switching runtimes. Resume a thread exactly,
-  or start a fresh one that already knows your goal, last result, and next action —
-  without replaying history.
-- **Earned memory.** Facts become durable memory only after repeated useful recall across
-  distinct contexts. Everything else stays as searchable evidence. Deleted memories are
-  archived before reset — never silently lost.
-- **Runtime-agnostic.** The shell survives underneath whichever model performs the loop:
-  ChatGPT/Codex subscription login, OpenRouter, native Anthropic and Gemini adapters,
-  Bedrock, Ollama, LM Studio. Put a model into Elpis and it becomes Elpis: your goals,
-  context, memory, and rules.
+- **Dual-Layer Context Pruning (Shipped in v0.1.0).** Layer 1 deterministically compacts older tool outputs into head/tail receipts with durable `rollout://` evidence pointers. Layer 2 ("Masih's Ace in the Hole") executes a background model pruning pass after each turn to evaluate user and assistant messages, purging transient thinking fluff while preserving core architectural conclusions. Inspect reports anytime via `file:///home/masih/.elpis/logs/prune_report.md` or type `/prune`.
+- **Interactive `/context` Visual Grid.** Type `/context` to see a real-time cell grid, category breakdown (System prompt, User/Agent/Tool cells), Checkpoints count, and System files list.
+- **The Context Ledger.** A visible, scrollable panel showing *exactly* what enters your next model request — every rule file, goal, checkpoint, and added file as its own row, each one toggleable. You decide what the model sees. `/add` a file of your own.
+- **Portable continuity.** The active goal (`GOAL.md`) and a lean checkpoint (`ES.md`) survive compaction, session death, and even switching runtimes. Resume a thread exactly, or start a fresh one that already knows your goal, last result, and next action — without replaying history.
+- **Earned memory.** Facts become durable memory only after repeated useful recall across distinct contexts. Everything else stays as searchable evidence. Deleted memories are archived before reset — never silently lost.
+- **Runtime-agnostic.** The shell survives underneath whichever model performs the loop: ChatGPT/Codex subscription login, OpenRouter, native Anthropic and Gemini adapters, Bedrock, Ollama, LM Studio. Put a model into Elpis and it becomes Elpis: your goals, context, memory, and rules.
 
-The execution foundation (terminal UI, patches, permissions, sandboxing, sessions) is a
-subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned here.
+The execution foundation (terminal UI, patches, permissions, sandboxing, sessions) is a subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned here.
 
-> **Current state:** approaching first release. `v0.1.0` is tagged only after live
-> acceptance recorded in [TASKS.md](TASKS.md). A green badge means those checks passed —
-> it never means unfinished work is finished.
+> **Release `v0.1.0`:** Shipped and verified with live acceptance recorded in [TASKS.md](TASKS.md).
 
 ## What works today
 
-- Native Ratatui terminal interface with streaming commands, patches, permission modes,
-  sandboxing, mouse selection, sessions, and compaction.
-- ChatGPT subscription authentication; OpenRouter through `OPENROUTER_API_KEY`; native
-  Anthropic Messages and Google Gemini adapters (`--provider anthropic`,
-  `--provider google-gemini`; live vendor acceptance pending).
-- One internal, read-only RAG service: `/rag <query>`, `/rag <path> -- <query>`, and
-  autonomous retrieval.
+- Native Ratatui terminal interface with streaming commands, patches, permission modes, sandboxing, mouse selection, sessions, and compaction.
+- Dual-Layer Context Pruning: Layer 1 instant tool receipts + Layer 2 meaning-aware Ace message pruning with live `/status` token breakdown.
+- Visual Context Grid: `/context` command with cell grid, category token breakdown, and System files overview.
+- Clickable Markdown Audit Report: `file:///home/masih/.elpis/logs/prune_report.md` showing verbatim prompt, model decision, and deletion audit.
+- ChatGPT subscription authentication; OpenRouter through `OPENROUTER_API_KEY`; native Anthropic Messages and Google Gemini adapters.
+- One internal, read-only RAG service: `/rag <query>`, `/rag <path> -- <query>`, and autonomous retrieval.
 - Portable `GOAL.md` + `ES.md` continuity; exact resume or lean continuation.
-- The Context Ledger with per-file rows and toggles; `/usage` reporting every admitted
-  source with size, lifetime, and reason.
-- Bounded local memory with recall tracking, promotion, provenance, and a
-  fail-closed archive.
-- Deterministic first-pass context cleaning: older long tool outputs become bounded
-  excerpts with durable `rollout://` evidence pointers.
-
-The full pruning engine — the agent-authored turn outcome record described in
-[`docs/CONTEXT_AND_SESSIONS.md`](docs/CONTEXT_AND_SESSIONS.md) — is the flagship feature
-in active development, alongside a visible per-turn "context saved" metric.
+- The Context Ledger with per-file rows and toggles; `/usage` reporting every admitted source with size, lifetime, and reason.
+- Bounded local memory with recall tracking, promotion, provenance, and a fail-closed archive.
 
 ## The working model
 
