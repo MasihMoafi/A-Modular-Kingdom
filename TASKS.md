@@ -19,15 +19,16 @@ levels above.
 No new feature work starts while the Current Action is open unless Masih explicitly
 changes priority.
 
-## Current Action — make the existing UI solid
+## Current Action — none open
 
-**Importance:** Foundational
+The previous Current Action (Context Ledger, Foundational) is **done and
+Masih-verified 2026-07-23**: Tab no longer submits the draft; Alt+C toggles the
+ledger; panel bottom-anchored (commits `81d6000`, `018f965`); design accepted.
+Masih sets the next Current Action; no new feature work starts until he does.
 
-**Status:** acceptance items 1–3 shipped and Masih-verified 2026-07-23 (Tab no longer
-submits the draft; Alt+C toggles the ledger; panel bottom-anchored — commits
-`81d6000`, `018f965`). Remaining: item 4, the ledger design review decision.
+## Completed — make the existing UI solid (Context Ledger)
 
-**First target:** Context Ledger
+**Importance:** Foundational · **Status:** done, Masih-verified 2026-07-23
 
 The current Elpis works well enough for daily use. The priority is now to perfect the
 features already present before adding new ones.
@@ -119,16 +120,25 @@ Startup already feels fast in current daily use, so there is no active startup p
 Binary-size reduction is also not an active feature. Measure release builds in CI and
 open focused work only if startup time or release size regresses.
 
+### I5. Structured interactive clarification — planned
+
+Elpis turns Masih's request into an explicit acceptance harness (criteria list) and
+confirms it with him before implementation on important or difficult tasks. This is
+the product form of the arbiter-of-truth rule in `AGENTS.md`: passing CI and cargo
+builds is never "done"; only Masih's verification against the confirmed criteria is.
+
+### I6. Multi-agent controls and `/multi-task` — planned
+
+Run and inspect several agents, potentially as a visible task graph.
+
+### I7. Voice input — planned
+
+### I8. LSP-backed code intelligence — planned
+
 ## Nice-to-have
 
 These are wanted ideas, but they are optional until the current product is polished:
 
-- Agent controls and `/multi-task`: run and inspect several agents, potentially as a
-  visible task graph.
-- Structured interactive clarification inside Elpis.
-- Voice input.
-- LSP-backed code intelligence.
-- Further UI improvements after the Context Ledger.
 - Remote messaging, scheduling, mobile control, and opt-in telemetry.
 
 Old-data cleanup is not active work. It would mean previewing and then removing stale

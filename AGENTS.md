@@ -24,11 +24,16 @@
 
 ## Definition Of Done
 
-- **Masih is the functionality tester for anything human-testable.** Agents verify
-  compilation and automated checks only, then build + install the binary and hand
-  Masih a plain, itemized test checklist (one bullet per behavior, stating exactly
-  what to do and what must happen). Agents never claim functional verification of
-  UI/UX behavior themselves; unverified is unverified until Masih confirms.
+- **Masih is the sole arbiter of truth.** No task is "done" because CI passed or
+  cargo built — those are necessary, never sufficient. Agents seldom deliver what
+  was requested precisely, so the flow is mandatory: (1) turn Masih's request into
+  an explicit acceptance harness — an itemized criteria list stating exactly what
+  must be true; (2) for important or difficult tasks, confirm that harness with
+  Masih BEFORE implementing; (3) implement, verify compilation and automated
+  checks, build + install; (4) hand Masih a plain test checklist (one bullet per
+  behavior: what to do, what must happen); (5) the task reaches "done" only when
+  Masih verifies it. Agents never claim functional verification themselves;
+  unverified is unverified until Masih confirms.
 - Behavior is implemented, not merely documented.
 - A feature becomes complete only when its acceptance check passes and evidence is
   recorded in `TASKS.md`.
