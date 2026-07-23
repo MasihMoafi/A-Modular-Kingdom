@@ -23,7 +23,9 @@ changes priority.
 
 **Importance:** Foundational
 
-**Status:** active
+**Status:** acceptance items 1–3 shipped and Masih-verified 2026-07-23 (Tab no longer
+submits the draft; Alt+C toggles the ledger; panel bottom-anchored — commits
+`81d6000`, `018f965`). Remaining: item 4, the ledger design review decision.
 
 **First target:** Context Ledger
 
@@ -61,8 +63,9 @@ Non-goals:
 - Preserve working context continuity, pruning, memory, RAG, provider, permission, and
   session behavior while polishing the product.
 
-### F2. Context, continuity, memory, and RAG — shipped
+### F2. Ace, context, continuity, memory, and RAG — shipped
 
+- Ace ("Masih's Ace in the Hole") is Elpis's meaning-aware second pruning layer.
 - Portable context, exact resume, lean continuation, dual-layer pruning, durable memory,
   and local RAG are implemented.
 - New defects in these systems are foundational regressions.
@@ -81,17 +84,36 @@ Non-goals:
 
 ## Important
 
-### I1. Easier installation and distribution — pending
+### I1. `/auto` cost-saving model routing — deferred experiment
+
+- Goal: avoid spending the strongest model on trivial work without increasing total
+  cost through bad routing, retries, or damaged work.
+- `/auto <task>` uses Terra at high reasoning to understand the task. Terra asks Masih
+  to state an intent when none is clear; otherwise it cleans the request and chooses
+  the working model.
+- Easy routes to Luna at medium reasoning, Medium to Terra at high reasoning, and Hard
+  to Sol at high reasoning.
+- Routing happens once for each explicitly started `/auto` task. The selected model
+  stays with that task, and Elpis shows the choice in the model bar.
+- Do not implement this yet. First test its decisions against a small set of Masih's
+  real tasks and compare total cost and successful completion with using Sol at high
+  reasoning throughout. Proceed only if it clearly saves money without unacceptable
+  routing mistakes.
+
+### I2. Easier installation and distribution — pending
 
 Improve installation and distribution after the current baseline is polished. Keep one
 clear supported path and verify it in a clean environment.
 
-### I2. Careful Rust subtraction — ongoing maintenance
+- **macOS build (Apple Silicon) — target v0.2.** The single biggest adoption blocker:
+  most of the potential audience cannot run Elpis today. Windows comes after macOS.
+
+### I3. Careful Rust subtraction — ongoing maintenance
 
 Continue deleting inherited Codex code only when reachability and behavior checks prove
 Elpis does not need it. Small, measured removals are preferred over broad deletion.
 
-### I3. Performance guardrails — monitor
+### I4. Performance guardrails — monitor
 
 Startup already feels fast in current daily use, so there is no active startup project.
 Binary-size reduction is also not an active feature. Measure release builds in CI and
@@ -101,7 +123,6 @@ open focused work only if startup time or release size regresses.
 
 These are wanted ideas, but they are optional until the current product is polished:
 
-- `/auto`: classify work as Easy, Medium, or Hard and choose a suitable model.
 - Agent controls and `/multi-task`: run and inspect several agents, potentially as a
   visible task graph.
 - Structured interactive clarification inside Elpis.
