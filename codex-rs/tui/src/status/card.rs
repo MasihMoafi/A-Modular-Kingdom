@@ -458,6 +458,7 @@ impl StatusHistoryCell {
         let agent_fmt = format_tokens_compact(agent_tokens);
         let total_fmt = format_tokens_compact(total_saved_tokens);
 
+        let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home/masih".to_string());
         Some(vec![
             Span::from(format!("~{total_fmt} tokens saved")),
             Span::from(format!(
@@ -465,7 +466,7 @@ impl StatusHistoryCell {
                 self.context_cleaner_evictions, self.context_pruner_passes
             ))
             .dim(),
-            Span::from(" | Report: ~/.elpis/logs/prune_report.md").dim(),
+            Span::from(format!(" | file://{home_dir}/.elpis/logs/prune_report.md")),
         ])
     }
 
