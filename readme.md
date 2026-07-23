@@ -1,98 +1,166 @@
+---
+name: Elpis
+type: terminal coding-agent shell for long-running developer workflows
+---
+
 # Elpis
 
 [![Linux verification](https://github.com/MasihMoafi/Elpis/actions/workflows/embedded-elpis-linux.yml/badge.svg)](https://github.com/MasihMoafi/Elpis/actions/workflows/embedded-elpis-linux.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Your terminal agent forgets everything. Elpis doesn't.**
+**A coding agent should not need the full transcript to remember why it is changing your code.**
 
-Every coding agent today has the same disease: the longer you work, the worse it gets.
-Goals drown in transcripts. Decisions vanish at compaction. Every new session starts with
-you explaining your task *again*, and every model request resends an ever-fatter history
-you're paying for.
+Elpis is a terminal coding-agent shell that keeps goals, selected context, memory, and evidence separate from the raw conversation log. It is for developers running long or repeated coding sessions who want to inspect what enters the next model request instead of treating the transcript as the product state.
 
-Elpis is a terminal agent shell that treats context as a managed asset, not an
-ever-growing log:
+**Current release:** `v0.1.0` on Linux x86_64. Release acceptance and the live development state are tracked in [TASKS.md](TASKS.md).
 
-- **Dual-Layer Context Pruning (Shipped in v0.1.0).** Layer 1 deterministically compacts older tool outputs into head/tail receipts with durable `rollout://` evidence pointers. Layer 2 ("Masih's Ace in the Hole") executes a background model pruning pass after each turn to evaluate user and assistant messages, purging transient thinking fluff while preserving core architectural conclusions. Inspect reports anytime via `file:///home/masih/.elpis/logs/prune_report.md` or type `/prune`.
-- **The Context Ledger.** A visible, scrollable panel showing *exactly* what enters your next model request — every rule file, goal, checkpoint, and added file as its own row, each one toggleable. Type `/context` for a real-time token grid and category breakdown; `/add` to include any file of your own.
-- **Portable continuity.** The active goal (`GOAL.md`) and a lean checkpoint (`ES.md`) survive compaction, session death, and even switching runtimes. Resume a thread exactly, or start a fresh one that already knows your goal, last result, and next action — without replaying history.
-- **Earned memory.** Facts become durable memory only after repeated useful recall across distinct contexts. Everything else stays as searchable evidence. Deleted memories are archived before reset — never silently lost.
-- **Runtime-agnostic.** The shell survives underneath whichever model performs the loop: ChatGPT/Codex subscription login, OpenRouter, native Anthropic and Gemini adapters, Bedrock, Ollama, LM Studio. Put a model into Elpis and it becomes Elpis: your goals, context, memory, and rules.
+## Quick start
 
-The execution foundation (terminal UI, patches, permissions, sandboxing, sessions) is a subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned here.
+Install the latest Linux x86_64 release and start Elpis:
 
-> **Release `v0.1.0`:** Shipped and verified with live acceptance recorded in [TASKS.md](TASKS.md).
+```bash
+mkdir -p "$HOME/.local/bin" && curl -fsSL https://github.com/MasihMoafi/Elpis/releases/latest/download/elpis-linux-x86_64 | install -m 755 /dev/stdin "$HOME/.local/bin/elpis"
+elpis
+```
 
-## Live Demonstration (Elpis Real-Time Context Pruning)
+Expected result:
 
-Side-by-side execution showing **Elpis** vs **Codex** on the exact same task:
+```text
+$ elpis
+Welcome to Elpis
+›
+```
 
-### 1. Initial Prompt Submission
+This assumes `~/.local/bin` is on your `PATH`. On first launch, choose a provider and complete its sign-in or API-key setup.
+
+Deeper guides are hosted on GitHub Pages:
+
+- [Context and sessions](https://masihmoafi.github.io/Elpis/context-and-sessions/)
+- [Memory](https://masihmoafi.github.io/Elpis/memory/)
+- [Provider configuration](https://masihmoafi.github.io/Elpis/providers/)
+
+## Proof: one controlled context-pruning comparison
+
+The screenshots below show Elpis and Codex running the same task. In this recorded comparison, Elpis ended with **93% free context** and Codex with **73% free context**.
+
+This is a reproducible demonstration of one workflow, not a claim that Elpis will produce the same reduction on every task.
+
+### Initial prompt submission
+
 ![Starting Elpis](docs/demo/starting-elpis.png)
 ![Starting Codex with the same prompt](docs/demo/starting-codex-with-the-same-prompt.png)
 
-### 2. Execution Outcome & Free Context Remaining
-* **Elpis**: **93% Free Context Remaining**  
-  ![Elpis End State](docs/demo/elpis-end-state.png)
+### Execution outcome
 
-* **Codex**: **Only 73% Free Context Remaining**  
-  ![Codex End State](docs/demo/codex-end-state.png)
+**Elpis: 93% free context remaining**
 
----
+![Elpis End State](docs/demo/elpis-end-state.png)
 
-## Context Reduction Architecture
+**Codex: 73% free context remaining**
 
-Elpis manages context through a 3-tiered reduction pipeline to ensure high prompt efficiency while preserving evidence durability:
+![Codex End State](docs/demo/codex-end-state.png)
 
-| Level | Component | Trigger Condition | Scope & Operation | Inspection & Evidence |
-| :--- | :--- | :--- | :--- | :--- |
-| **Level 1** | **Deterministic Tool Cleaner** | Real-time tool execution (>1,200 chars) | Replaces oversized tool stdout/stderr with positional head/tail excerpts. | Live header `/status` token count & `rollout://tool-call/<id>` evidence pointers. |
-| **Level 2** | **Ace Model Pruner** | End of turn (`!needs_follow_up`) | Evaluates user and assistant conversation turns, purging transient thinking fluff while retaining core decisions. | `/prune` slash command & clickable markdown report at `file:///home/masih/.elpis/logs/prune_report.md`. |
-| **Level 3** | **Full Session Compaction** | `/compact` or context budget limit | Summarizes multi-turn history into a single `ContextCompactionItem` block, preserving `GOAL.md` & `ES.md`. | Context Ledger, `/usage`, and full disk rollout logs at `~/.elpis/sessions/`. |
+## The problem
 
----
+Long coding-agent sessions accumulate transcripts and tool output. Important goals and decisions can become difficult to distinguish from disposable execution detail, while replaying large histories consumes context that could be used for the current task.
 
-## What works today
+Elpis addresses that specific workflow problem by keeping exact evidence on disk while admitting a smaller, inspectable working set into the next request.
 
-- Native Ratatui terminal interface with streaming commands, patches, permission modes, sandboxing, mouse selection, sessions, and compaction.
-- Dual-Layer Context Pruning: Layer 1 instant tool receipts + Layer 2 meaning-aware Ace message pruning with live `/status` token breakdown.
-- Visual Context Grid: `/context` command with cell grid, category token breakdown, and System files overview.
-- Clickable Markdown Audit Report: `file:///home/masih/.elpis/logs/prune_report.md` showing verbatim prompt, model decision, and deletion audit.
-- ChatGPT subscription authentication; OpenRouter through `OPENROUTER_API_KEY`; native Anthropic Messages and Google Gemini adapters.
-- One internal, read-only RAG service: `/rag <query>`, `/rag <path> -- <query>`, and autonomous retrieval.
-- Portable `GOAL.md` + `ES.md` continuity; exact resume or lean continuation.
-- The Context Ledger with per-file rows and toggles; `/usage` reporting every admitted source with size, lifetime, and reason.
-- Bounded local memory with recall tracking, promotion, provenance, and a fail-closed archive.
+## How it works
 
-## The working model
+Elpis uses three context-reduction layers:
 
-Elpis keeps the surrounding control environment stable while the selected runtime performs the model loop. Exact evidence remains durable; only a small, reasoned working set enters the next request.
+| Level | Component | Trigger | Operation | Inspection |
+| --- | --- | --- | --- | --- |
+| 1 | Deterministic tool cleaner | Tool output over 1,200 characters | Replaces oversized stdout/stderr with positional head/tail receipts | `/status` and `rollout://tool-call/<id>` evidence pointers |
+| 2 | Ace model pruner | End of eligible turns | Evaluates conversation turns and removes transient material while retaining selected decisions | `/prune` and the local pruning report |
+| 3 | Session compaction | `/compact` or context-budget pressure | Compacts older history while preserving portable goal/checkpoint state | Context Ledger, `/usage`, and local rollout logs |
+
+The execution foundation—terminal UI, patches, permissions, sandboxing, and sessions—is derived from OpenAI's Apache-2.0 Codex CLI. Elpis adds its own context, continuity, memory, retrieval, and provider-control layer around that execution loop.
+
+## Working model
+
+Elpis keeps the surrounding control environment stable while the selected runtime performs the model loop. Exact artifacts stay available as evidence; the next request receives only the admitted working set.
 
 ![Elpis Operating Model](Elpis%20Operating%20Model.png)
 
-### Context management & Session continuity
+### Context and session continuity
 
-Elpis admits rules, the current request, portable state, and relevant memory into a small working set. The Context Ledger and `/usage` expose why each source is present while full artifacts stay on disk.
+Rules, the current request, portable state, added files, and selected memory are represented separately. The Context Ledger and `/usage` expose why a source is present and how much space it occupies.
 
 ![Elpis Context Management](Elpis%20Context%20Management.png)
 
-The working context is not the transcript. Full conversations, terminal events, and artifacts remain available as evidence, but are retrieved only when a later task needs them — by exact evidence pointer first, RAG second. Neither makes the full history a default prompt attachment. The aim is to make a modest context window sufficient and legible, rather than pay to resend an ever-growing one.
+Full conversations, terminal events, and artifacts remain on disk. Elpis can retrieve exact evidence later instead of attaching the full history to every request.
 
-### Memory management
+### Memory
 
-New evidence stays searchable until repeated useful recall makes it eligible for durable memory. Durable artifacts are bounded, and deleted or faded lines are archived before reset.
+Reusable facts are promoted into bounded durable memory only after repeated useful recall. Deleted or faded memory is archived before reset.
 
 ### Read-only RAG
 
-The startup path exposes one minimal read-only tool without loading the retrieval stack. Embeddings and indexing load lazily only after an explicit semantic query.
+The optional local RAG sidecar exposes one read-only retrieval tool. Embeddings and indexing load only when semantic retrieval is requested.
 
-### Safe execution and evidence
+### Execution and evidence
 
-Consequential actions pass through visible permission and sandbox policy before execution. Elpis records outcomes and evidence, then distinguishes verified success from failure or unresolved gaps.
+Consequential actions pass through visible permission and sandbox controls. Outcomes and supporting evidence remain inspectable after execution.
 
-## Install
+## Current state
 
-Linux x86_64 today; macOS and Windows builds are planned through CI release runners.
+Source of truth: [TASKS.md](TASKS.md).
+
+### Implemented and verified
+
+- `v0.1.0` Linux x86_64 release path and checksummed installer.
+- Ratatui terminal interface with streaming commands, patches, permission modes, sandboxing, sessions, and compaction.
+- Dual-layer pruning: deterministic tool receipts plus Ace message pruning.
+- Context Ledger and `/usage` source accounting.
+- Portable `GOAL.md` + `ES.md` continuity and exact session resume.
+- Bounded local memory with provenance, recall tracking, promotion, and archival.
+- Local read-only RAG.
+- OpenAI subscription authentication plus supported Anthropic, Gemini, and OpenRouter adapters.
+- Context Ledger interaction accepted by the project owner on 2026-07-23.
+
+### Implemented, still under ongoing acceptance/polish
+
+- The current baseline remains under bug-fix and UI-polish work. Existing context, continuity, pruning, memory, RAG, provider, permission, and session behavior are treated as foundational regressions if they break.
+
+### Planned or deferred
+
+- Easier installation and distribution.
+- Apple Silicon macOS build targeted for `v0.2`; Windows comes later.
+- Structured interactive clarification.
+- Multi-agent controls and `/multi-task`.
+- Voice input.
+- LSP-backed code intelligence.
+- `/auto` cost-saving model routing remains a deferred experiment until it proves that routing actually reduces total cost without unacceptable mistakes.
+
+### Not supported in `v0.1.0`
+
+- macOS and Windows release binaries.
+- `/auto`, `/multi-task`, voice input, and LSP integration.
+
+## What sets the design apart
+
+These are design choices, not novelty claims:
+
+- **Context is inspectable.** The Context Ledger shows admitted sources instead of treating the full transcript as an opaque prompt.
+- **Evidence and working context are different things.** Exact artifacts stay durable even when they are not resent to the model.
+- **Continuity is explicit.** Goal and checkpoint state can survive compaction or a fresh session without replaying the entire conversation.
+- **Memory is selective.** Reusable memory is bounded and promoted from evidence rather than equated with stored chat history.
+- **Provider identity stays visible.** The control layer does not silently collapse provider selection into one opaque route.
+
+## Evals and test series
+
+Linux verification and binary builds run through [`.github/workflows/embedded-elpis-linux.yml`](.github/workflows/embedded-elpis-linux.yml).
+
+Ordinary changes run focused first-release checks and build the Elpis binary. Broader inherited TUI/app-server regression runs are reserved for nightly, manual, and tagged-release workflows.
+
+The Python retrieval service has focused tests under `tests/`. Release acceptance is tracked in [TASKS.md](TASKS.md). Build and dependency-reduction measurements live in [`docs/BUILD_AND_REDUCTION_AUDIT.md`](docs/BUILD_AND_REDUCTION_AUDIT.md).
+
+A passing CI badge proves that the configured automated checks passed for the referenced commit. It does not prove that every provider, workflow, or long-running session shape has been exercised.
+
+## Install from a checkout
+
 Tagged releases publish a checksummed binary. From a checkout:
 
 ```bash
@@ -101,92 +169,55 @@ scripts/install-elpis.sh
 
 The installer verifies the checksum and installs `elpis` into `~/.local/bin` atomically.
 
-The internal RAG service (`/rag`) is a separate Python sidecar, off by default. To enable
-it:
+To enable the optional local RAG sidecar:
 
 ```bash
 scripts/setup-rag.sh
 ```
 
-This creates the venv and writes the `mcp_servers.elpis-rag` entry in `config.toml` with
-absolute paths computed from wherever the repo actually lives on this machine — never
-hand-edit those paths, and re-run this script after moving the repo or on a fresh device.
+The setup script creates the environment and writes the `mcp_servers.elpis-rag` entry in `config.toml` using paths derived from the current checkout.
 
-OpenAI subscription login is the default. Other routes:
+Provider examples:
 
 ```bash
-# OpenRouter (separate key)
+# OpenRouter
 export OPENROUTER_API_KEY="your-key"
 elpis --provider openrouter --model "provider/model"
 
-# Native vendor adapters
+# Native Anthropic adapter
 export ANTHROPIC_API_KEY="your-key"
 elpis --provider anthropic
 
+# Native Gemini adapter
 export GEMINI_API_KEY="your-key"
 elpis --provider google-gemini
 ```
 
-`elpis --provider claude|gemini|gemini-flash` are OpenRouter compatibility shortcuts,
-distinct from the native adapters above.
+## External docs
 
-## Verification
+Keep the README high-level; use the documentation site for deeper contracts and configuration:
 
-Linux verification and binary builds run through
-[`.github/workflows/embedded-elpis-linux.yml`](.github/workflows/embedded-elpis-linux.yml).
-Ordinary changes run focused first-release checks and build the Elpis binary. Exhaustive
-inherited TUI/app-server regression runs nightly, manually, and for tagged releases.
+- [Context and sessions](https://masihmoafi.github.io/Elpis/context-and-sessions/)
+- [Memory](https://masihmoafi.github.io/Elpis/memory/)
+- [Providers](https://masihmoafi.github.io/Elpis/providers/)
+- [`GUIDE.md`](GUIDE.md) — product vision, requirements, and architecture source of truth
+- [`TASKS.md`](TASKS.md) — current release state and backlog
+- [`docs/BUILD_AND_REDUCTION_AUDIT.md`](docs/BUILD_AND_REDUCTION_AUDIT.md) — measured build/subtraction work
 
-The Python retrieval service has focused tests under `tests/`. Release acceptance is tracked
-in [TASKS.md](TASKS.md). The measured build and dependency-reduction plan is documented in
-[`docs/BUILD_AND_REDUCTION_AUDIT.md`](docs/BUILD_AND_REDUCTION_AUDIT.md).
+## Future development
 
-## Principles
-
-- Say what is implemented and what is not.
-- Keep exact evidence on disk and admitted context small.
-- Preserve the active goal, decisions, constraints, verification, and next action.
-- Treat memory as selected reusable knowledge, not stored conversation.
-- Keep authentication, provider, context, and memory boundaries visible.
-- Prefer small changes with focused checks.
+Only work already represented in [TASKS.md](TASKS.md) belongs here. The near-term direction is baseline polish and distribution before new feature expansion.
 
 ## Repository map
 
 - `codex-rs/` — Rust application and TUI.
-- `src/` — the single-tool Python retrieval service.
-- `AGENTS.md` — agent entry point: dispatch, workflow, and definition of done.
+- `src/` — local retrieval service.
+- `AGENTS.md` — agent workflow and definition of done.
 - `GUIDE.md` — product vision, requirements, and architecture source of truth.
-- `TASKS.md` — release work, acceptance state, and version-mapped backlog.
+- `TASKS.md` — live task and acceptance source of truth.
 - `docs/CONTEXT_AND_SESSIONS.md` — context and continuation contract.
 - `docs/BUILD_AND_REDUCTION_AUDIT.md` — build baseline and measured subtraction plan.
 
 ## License
 
-Elpis is MIT licensed. The contained Codex-derived source retains its upstream Apache-2.0
-notices and attribution.
-## Quick start
-
-Install the latest release, then start Elpis:
-
-```bash
-mkdir -p "$HOME/.local/bin" && curl -fsSL https://github.com/MasihMoafi/Elpis/releases/latest/download/elpis-linux-x86_64 | install -m 755 /dev/stdin "$HOME/.local/bin/elpis"
-elpis
-```
-
-This Linux x86_64 command assumes `~/.local/bin` is on your `PATH`. Elpis opens an
-interactive terminal session. On first launch, choose a provider and complete its
-sign-in prompt; subsequent launches resume your local Elpis workflow.
-
-```text
-$ elpis
-Welcome to Elpis
-›
-```
-
-For the full workflow, screenshots, and configuration details, see the
-[visual walkthrough](#visual-walkthrough). The documentation site has deeper guides
-for [context and sessions](https://masihmoafi.github.io/Elpis/context-and-sessions/),
-[memory](https://masihmoafi.github.io/Elpis/memory/), and
-[provider configuration](https://masihmoafi.github.io/Elpis/providers/).
-
-# Visual walkthrough
+Elpis is MIT licensed. Codex-derived source retains its upstream Apache-2.0 notices and attribution.
