@@ -458,16 +458,21 @@ impl StatusHistoryCell {
         let agent_fmt = format_tokens_compact(agent_tokens);
         let total_fmt = format_tokens_compact(total_saved_tokens);
 
-        let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home/masih".to_string());
-        Some(vec![
+        let mut spans = vec![
             Span::from(format!("~{total_fmt} tokens saved")),
             Span::from(format!(
                 " — {det_fmt} ({}) deterministic, {agent_fmt} ({}) agent-authored",
                 self.context_cleaner_evictions, self.context_pruner_passes
             ))
             .dim(),
-            Span::from(format!(" | file://{home_dir}/.elpis/logs/prune_report.md")),
-        ])
+        ];
+        if let Some(home_dir) = std::env::var_os("HOME") {
+            spans.push(Span::from(format!(
+                " | file://{}/.elpis/logs/prune_report.md",
+                home_dir.to_string_lossy()
+            )));
+        }
+        Some(spans)
     }
 
     fn rate_limit_lines(

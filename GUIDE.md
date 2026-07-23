@@ -167,7 +167,7 @@ is unaffected and remains the supported way to run Claude models in Elpis.
 6. Implement the persistent identity line and coherent cyan foundation.
 7. For every release, install the artifact in a clean environment and complete a real task.
 
-`v0.1.0` was tagged at `eba95a0`. Its remaining acceptance evidence, if any, is
+`v0.1.0` is the release tag (re-tagged 2026-07-23 after history cleanup; do not pin its hash in docs). Its remaining acceptance evidence, if any, is
 recorded in `TASKS.md`; this order is a release checklist, not a claim that every item
 was complete when the tag was made.
 
@@ -617,6 +617,12 @@ large outputs also should not remain indefinitely in the model-visible working s
 Elpis should feel unique because the interface exposes what Elpis uniquely owns: runtime
 identity, admitted context, durable memory, continuity, permissions, and evidence.
 
+The current product priority is to make the existing interface solid before adding new
+features. The Context Ledger is the first target. Tab must never submit a draft or behave
+like Enter; opening and closing the ledger must preserve the composer exactly. After that
+bug is fixed, Masih will review the ledger and decide whether its design should be
+improved or the ledger should be removed. Do not assume that decision.
+
 > The model may change; the work continues.
 
 ### Implemented
@@ -667,6 +673,13 @@ expired; what changed and was verified; and where exact evidence can be inspecte
 
 ## Current State
 
+Current priority:
+
+- Polish and stabilize the features already in daily use.
+- Fix the Context Ledger first, beginning with its Tab key-routing bug.
+- Add no new product features until the current baseline is accepted, unless Masih
+  explicitly changes priority.
+
 Verified foundation:
 
 - `main` contains the pinned Codex Rust workspace under `codex-rs/` and builds the
@@ -679,15 +692,23 @@ Verified foundation:
   are preserved as named tips inside `archive/pre-cleanup-20260716`; they are not part
   of canonical `main`.
 
-Current foundation work is memory plus context acceptance. Elpis-owned memory storage,
-promotion, bounded retrieval, portable `GOAL.md`/`ES.md`, lean fresh-thread admission,
-pre-compaction protection, and the visible admitted-context list are implemented pending
-remote verification. Visual identity (cyan identity header, Context Ledger — see
-[UI Identity](#ui-identity)), provider expansion (native Anthropic/Gemini adapters —
-see [Providers](#providers)), and deterministic tool-output pruning (see
-`docs/CONTEXT_AND_SESSIONS.md`) have each already shipped a first slice ahead of full
-memory/context acceptance; `/auto` routing has not started. None of these are complete
-acceptance until their own acceptance checks pass — see `TASKS.md`.
+Context continuity, pruning, memory, local RAG, provider adapters, permissions, and
+release installation have shipped and are in daily use. Defects in those systems are
+foundational regressions. The active work is UI stability and polish, beginning with the
+Context Ledger. `/auto` routing and other new features have not started.
+
+### Task importance and task difficulty
+
+Elpis product tasks use three importance levels:
+
+- **Foundational:** Elpis loses its purpose, reliability, or basic usability without it.
+- **Important:** a material improvement after the foundation is solid.
+- **Nice-to-have:** optional work that cannot delay foundational polish.
+
+These levels are not release numbers and do not describe implementation complexity.
+Easy, Medium, and Hard are separate difficulty labels for the proposed `/auto` feature,
+which would use task difficulty to choose an appropriate model. `/auto` remains optional
+future work.
 
 The currently installed build includes the command-surface changes from `b135e7a` and
 the startup-tip/test-command changes from `419384d`. Most unwanted commands were made

@@ -320,9 +320,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mv dist/elpis dist/elpis-linux-x86_64
-          sha256sum dist/elpis-linux-x86_64 > dist/elpis-linux-x86_64.sha256
+          (cd dist && sha256sum elpis-linux-x86_64 > elpis-linux-x86_64.sha256)
           for deb in dist/*.deb; do
-            sha256sum "$deb" > "$deb.sha256"
+            (cd dist && sha256sum "$(basename "$deb")" > "$(basename "$deb").sha256")
           done
           gh release create "$GITHUB_REF_NAME" \
             dist/elpis-linux-x86_64 \

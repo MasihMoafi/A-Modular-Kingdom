@@ -265,13 +265,13 @@ impl SlashCommand {
             | SlashCommand::Quit
             | SlashCommand::Memories
             | SlashCommand::Theme
+            | SlashCommand::Fork
+            | SlashCommand::Goal
             | SlashCommand::Clear => true,
-            SlashCommand::Fork
-            | SlashCommand::Hooks
+            SlashCommand::Hooks
             | SlashCommand::Keymap
             | SlashCommand::Rename
             | SlashCommand::Delete
-            | SlashCommand::Goal
             | SlashCommand::Agent
             | SlashCommand::Side
             | SlashCommand::Btw

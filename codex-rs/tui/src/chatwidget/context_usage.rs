@@ -9,22 +9,17 @@
 //! already available synchronously on `ChatWidget` via `self.token_info` and
 //! `self.continuity_sources()`.
 //!
-//! ## Why the category breakdown is a transcript-composition estimate
+//! ## Category percentages are relative to the model context window
 //!
-//! `transcript_cells` is the full rendered history for this session; it is never
-//! trimmed. Pruning (both layers — see `docs/CONTEXT_AND_SESSIONS.md`) is deliberately
-//! ephemeral: it reduces what goes out on the *next request*, not the durable
-//! transcript, and that reduction happens at request-assembly time in `client.rs`,
-//! which this module has no visibility into. Reporting "category X is N% of the
-//! context window" from transcript-only data is provably wrong whenever pruning has
-//! run (the categories can sum to far more than the actual window occupancy — this
-//! shipped broken once already: transcript composition claimed 53% of the window while
-//! actual usage was 11.8%). To stay honest, category percentages here are **share of
-//! the visible transcript** (they sum to ~100% by construction), never "% of window."
+//! Per explicit user requirement (2026-07-23, stated repeatedly): category
+//! percentages are **% of the model's context window**, not share-of-transcript.
+//! Caveat that remains true: category token counts are estimated from the untrimmed
+//! rendered transcript (`transcript_cells`), while pruning reduces what is actually
+//! sent at request-assembly time in `client.rs`, which this module cannot see. After
+//! heavy pruning the categories can therefore sum to more than the real occupancy.
 //! The one number that *is* exact — total tokens currently in context — comes from
-//! `token_info.last_token_usage`, the same source `/usage` uses, and the already-proven
-//! pruning-savings stats are surfaced alongside it so the gap between "transcript ever
-//! produced" and "tokens actually in context" is explained, not hidden.
+//! `token_info.last_token_usage` (same source `/usage` uses) and is shown on the
+//! "used / window" line; the pruning-savings line explains the gap.
 //!
 //! System tools (MCP tool schemas) are not included: enumerating them requires the
 //! async app-server round trip `/mcp` already uses (`AppEvent::FetchMcpInventory`),
@@ -145,29 +140,22 @@ impl ChatWidget {
 
         lines.push(" Token usage by category".bold().into());
         lines.push(
-            "   (share of this session's visible transcript, not of the context window —"
-                .dim()
-                .into(),
-        );
-        lines.push(
-            "   most tool output above is already pruned from what's actually sent)"
+            "   (estimated from the visible transcript; % is of the model's context window)"
                 .dim()
                 .into(),
         );
         let category_total_chars: usize = categories.iter().map(|c| c.chars).sum();
         for category in &categories {
             let tokens = codex_utils_string::approx_tokens_from_byte_count(category.chars);
-            let share_percent = if category_total_chars > 0 {
-                (category.chars * 100) / category_total_chars
-            } else {
-                0
-            };
+            let window_label = context_window
+                .map(|window| {
+                    let percent = (u128::from(tokens) * 100) / (window.max(1) as u128);
+                    format!(" ({percent}% of context window)")
+                })
+                .unwrap_or_default();
             lines.push(Line::from(vec![
                 Span::styled("● ", Style::default().fg(category.color)),
-                Span::from(format!(
-                    "{}: {tokens} tokens ({share_percent}% of transcript)",
-                    category.label
-                )),
+                Span::from(format!("{}: {tokens} tokens{window_label}", category.label)),
             ]));
         }
         if category_total_chars == 0 {
