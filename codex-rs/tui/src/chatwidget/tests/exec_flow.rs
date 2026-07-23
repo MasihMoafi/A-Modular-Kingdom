@@ -731,12 +731,12 @@ async fn unified_exec_empty_poll_for_finished_process_does_not_show_waiting_stat
 
     terminal_interaction(&mut chat, "call-finished", "proc-finished", "");
 
-    assert_eq!(chat.status_state.current_status.header, "Working");
+    assert_eq!(chat.status_state.current_status.header, "elpising…");
     let status = chat
         .bottom_pane
         .status_widget()
         .expect("task status indicator should remain visible");
-    assert_eq!(status.header(), "Working");
+    assert_eq!(status.header(), "elpising…");
     assert!(chat.unified_exec_wait_streak.is_none());
 }
 

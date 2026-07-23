@@ -253,6 +253,7 @@ impl SlashCommand {
             | SlashCommand::Mcp
             | SlashCommand::Quit
             | SlashCommand::Memories
+            | SlashCommand::Theme
             | SlashCommand::Clear => true,
             SlashCommand::Fork
             | SlashCommand::Hooks
@@ -280,7 +281,6 @@ impl SlashCommand {
             | SlashCommand::DebugConfig
             | SlashCommand::Title
             | SlashCommand::Statusline
-            | SlashCommand::Theme
             | SlashCommand::Pets
             | SlashCommand::Apps
             | SlashCommand::Plugins

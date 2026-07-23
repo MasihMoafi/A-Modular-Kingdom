@@ -78,7 +78,7 @@ impl ChatWidget {
             .set_interrupt_hint_visible(/*visible*/ true);
         self.status_state.terminal_title_status_kind = TerminalTitleStatusKind::Working;
         if self.mcp_startup_status.is_none() || !self.status_header_is_mcp_startup_owned() {
-            self.set_status_header(String::from("Working"));
+            self.set_status_header(String::from("elpising…"));
         }
         self.reasoning_summary_parts.clear();
         self.reasoning_buffer.clear();

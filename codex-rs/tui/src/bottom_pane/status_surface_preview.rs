@@ -44,7 +44,7 @@ impl StatusSurfacePreviewItem {
             StatusSurfacePreviewItem::ProjectName => "my-project",
             StatusSurfacePreviewItem::ProjectRoot => "my-project",
             StatusSurfacePreviewItem::CurrentDir => "~/my-project/subdir",
-            StatusSurfacePreviewItem::Status => "Working",
+            StatusSurfacePreviewItem::Status => "elpising…",
             StatusSurfacePreviewItem::ThreadTitle => "thread title",
             StatusSurfacePreviewItem::GitBranch => "feat/awesome-feature",
             StatusSurfacePreviewItem::PullRequestNumber => "PR #123",

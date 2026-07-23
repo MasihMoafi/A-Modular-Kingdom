@@ -12,7 +12,7 @@ pub(super) struct StatusIndicatorState {
 impl StatusIndicatorState {
     pub(super) fn working() -> Self {
         Self {
-            header: String::from("Working"),
+            header: String::from("elpising…"),
             details: None,
             details_max_lines: STATUS_DETAILS_DEFAULT_MAX_LINES,
         }
