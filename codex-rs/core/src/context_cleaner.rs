@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 1200;
+const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 400;
 const RETAINED_EDGE_CHARS: usize = 150;
 const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 0;
 static EVICTED_TOOL_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
