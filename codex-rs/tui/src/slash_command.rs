@@ -356,8 +356,6 @@ mod tests {
             "debug-m-update",
             "exit",
             "feedback",
-            "fork",
-            "goal",
             "hooks",
             "hotkeys",
             "apps",
@@ -383,6 +381,8 @@ mod tests {
         assert!(visible.contains(&"memories"));
         assert!(visible.contains(&"add"));
         assert!(visible.contains(&"usage"));
+        assert!(visible.contains(&"fork"));
+        assert!(visible.contains(&"goal"));
         assert!(SlashCommand::from_str("debug-m-drop").is_err());
         assert!(SlashCommand::from_str("debug-m-update").is_err());
     }
