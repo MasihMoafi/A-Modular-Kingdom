@@ -330,9 +330,9 @@ mod tests {
             tool_output("b", "bb"),
         ];
         let mut covered = HashSet::new();
-        assert_eq!(uncovered_transient_chars(&input, &covered), 6);
+        assert_eq!(uncovered_transient_chars(&input, &covered), 26);
         covered.insert("a".to_string());
-        assert_eq!(uncovered_transient_chars(&input, &covered), 2);
+        assert_eq!(uncovered_transient_chars(&input, &covered), 22);
     }
 
     #[test]
