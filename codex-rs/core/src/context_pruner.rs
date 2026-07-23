@@ -89,17 +89,21 @@ pub(crate) fn build_fallback_prune_record(batch: &[(String, String)]) -> PruneRe
     }
 }
 
-fn prunable_text(item: &ResponseItem) -> Option<(&str, &str)> {
+fn prunable_text(item: &ResponseItem) -> Option<(&str, String)> {
     match item {
         ResponseItem::FunctionCallOutput {
             call_id, output, ..
         }
         | ResponseItem::CustomToolCallOutput {
             call_id, output, ..
-        } => match &output.body {
-            FunctionCallOutputBody::Text(text) => Some((call_id.as_str(), text.as_str())),
-            _ => None,
-        },
+        } => {
+            let text = output.body.to_text()?;
+            if text.is_empty() {
+                None
+            } else {
+                Some((call_id.as_str(), text))
+            }
+        }
         _ => None,
     }
 }
@@ -129,7 +133,7 @@ pub(crate) fn build_prune_batch(
         .iter()
         .filter_map(prunable_text)
         .filter(|(call_id, _)| !covered_call_ids.contains(*call_id))
-        .map(|(call_id, text)| (call_id.to_string(), text.to_string()))
+        .map(|(call_id, text)| (call_id.to_string(), text))
         .collect()
 }
 
@@ -224,7 +228,7 @@ pub(crate) fn apply_prune_record(input: &mut [ResponseItem], record: &PruneRecor
         if !covered.contains(call_id) {
             continue;
         }
-        let FunctionCallOutputBody::Text(text) = body else {
+        let Some(text) = body.to_text() else {
             continue;
         };
         let original_chars = text.chars().count();
@@ -241,7 +245,7 @@ pub(crate) fn apply_prune_record(input: &mut [ResponseItem], record: &PruneRecor
             continue;
         }
         saved += original_chars - new_chars;
-        *text = receipt;
+        *body = FunctionCallOutputBody::Text(receipt);
     }
     PRUNE_PASSES.fetch_add(1, Ordering::Relaxed);
     PRUNE_SAVED_CHARS.fetch_add(saved, Ordering::Relaxed);

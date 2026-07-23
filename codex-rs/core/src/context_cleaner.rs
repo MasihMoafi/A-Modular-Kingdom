@@ -79,24 +79,25 @@ pub(crate) fn clean_transient_tool_outputs(input: &mut [ResponseItem]) -> usize 
             ),
             _ => continue,
         };
-        let FunctionCallOutputBody::Text(text) = body else {
+        let Some(text) = body.to_text() else {
             continue;
         };
         let original_chars = text.chars().count();
         if original_chars <= MAX_INLINE_TOOL_OUTPUT_CHARS {
             continue;
         }
-        let head = compact_terminal_excerpt(&take_chars(text, RETAINED_EDGE_CHARS));
-        let tail = compact_terminal_excerpt(&take_last_chars(text, RETAINED_EDGE_CHARS));
+        let head = compact_terminal_excerpt(&take_chars(&text, RETAINED_EDGE_CHARS));
+        let tail = compact_terminal_excerpt(&take_last_chars(&text, RETAINED_EDGE_CHARS));
         let evidence = format!("rollout://tool-call/{call_id}");
-        *text = format!(
+        let receipt = format!(
             "[ELPIS CONTEXT UPDATE]\nreason=older transient tool output exceeded {MAX_INLINE_TOOL_OUTPUT_CHARS} chars\nevidence={evidence}\ntool={name}\noriginal_chars={original_chars}\nretained=head:{RETAINED_EDGE_CHARS}+tail:{RETAINED_EDGE_CHARS}\n--- head ---\n{head}\n--- omitted; full evidence remains in durable rollout ---\n{tail}\n--- tail ---"
         );
         latest_event = Some(format!(
             "ELPIS continuity: compacted older {name} output ({original_chars} chars); exact evidence: {evidence}"
         ));
-        saved += original_chars.saturating_sub(text.chars().count());
+        saved += original_chars.saturating_sub(receipt.chars().count());
         evicted += 1;
+        *body = FunctionCallOutputBody::Text(receipt);
     }
     if evicted > 0 {
         EVICTED_TOOL_OUTPUTS.fetch_add(evicted, Ordering::Relaxed);
