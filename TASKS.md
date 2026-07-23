@@ -175,15 +175,13 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
 
 ## Important — after the first-release foundation (v0.2)
 
-- Default tool integration, evaluated 2026-07-19: `rtk` 0.43.0 (token-optimizing command
-  proxy — candidate engine for pruning's compact action receipts) and `ponytail`
-  (minimal-code discipline; ship as a default `skills/dev` rule). A fourth candidate — a
-  fast codebase-indexing bash script Masih linked in an earlier (lost) conversation —
-  needs Masih to re-send the link before it can be evaluated. `codebase-memory-mcp`
-  dropped 2026-07-22 (Masih: not pursuing it).
 - Interactive clarifying questions: before ambiguous or costly work, Elpis presents a
   structured selectable prompt (question, options, multi-select) instead of silently
-  assuming, and records the chosen answer in the session evidence.
+  assuming, and records the chosen answer in the session evidence. Not the same as the
+  Plan-mode nudge (`should_show_plan_mode_nudge`, `tui/src/chatwidget/settings.rs`) —
+  that's a passive footer hint suggesting Plan mode when the draft contains a plan
+  keyword; it has no options UI and records nothing. Confirmed 2026-07-23 this is
+  genuinely unbuilt.
 - Add providers: additional adapters via proven Pi/OpenClaw patterns, plus the full
   OpenRouter model catalog — (near-)all models it exposes — including current GPT, Claude
   (Sonnet/Opus/Fable-family), and Gemini IDs — via the OpenRouter models API rather than
@@ -191,14 +189,15 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   this pattern (and also supports Gemini directly); fetch its repo for reference before
   building. OpenClaw noted as another reference/target. Deliberately deferred — backlog is
   already long.
-- Dictation with visible consent and editable, unsent text.
+- `/talk`: optional voice dictation (STT) command — free cloud Whisper if available, else
+  document the local workaround (Masih's own `vc` terminal alias). Strictly opt-in, never
+  a required step in any flow; Codex's own docs mention a speak/voice feature but it isn't
+  actually present in the inherited codebase to build on.
+- Bring `/theme` into the visible command list: it's already fully implemented
+  (`open_theme_picker`, `tui/src/chatwidget/slash_dispatch.rs:488`) and inherited from
+  Codex, just hidden — the same one-line `is_visible()` arm move as the `/fork`/`/hooks`/
+  `/memories` fixes from the v0.1.0 ship.
 - Further Codex subtraction, one measured capability at a time.
-- Workspace RAG: an interactive path prompt on `/rag` (Enter defaults to the terminal's
-  current working directory with a configurable folder-depth/token guardrail against
-  scanning something like `node_modules`), and keeping RAG defaults from mixing active
-  workspace source with the global memory `archive.md`. The natural-language trigger is
-  already done: `query_knowledge_base` is a live MCP tool (`src/agent/host.py`) the agent
-  can call on its own judgment without an explicit `/rag` command.
 - LSP-backed code intelligence for the active runtime: real language-server queries
   (go-to-definition, precise references, live diagnostics) instead of grep/text search.
   No confirmed LSP client exists in any runtime currently bridged into Elpis; scope as its
