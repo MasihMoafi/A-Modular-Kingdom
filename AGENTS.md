@@ -24,6 +24,11 @@
 
 ## Definition Of Done
 
+- **Masih is the functionality tester for anything human-testable.** Agents verify
+  compilation and automated checks only, then build + install the binary and hand
+  Masih a plain, itemized test checklist (one bullet per behavior, stating exactly
+  what to do and what must happen). Agents never claim functional verification of
+  UI/UX behavior themselves; unverified is unverified until Masih confirms.
 - Behavior is implemented, not merely documented.
 - A feature becomes complete only when its acceptance check passes and evidence is
   recorded in `TASKS.md`.
