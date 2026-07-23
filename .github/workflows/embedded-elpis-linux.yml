@@ -324,6 +324,10 @@ jobs:
           for deb in dist/*.deb; do
             (cd dist && sha256sum "$(basename "$deb")" > "$(basename "$deb").sha256")
           done
+          # Re-tagging the same version must replace the release, not fail on it;
+          # this runs only after build+tests pass, so the old release stays live
+          # until a verified replacement is seconds away.
+          gh release delete "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --yes || true
           gh release create "$GITHUB_REF_NAME" \
             dist/elpis-linux-x86_64 \
             dist/elpis-linux-x86_64.sha256 \
