@@ -465,6 +465,7 @@ impl StatusHistoryCell {
                 self.context_cleaner_evictions, self.context_pruner_passes
             ))
             .dim(),
+            Span::from(" | Report: ~/.elpis/logs/prune_report.md").dim(),
         ])
     }
 

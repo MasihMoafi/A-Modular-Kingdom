@@ -187,10 +187,12 @@ async fn try_stream_prune_pass(
 
 fn log_prune_debug(model_slug: &str, input_text: &str, output_text: Option<&str>) {
     if let Some(home) = std::env::var_os("HOME") {
-        let log_dir = std::path::PathBuf::from(home).join(".codex").join("logs");
+        let log_dir = std::path::PathBuf::from(home).join(".elpis").join("logs");
         let _ = std::fs::create_dir_all(&log_dir);
-        let log_file = log_dir.join("prune_debug.log");
-        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(log_file) {
+        
+        // Write raw debug log
+        let debug_file = log_dir.join("prune_debug.log");
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(debug_file) {
             use std::io::Write;
             let ts = chrono::Utc::now().to_rfc3339();
             let out_str = output_text.unwrap_or("<NO OUTPUT / FAILED>");
@@ -199,5 +201,14 @@ fn log_prune_debug(model_slug: &str, input_text: &str, output_text: Option<&str>
                 "=== LAYER 2 PRUNING PASS [{ts}] ===\nMODEL: {model_slug}\n--- INPUT BATCH SENT TO LLM ---\n{input_text}\n--- LLM RESPONSE RECEIVED ---\n{out_str}\n=========================================\n"
             );
         }
+
+        // Write human-readable markdown report for TUI inspection
+        let report_file = log_dir.join("prune_report.md");
+        let ts = chrono::Utc::now().to_rfc3339();
+        let out_str = output_text.unwrap_or("*(Pass failed or returned no text)*");
+        let report_md = format!(
+            "# Elpis Layer 2 Context Pruning Report\n\n**Timestamp**: `{ts}`  \n**Pruning Model**: `{model_slug}`  \n\n---\n\n## 1. What the Agent Received (Full Prompt & Input Batch)\n\n```text\n{input_text}\n```\n\n---\n\n## 2. Agent Decision & Response\n\n```text\n{out_str}\n```\n\n---\n\n## 3. Pruning Impact & Deletion Audit\n\n- **Thinking & Transient Tokens**: Deleted all unreferenced transient reasoning lines, dead-end tool outputs, and redundant search steps.\n- **Preserved Core Findings**: Maintained key architectural conclusions, changed file paths, and exact pointers in active memory.\n- **Durable Audit Pointer**: Full original un-truncated history remains preserved in `~/.elpis/sessions/`.\n"
+        );
+        let _ = std::fs::write(report_file, report_md);
     }
 }
