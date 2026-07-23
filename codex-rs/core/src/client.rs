@@ -915,10 +915,8 @@ impl ModelClient {
             }
         }
 
-        if !store {
-            crate::context_cleaner::strip_reasoning_items(input);
-            clean_transient_tool_outputs(input);
-        }
+        crate::context_cleaner::strip_reasoning_items(input);
+        clean_transient_tool_outputs(input);
 
         if self.state.item_ids_enabled || store {
             return;

@@ -79,15 +79,14 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   OpenRouter, proving Elpis-owned goal, context, memory, permissions, and evidence survive.
 - The `/model` surface now uses the Elpis `Choose a mind` naming and shows provider,
   protocol, route, and credential labels.
-- Live provider switching mid-session is unimplemented at the protocol layer:
-  `ThreadSettingsUpdateParams` (`app-server-protocol/src/protocol/v2/thread.rs`) carries
-  `model` but no provider field, while the paired `ThreadSettings` read/notification struct
-  does carry `model_provider`. Provider choice still happens only at launch (`--provider`);
-  a live switch needs an explicit protocol/runtime slice, not a cosmetic selector.
+- Mid-session provider switching is implemented at the protocol and TUI settings layers:
+  `ThreadSettingsUpdateParams` carries `model_provider` alongside `model` (commit
+  `5ffd4ca`). Live authenticated acceptance remains unrecorded.
 
-### F6. Release readiness and build cycle — in progress
+### F6. Release readiness and build cycle — tagged; acceptance evidence incomplete
 
 - The binary reports `0.1.0`.
+- `v0.1.0` is tagged at `eba95a0`.
 - Run `29534784054` passed and uploaded the verified Linux x86_64 artifact.
 - Tagged builds publish a checksummed release asset; the installer verifies and atomically
   installs it.
@@ -96,8 +95,8 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
 - Build-cycle branch removes CI source mutation and status-file commits, enables incremental
   cross-commit cache reuse, keeps focused checks on ordinary changes, moves exhaustive
   inherited regression to nightly/manual/tag runs, and uploads Cargo timing evidence.
-- Remaining acceptance: compare the optimized runtime to the baseline, install the verified
-  artifact from a clean environment, authenticate, launch, and complete a first task.
+- Remaining evidence: compare the optimized runtime to the baseline and record a clean-environment
+  install, authentication, launch, and first-task acceptance for the tagged artifact.
 
 ### F7. Distinctive Elpis UI/UX — design complete; implementation partial
 
@@ -228,13 +227,19 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   Code's left-arrow agent panel), mid-turn message queuing, mobile remote control of a
   session, and opt-in telemetry. Large, multi-slice work; explicitly not v0.1/v0.2.
 
-## Current Action — the v1 gate list (updated 2026-07-20 evening; supersedes the
-2026-07-19 status below, which was left stale through several merges)
+## Current Action — post-v0.1 reconciliation (updated 2026-07-23)
+
+`v0.1.0` was tagged at `eba95a0`; the 2026-07-20 gate snapshot below predates that tag.
+It remains a record of the then-unresolved live acceptance evidence, not the current
+implementation priority. No post-v0.1 implementation action is assigned here; set one
+explicitly before starting new feature work.
+
+### Historical v0.1 gate snapshot (2026-07-20)
 
 Done today: takeover mode merged and tmux-verified (PR #56, main `e01e2a3`); terra PR #54
 and sol's grouped-ledger/picker branch merged; fresh binary from run `29689905487`
-installed. Masih's live review of that build produced the list below. **v0.1 does not tag
-until every item here passes his test.**
+installed. Masih's live review of that build produced the list below. At that time, the
+release was not to tag until every item passed his test.
 
 **Gate status (2026-07-20 evening):** 1 IMPLEMENTED via the Codex-runtime path (PR #93,
 see below) — the Claude-runtime path (PR #63) was removed along with the rest of the
@@ -245,11 +250,9 @@ question on the 4th ("plan") preset — see below; 5 MERGED (#88). #89 (Claude C
 runtime findings) and #92 (TUI ledger-hint placement) merged since, both now partly
 moot given the F8 removal. #90/#91 closed 2026-07-20 (redone cleanly against current
 main as the F8 removal above, since #91 was built off a stale base missing #89).
-#94 (Jules, build-profile + size regression) open, CI red twice on a duplicate
-`--release` flag getting reintroduced, fixed both times (last: commit `8d3bcaf`) —
-rerun pending before merge. Next: merge #94 on green, confirm no other open PRs/stale
-branches remain, then Masih's live test of 1–6 is the only thing left before tagging
-`v0.1.0`.
+#94 (Jules, build-profile + size regression) was open at the time. The next planned steps
+were to merge it on green, confirm no other open PRs/stale branches remained, and then run
+Masih's live test of 1–6 before tagging `v0.1.0`.
 
 1. **The ace — per-turn context deletion, visible (Fable-owned).** The deterministic
    cleaner is wired but invisible and positional. Required for v1: the agent-authored
@@ -301,7 +304,7 @@ branches remain, then Masih's live test of 1–6 is the only thing left before t
 5. **Welcome screen identity — MERGED, PR #88.** Version + "what's new" lines,
    Claude-Code-style, replacing the Codex-identical startup window.
 6. Masih tests the rebuilt binary against 1–5; on his explicit okay, tag `v0.1.0` with
-   checksummed release assets. **Status 2026-07-20: not yet run** — Masih's Claude
+   checksummed release assets. **Status on 2026-07-20: not yet run** — Masih's Claude
    subscription hit its usage limit, deferring the live test a few days; code-level
    review and CI are the interim signal. Then v0.2: Elpis data janitor (`/clean-up` for
    compounded rollouts/archives/evidence), size regression (in flight, PR #94),

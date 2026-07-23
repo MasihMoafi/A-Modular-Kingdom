@@ -151,12 +151,6 @@ pub fn continuity_sources(
 
     let mut instruction_paths: Vec<PathBuf> = instruction_source_paths.to_vec();
     if instruction_paths.is_empty() {
-        if let Some(home) = dirs::home_dir() {
-            let global_agents = home.join(".codex/AGENTS.md");
-            if global_agents.exists() {
-                instruction_paths.push(global_agents);
-            }
-        }
         let proj_agents = cwd.join("AGENTS.md");
         if proj_agents.exists() {
             instruction_paths.push(proj_agents);
@@ -167,7 +161,6 @@ pub fn continuity_sources(
         cwd.parent().map(|parent| parent.join("skills/dev")),
         dirs::home_dir().map(|home| home.join("Desktop/p/skills/dev")),
         dirs::home_dir().map(|home| home.join("Desktop/f/p/skills/dev")),
-        dirs::home_dir().map(|home| home.join(".codex/skills/dev")),
     ];
 
     let mut already_listed: std::collections::HashSet<PathBuf> = instruction_paths
@@ -623,12 +616,13 @@ mod tests {
         let cwd = home.path().join("projects/Elpis");
         let dev = home.path().join("projects/skills/dev");
         let workspace = workspace_context_dir(Some(&memories), &cwd).expect("workspace path");
-        std::fs::create_dir_all(home.path().join(".codex"))?;
+        let global = home.path().join("global/AGENTS.md");
         std::fs::create_dir_all(&memories)?;
         std::fs::create_dir_all(&cwd)?;
         std::fs::create_dir_all(&dev)?;
         std::fs::create_dir_all(&workspace)?;
-        std::fs::write(home.path().join(".codex/AGENTS.md"), "Global instructions")?;
+        std::fs::create_dir_all(global.parent().expect("global parent"))?;
+        std::fs::write(&global, "Global instructions")?;
         std::fs::write(cwd.join("AGENTS.md"), "Project instructions")?;
         std::fs::write(dev.join("SKILL.md"), "Development instructions")?;
         std::fs::write(workspace.join("GOAL.md"), "x".repeat(MAX_GOAL_CHARS + 40))?;
@@ -638,7 +632,7 @@ mod tests {
         add_continuity_source(Some(&memories), &cwd, &memory)?;
 
         let instructions = vec![
-            home.path().join(".codex/AGENTS.md"),
+            global,
             cwd.join("AGENTS.md"),
             dev.join("SKILL.md"),
         ];
@@ -751,16 +745,17 @@ mod tests {
         let memories = home.path().join(".elpis/memories");
         let cwd = home.path().join("projects/Elpis");
         let dev = home.path().join("projects/skills/dev");
-        tokio::fs::create_dir_all(home.path().join(".codex")).await?;
+        let global = home.path().join("global/AGENTS.md");
         tokio::fs::create_dir_all(&cwd).await?;
         tokio::fs::create_dir_all(&dev).await?;
-        tokio::fs::write(home.path().join(".codex/AGENTS.md"), "Global rule").await?;
+        tokio::fs::create_dir_all(global.parent().expect("global parent")).await?;
+        tokio::fs::write(&global, "Global rule").await?;
         tokio::fs::write(cwd.join("AGENTS.md"), "Project rule").await?;
         tokio::fs::write(dev.join("AGENTS.md"), "Dev rule").await?;
         tokio::fs::write(dev.join("SKILL.md"), "Skill rule").await?;
 
         let instructions = vec![
-            home.path().join(".codex/AGENTS.md"),
+            global,
             cwd.join("AGENTS.md"),
             dev.join("AGENTS.md"),
             dev.join("SKILL.md"),

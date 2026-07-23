@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 
 const MAX_INLINE_TOOL_OUTPUT_CHARS: usize = 400;
 const RETAINED_EDGE_CHARS: usize = 150;
-const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 1;
+const RECENT_TOOL_OUTPUTS_TO_KEEP: usize = 0;
 static EVICTED_TOOL_OUTPUTS: AtomicUsize = AtomicUsize::new(0);
 static SAVED_CHARS: AtomicUsize = AtomicUsize::new(0);
 static LAST_EVICTION_EVENT: Mutex<Option<String>> = Mutex::new(None);
@@ -166,8 +166,8 @@ mod tests {
             output("recent", large.clone()),
         ];
 
-        assert_eq!(clean_transient_tool_outputs(&mut input), 3);
-        for item in &input[..3] {
+        assert_eq!(clean_transient_tool_outputs(&mut input), 4);
+        for item in &input {
             let ResponseItem::FunctionCallOutput {
                 call_id, output, ..
             } = item
@@ -180,10 +180,6 @@ mod tests {
             assert!(text.contains("TAIL"));
             assert!(text.contains("full evidence remains in durable rollout"));
         }
-        let ResponseItem::FunctionCallOutput { output, .. } = &input[3] else {
-            panic!("function output");
-        };
-        assert_eq!(output.text_content(), Some(large.as_str()));
     }
 
     #[test]
@@ -200,17 +196,13 @@ mod tests {
             output("recent", large),
         ];
 
-        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+        assert_eq!(clean_transient_tool_outputs(&mut input), 2);
         let ResponseItem::CustomToolCallOutput { output, .. } = &input[0] else {
             panic!("custom output");
         };
         let text = output.text_content().expect("text");
         assert!(text.contains("tool=browser"));
         assert!(text.contains("evidence=rollout://tool-call/custom-old"));
-        let ResponseItem::FunctionCallOutput { output, .. } = &input[1] else {
-            panic!("function output");
-        };
-        assert_eq!(output.text_content().map(str::len), Some(5_000));
     }
 
     #[test]
@@ -292,13 +284,9 @@ mod tests {
             output("recent", large),
         ];
 
-        assert_eq!(clean_transient_tool_outputs(&mut input), 1);
+        assert_eq!(clean_transient_tool_outputs(&mut input), 2);
         assert_eq!(input[0], user_message("first, please grep the repo"));
         assert_eq!(input[2], user_message("now check the other file"));
-        let ResponseItem::FunctionCallOutput { output, .. } = &input[3] else {
-            panic!("function output");
-        };
-        assert_eq!(output.text_content().map(str::len), Some(5_000));
     }
 
     #[test]

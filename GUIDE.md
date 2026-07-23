@@ -165,7 +165,11 @@ is unaffected and remains the supported way to run Claude models in Elpis.
 4. Finish exact/lean context and session acceptance; replace the length-only cleaner.
 5. Verify authenticated OpenAI and OpenRouter task/resume paths.
 6. Implement the persistent identity line and coherent cyan foundation.
-7. Install and complete a real task from a clean environment, then tag `v0.1.0`.
+7. For every release, install the artifact in a clean environment and complete a real task.
+
+`v0.1.0` was tagged at `eba95a0`. Its remaining acceptance evidence, if any, is
+recorded in `TASKS.md`; this order is a release checklist, not a claim that every item
+was complete when the tag was made.
 
 ### State Layout
 

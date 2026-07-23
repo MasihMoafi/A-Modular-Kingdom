@@ -14,25 +14,26 @@ Implemented and covered by focused remote checks:
 - fresh-thread admission of the portable goal and checkpoint;
 - exact native-thread resume;
 - pre-compaction synchronization that stops on write failure;
-- `/status` reporting for portable sources, sizes, lifetimes, and reasons;
+- `/usage` reporting for portable sources, sizes, lifetimes, and reasons;
 - Elpis-owned bounded memory roots, retrieval, promotion, and archive storage.
 
 Still requiring end-to-end acceptance:
 
 - one real exact resume and one lean continuation;
-- proof that `/status` matches the next model-visible request;
+- proof that `/usage` matches the next model-visible request;
 - related versus unrelated memory admission;
 - memory review, deletion, reset, and compaction behavior.
 
-The current deterministic cleaner keeps the two newest tool outputs intact and replaces older
-output text longer than 1,200 characters with a compact receipt: head/tail excerpts (cleaned of
-trailing whitespace and collapsed blank runs) plus a durable `rollout://tool-call/<id>` evidence
-pointer. This implements the deterministic first pass of the pruning contract below; the
-agent-authored turn outcome record and meaning-aware classification are not yet implemented.
-Focused unit coverage exists, but no end-to-end check yet proves the expired material is absent
-from the actual next request. Earlier design notes about a lossless context database,
-background summarizer, decoupled compaction model, or global vector session index are not
-implemented.
+The deterministic cleaner keeps the two newest tool outputs intact and replaces older output text
+longer than 1,200 characters with a compact receipt: head/tail excerpts (cleaned of trailing
+whitespace and collapsed blank runs) plus a durable `rollout://tool-call/<id>` evidence pointer.
+For eligible uncovered tool output, Layer 2 can also classify each covered item as a dead end or a
+compact finding; if that model-assisted pass fails, deterministic receipts remain the fallback.
+This is a bounded first slice of meaning-aware pruning, not a complete agent-authored per-turn
+outcome record. Focused unit coverage exists, but no end-to-end check yet proves the expired
+material is absent from the actual next request. Earlier design notes about a lossless context
+database, background summarizer, decoupled compaction model, or global vector session index are
+not implemented.
 
 ## Context Lifecycle
 
@@ -79,8 +80,8 @@ A compliant cleaner must:
 5. prove evicted material is absent from the next request;
 6. stop when safe checkpointing cannot be completed.
 
-The current length-only replacement should be replaced, not expanded with more arbitrary
-thresholds.
+The shipped deterministic and model-assisted passes are incomplete; finish the lifecycle contract
+without expanding it through arbitrary thresholds alone.
 
 ## Memory And Archive Contract
 
@@ -96,7 +97,7 @@ the entire archive is never injected by default.
 
 1. Exact resume retains the native thread.
 2. Lean continuation receives only the portable goal/checkpoint and recent suffix.
-3. `/status` names every admitted portable source and reason.
+3. `/usage` names every admitted portable source and reason.
 4. The cleaner removes stale raw output while preserving a useful record and evidence pointer.
 5. Related memory appears with provenance; unrelated memory stays absent.
 6. Review, deletion, archive, and reset work without losing exact evidence.
@@ -165,7 +166,7 @@ the same next-request scope. A persistent Elpis context label and an inherited s
 must not present conflicting numbers. The inherited, intermittent top-left context display should
 be removed or suppressed until Elpis can replace it with this verified measure.
 
-Acceptance requires a controlled turn where the rendered value, `/status`, and the runtime's next
+Acceptance requires a controlled turn where the rendered value, `/usage`, and the runtime's next
 request accounting agree on used tokens, remaining tokens, and the context-window limit.
 
 ### Captured Design Inputs

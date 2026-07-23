@@ -35,6 +35,8 @@ pub(super) async fn maybe_run_context_prune(
         return;
     }
 
+    let active_context_tokens = sess.get_total_token_usage().await;
+
     let covered_call_ids = {
         let state = sess.state.lock().await;
         state.context_prune_covered.clone()
@@ -42,7 +44,7 @@ pub(super) async fn maybe_run_context_prune(
 
     let items = sess.clone_history().await.into_raw_items();
     let uncovered = context_pruner::uncovered_transient_chars(&items, &covered_call_ids);
-    if !context_pruner::should_prune(uncovered, context_window) {
+    if !context_pruner::should_prune(active_context_tokens, uncovered, context_window) {
         return;
     }
     let batch = context_pruner::build_prune_batch(&items, &covered_call_ids);
@@ -50,11 +52,10 @@ pub(super) async fn maybe_run_context_prune(
         return;
     }
 
-    let Some(raw) = run_prune_pass(sess, turn_context, client_session, &batch).await else {
-        return;
-    };
-    let Some(record) = context_pruner::parse_prune_output(&raw, &batch) else {
-        return;
+    let record = match run_prune_pass(sess, turn_context, client_session, &batch).await {
+        Some(raw) => context_pruner::parse_prune_output(&raw, &batch)
+            .unwrap_or_else(|| context_pruner::build_fallback_prune_record(&batch)),
+        None => context_pruner::build_fallback_prune_record(&batch),
     };
 
     let mut state = sess.state.lock().await;
@@ -72,14 +73,41 @@ async fn run_prune_pass(
     client_session: &mut ModelClientSession,
     batch: &[(String, String)],
 ) -> Option<String> {
-    let prune_model_slug = if turn_context.config.model_provider_id
-        == codex_model_provider_info::OPENROUTER_PROVIDER_ID
+    let primary_slug = if turn_context.config.model_provider_id
+        == codex_model_provider_info::OPENAI_PROVIDER_ID
     {
-        turn_context.model_info.slug.as_str()
-    } else {
         context_pruner::PRUNE_MODEL_SLUG
+    } else {
+        turn_context.model_info.slug.as_str()
     };
 
+    if let Some(output) =
+        try_stream_prune_pass(sess, turn_context, client_session, batch, primary_slug).await
+    {
+        return Some(output);
+    }
+
+    if primary_slug != turn_context.model_info.slug.as_str() {
+        return try_stream_prune_pass(
+            sess,
+            turn_context,
+            client_session,
+            batch,
+            turn_context.model_info.slug.as_str(),
+        )
+        .await;
+    }
+
+    None
+}
+
+async fn try_stream_prune_pass(
+    sess: &Arc<Session>,
+    turn_context: &Arc<TurnContext>,
+    client_session: &mut ModelClientSession,
+    batch: &[(String, String)],
+    prune_model_slug: &str,
+) -> Option<String> {
     let model_info = sess
         .services
         .models_manager

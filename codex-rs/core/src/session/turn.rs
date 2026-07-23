@@ -349,6 +349,14 @@ pub(crate) async fn run_turn(
                     allow_auto_compact_fallback,
                 )
                 .await;
+                {
+                    let mut state = sess.state.lock().await;
+                    let mut items = state.history.raw_items().to_vec();
+                    crate::context_cleaner::strip_reasoning_items(&mut items);
+                    if crate::context_cleaner::clean_transient_tool_outputs(&mut items) > 0 {
+                        state.history.replace(items);
+                    }
+                }
                 super::context_prune::maybe_run_context_prune(
                     &sess,
                     &turn_context,

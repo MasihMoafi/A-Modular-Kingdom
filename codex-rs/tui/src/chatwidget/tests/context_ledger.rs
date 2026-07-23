@@ -23,14 +23,15 @@ fn configure_ledger_sources(
     let memories = root.join(".elpis/memories");
     let cwd = root.join("projects/Elpis");
     let dev = root.join("projects/skills/dev");
+    let global = root.join("global/AGENTS.md");
     let workspace = crate::legacy_core::elpis_context::workspace_context_dir(Some(&memories), &cwd)
         .expect("workspace path");
 
-    std::fs::create_dir_all(root.join(".codex"))?;
+    std::fs::create_dir_all(global.parent().expect("global parent"))?;
     std::fs::create_dir_all(&cwd)?;
     std::fs::create_dir_all(&dev)?;
     std::fs::create_dir_all(&workspace)?;
-    std::fs::write(root.join(".codex/AGENTS.md"), "Global instructions")?;
+    std::fs::write(&global, "Global instructions")?;
     std::fs::write(cwd.join("AGENTS.md"), "Project instructions")?;
     std::fs::write(dev.join("SKILL.md"), "Development instructions")?;
     std::fs::write(workspace.join("GOAL.md"), "Ship the grouped ledger")?;
@@ -41,7 +42,7 @@ fn configure_ledger_sources(
     // The ledger reads instruction rows from the server-reported list, exactly as
     // /usage does. Mirror a real session by reporting the same files created above.
     chat.instruction_source_paths = vec![
-        codex_utils_path_uri::PathUri::from_abs_path(&root.join(".codex/AGENTS.md").abs()),
+        codex_utils_path_uri::PathUri::from_abs_path(&global.abs()),
         codex_utils_path_uri::PathUri::from_abs_path(&cwd.join("AGENTS.md").abs()),
         codex_utils_path_uri::PathUri::from_abs_path(&dev.join("SKILL.md").abs()),
     ];

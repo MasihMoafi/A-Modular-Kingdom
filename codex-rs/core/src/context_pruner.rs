@@ -66,15 +66,34 @@ impl PruneRecord {
     }
 }
 
-/// True once uncovered turn-lifetime content has grown to `PRUNE_TRIGGER_PERCENT` of
-/// the model's context window.
-pub(crate) fn should_prune(uncovered_chars: usize, context_window: i64) -> bool {
-    if context_window <= 0 {
+/// True when remaining context capacity drops by 10% or more (used context reaches or
+/// passes 10% of the model's context window) and uncovered transient content exists,
+/// or when uncovered content itself exceeds 10% of the context window.
+pub(crate) fn should_prune(
+    used_tokens: i64,
+    uncovered_chars: usize,
+    context_window: i64,
+) -> bool {
+    if context_window <= 0 || uncovered_chars == 0 {
         return false;
+    }
+    let used_percent = (used_tokens.max(0) * 100) / context_window;
+    if used_percent >= 10 {
+        return true;
     }
     let threshold_tokens = (context_window * PRUNE_TRIGGER_PERCENT) / 100;
     let threshold_chars = approx_bytes_for_tokens(threshold_tokens.max(0) as usize);
     threshold_chars > 0 && uncovered_chars >= threshold_chars
+}
+
+/// Fallback prune record applied when a model-assisted prune pass fails or is unparseable.
+/// Marks all uncovered call IDs as processed and lets apply_prune_record replace oversized
+/// tool outputs with deterministic compact evidence receipts.
+pub(crate) fn build_fallback_prune_record(batch: &[(String, String)]) -> PruneRecord {
+    PruneRecord {
+        covered_call_ids: batch.iter().map(|(id, _)| id.clone()).collect(),
+        text: String::new(),
+    }
 }
 
 fn prunable_text(item: &ResponseItem) -> Option<(&str, &str)> {
@@ -252,15 +271,30 @@ mod tests {
 
     #[test]
     fn should_prune_respects_ten_percent_threshold() {
-        // 1_000_000-token window -> 100_000-token threshold -> ~400_000 chars.
-        assert!(!should_prune(399_999, 1_000_000));
-        assert!(should_prune(400_000, 1_000_000));
+        // At <10% used (e.g. 50k tokens out of 1M), only prunes if uncovered content >= 10% context window (~400k chars).
+        assert!(!should_prune(50_000, 399_999, 1_000_000));
+        assert!(should_prune(50_000, 400_000, 1_000_000));
+
+        // At >=10% used (100k tokens out of 1M -> context bar dropped past 90%), any uncovered content triggers prune.
+        assert!(should_prune(100_000, 100, 1_000_000));
+        assert!(!should_prune(100_000, 0, 1_000_000));
     }
 
     #[test]
     fn should_prune_false_for_non_positive_context_window() {
-        assert!(!should_prune(1_000_000, 0));
-        assert!(!should_prune(1_000_000, -1));
+        assert!(!should_prune(200_000, 1_000_000, 0));
+        assert!(!should_prune(200_000, 1_000_000, -1));
+    }
+
+    #[test]
+    fn build_fallback_prune_record_covers_all_ids() {
+        let batch = vec![
+            ("a".to_string(), "text a".to_string()),
+            ("b".to_string(), "text b".to_string()),
+        ];
+        let record = build_fallback_prune_record(&batch);
+        assert_eq!(record.covered_call_ids, vec!["a", "b"]);
+        assert_eq!(record.text, "");
     }
 
     #[test]
