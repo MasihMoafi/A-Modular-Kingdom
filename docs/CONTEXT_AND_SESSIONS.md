@@ -24,16 +24,9 @@ Still requiring end-to-end acceptance:
 - related versus unrelated memory admission;
 - memory review, deletion, reset, and compaction behavior.
 
-The deterministic cleaner keeps the two newest tool outputs intact and replaces older output text
-longer than 1,200 characters with a compact receipt: head/tail excerpts (cleaned of trailing
-whitespace and collapsed blank runs) plus a durable `rollout://tool-call/<id>` evidence pointer.
-For eligible uncovered tool output, Layer 2 can also classify each covered item as a dead end or a
-compact finding; if that model-assisted pass fails, deterministic receipts remain the fallback.
-This is a bounded first slice of meaning-aware pruning, not a complete agent-authored per-turn
-outcome record. Focused unit coverage exists, but no end-to-end check yet proves the expired
-material is absent from the actual next request. Earlier design notes about a lossless context
-database, background summarizer, decoupled compaction model, or global vector session index are
-not implemented.
+The deterministic cleaner (Layer 1) compacts all completed tool outputs (supporting both `Text` and `ContentItems` payloads) longer than 400 characters into compact receipts containing head/tail excerpts plus a durable `rollout://tool-call/<id>` evidence pointer directly inside session history.
+
+For eligible uncovered tool output, Layer 2 ("Masih's Ace in the Hole") executes background model pruning passes whenever uncovered transient content exists (`uncovered_chars >= 1,000` or `used_percent >= 1%`), classifying covered items as dead ends or compact findings. `/usage` tracks and reports live combined savings (e.g. `~34.2K tokens saved — 39 deterministic, 7 agent-authored`).
 
 ## Context Lifecycle
 
