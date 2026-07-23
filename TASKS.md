@@ -193,10 +193,6 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   document the local workaround (Masih's own `vc` terminal alias). Strictly opt-in, never
   a required step in any flow; Codex's own docs mention a speak/voice feature but it isn't
   actually present in the inherited codebase to build on.
-- Bring `/theme` into the visible command list: it's already fully implemented
-  (`open_theme_picker`, `tui/src/chatwidget/slash_dispatch.rs:488`) and inherited from
-  Codex, just hidden — the same one-line `is_visible()` arm move as the `/fork`/`/hooks`/
-  `/memories` fixes from the v0.1.0 ship.
 - Further Codex subtraction, one measured capability at a time.
 - LSP-backed code intelligence for the active runtime: real language-server queries
   (go-to-definition, precise references, live diagnostics) instead of grep/text search.
@@ -214,8 +210,6 @@ Version map: **Foundational = v0.1** (publish gate), **Important = v0.2**,
   that blocks the first frame, using the audit method in
   `docs/BUILD_AND_REDUCTION_AUDIT.md`; the binary must feel faster than a Node CLI or
   the Rust choice is being wasted. Related: the 3.5× size regression above.
-- Spinner identity: replace inherited working-state words with Elpis language
-  ("elpising…"), matching the cyan identity; small, delegable.
 
 ## Nice-to-have (v0.3+)
 
