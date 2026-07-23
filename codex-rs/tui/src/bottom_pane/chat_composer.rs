@@ -3129,10 +3129,8 @@ impl ChatComposer {
         } else {
             self.footer.mode = reset_mode_after_activity(self.footer.mode);
         }
-        if self.queue_keys.is_pressed(key_event)
-            && (self.is_task_running || self.queue_submissions || !self.is_bang_shell_command())
-        {
-            return self.handle_submission(self.is_task_running || self.queue_submissions);
+        if self.queue_keys.is_pressed(key_event) && self.should_queue_on_tab() {
+            return self.handle_submission(true);
         }
 
         if self.submit_keys.is_pressed(key_event) {
@@ -3185,6 +3183,14 @@ impl ChatComposer {
         }
 
         self.handle_input_basic(key_event)
+    }
+
+    /// Whether pressing the queue key (`Tab` by default) right now should queue the
+    /// draft as a follow-up instead of leaving `Tab` free for other bindings (for
+    /// example, the Context Ledger toggle). Only true when there is an active turn
+    /// to queue behind, or during the startup window before a session exists.
+    pub(crate) fn should_queue_on_tab(&self) -> bool {
+        self.is_task_running || self.queue_submissions
     }
 
     fn is_bang_shell_command(&self) -> bool {

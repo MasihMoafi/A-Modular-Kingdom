@@ -22,7 +22,7 @@ pub(super) struct ContextLedgerState {
 impl Default for ContextLedgerState {
     fn default() -> Self {
         Self {
-            // Open by default; Tab hides it.
+            // Open by default; Tab or Alt+C hides it.
             visible: true,
             focused: false,
             selected: 0,
@@ -36,9 +36,13 @@ impl Default for ContextLedgerState {
 }
 
 impl ChatWidget {
-    /// The ledger is a sidebar shown by default and toggled with Tab: one press
-    /// hides it, the next shows and focuses it. On narrower terminals it takes a
-    /// proportional slice instead of a fixed 52 columns so the composer keeps room.
+    /// The ledger is a sidebar shown by default and toggled with `Tab` or `Alt+C`:
+    /// one press hides it, the next shows and focuses it. `Tab` defers to the
+    /// composer's queue-the-draft action while a turn is running (or during the
+    /// startup queueing window), since that binding needs `Tab` too; `Alt+C`
+    /// always toggles the ledger regardless. On narrower terminals the ledger
+    /// takes a proportional slice instead of a fixed 52 columns so the composer
+    /// keeps room.
     pub(super) fn context_ledger_width(&self, terminal_width: u16) -> u16 {
         if !self.context_ledger.visible || terminal_width < LEDGER_MIN_TERMINAL_WIDTH {
             return 0;
@@ -71,9 +75,11 @@ impl ChatWidget {
         if key_event.kind != KeyEventKind::Press {
             return false;
         }
-        if matches!(key_event.code, KeyCode::Tab)
+        let is_toggle_key = (matches!(key_event.code, KeyCode::Tab)
             && key_event.modifiers.is_empty()
-            && self.bottom_pane.composer_is_empty()
+            && !self.bottom_pane.should_queue_on_tab())
+            || key_hint::alt(KeyCode::Char('c')).is_press(key_event);
+        if is_toggle_key
             && self.bottom_pane.no_modal_or_popup_active()
             && self
                 .last_rendered_width
