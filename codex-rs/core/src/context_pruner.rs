@@ -15,6 +15,7 @@
 //! 1's deterministic receipts remain the fallback safety net, and the next request's
 //! larger uncovered total will simply retry.
 
+use codex_protocol::models::ContentItem;
 use codex_protocol::models::FunctionCallOutputBody;
 use codex_protocol::models::ResponseItem;
 use std::collections::HashMap;
@@ -102,6 +103,25 @@ fn prunable_text(item: &ResponseItem) -> Option<(&str, String)> {
                 None
             } else {
                 Some((call_id.as_str(), text))
+            }
+        }
+        ResponseItem::Message { id, content, role, .. } => {
+            if role == "system" {
+                return None;
+            }
+            let text = content
+                .iter()
+                .filter_map(|c| match c {
+                    ContentItem::InputText { text } | ContentItem::OutputText { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            if text.trim().is_empty() {
+                None
+            } else {
+                let msg_id = id.as_deref().unwrap_or("msg");
+                Some((msg_id, text))
             }
         }
         _ => None,

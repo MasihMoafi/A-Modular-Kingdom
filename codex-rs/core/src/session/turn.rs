@@ -357,12 +357,14 @@ pub(crate) async fn run_turn(
                         state.history.replace(items);
                     }
                 }
-                super::context_prune::maybe_run_context_prune(
-                    &sess,
-                    &turn_context,
-                    &mut client_session,
-                )
-                .await;
+                if !needs_follow_up {
+                    super::context_prune::maybe_run_context_prune(
+                        &sess,
+                        &turn_context,
+                        &mut client_session,
+                    )
+                    .await;
+                }
 
                 // as long as compaction works well in getting us way below the token limit, we shouldn't worry about being in an infinite loop.
                 if should_roll_over {
