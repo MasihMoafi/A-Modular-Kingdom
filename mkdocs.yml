@@ -1,0 +1,21 @@
+site_name: Elpis
+site_description: Portable context, memory, and continuity for terminal coding agents.
+site_url: https://masihmoafi.github.io/Elpis/
+repo_url: https://github.com/MasihMoafi/Elpis
+repo_name: MasihMoafi/Elpis
+theme:
+  name: material
+  features:
+    - navigation.footer
+    - navigation.sections
+    - content.action.edit
+nav:
+  - Home: index.md
+  - Context and sessions: context-and-sessions.md
+  - Memory: memory.md
+  - Providers: providers.md
+  - Visual walkthrough: visual-walkthrough.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.superfences

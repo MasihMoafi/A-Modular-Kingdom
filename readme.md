@@ -164,3 +164,29 @@ in [TASKS.md](TASKS.md). The measured build and dependency-reduction plan is doc
 
 Elpis is MIT licensed. The contained Codex-derived source retains its upstream Apache-2.0
 notices and attribution.
+## Quick start
+
+Install the latest release, then start Elpis:
+
+```bash
+mkdir -p "$HOME/.local/bin" && curl -fsSL https://github.com/MasihMoafi/Elpis/releases/latest/download/elpis-linux-x86_64 | install -m 755 /dev/stdin "$HOME/.local/bin/elpis"
+elpis
+```
+
+This Linux x86_64 command assumes `~/.local/bin` is on your `PATH`. Elpis opens an
+interactive terminal session. On first launch, choose a provider and complete its
+sign-in prompt; subsequent launches resume your local Elpis workflow.
+
+```text
+$ elpis
+Welcome to Elpis
+›
+```
+
+For the full workflow, screenshots, and configuration details, see the
+[visual walkthrough](#visual-walkthrough). The documentation site has deeper guides
+for [context and sessions](https://masihmoafi.github.io/Elpis/context-and-sessions/),
+[memory](https://masihmoafi.github.io/Elpis/memory/), and
+[provider configuration](https://masihmoafi.github.io/Elpis/providers/).
+
+# Visual walkthrough
