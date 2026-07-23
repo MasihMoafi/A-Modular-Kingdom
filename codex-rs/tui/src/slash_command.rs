@@ -43,6 +43,7 @@ pub enum SlashCommand {
     App,
     Init,
     Compact,
+    Prune,
     Plan,
     Goal,
     Agent,
@@ -101,6 +102,7 @@ impl SlashCommand {
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Usage => "inspect current context, continuity, and token usage",
+            SlashCommand::Prune => "run a Layer 2 context pruning pass over active working memory",
             SlashCommand::Context => {
                 "show context usage as a grid, by category, with checkpoints and system files"
             }
@@ -192,6 +194,7 @@ impl SlashCommand {
             | SlashCommand::Fork
             | SlashCommand::Init
             | SlashCommand::Compact
+            | SlashCommand::Prune
             | SlashCommand::Keymap
             | SlashCommand::Vim
             | SlashCommand::ElevateSandbox
@@ -254,6 +257,7 @@ impl SlashCommand {
             | SlashCommand::Resume
             | SlashCommand::Init
             | SlashCommand::Compact
+            | SlashCommand::Prune
             | SlashCommand::Diff
             | SlashCommand::Usage
             | SlashCommand::Context
