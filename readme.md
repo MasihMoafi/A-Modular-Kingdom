@@ -14,8 +14,7 @@ Elpis is a terminal agent shell that treats context as a managed asset, not an
 ever-growing log:
 
 - **Dual-Layer Context Pruning (Shipped in v0.1.0).** Layer 1 deterministically compacts older tool outputs into head/tail receipts with durable `rollout://` evidence pointers. Layer 2 ("Masih's Ace in the Hole") executes a background model pruning pass after each turn to evaluate user and assistant messages, purging transient thinking fluff while preserving core architectural conclusions. Inspect reports anytime via `file:///home/masih/.elpis/logs/prune_report.md` or type `/prune`.
-- **Interactive `/context` Visual Grid.** Type `/context` to see a real-time cell grid, category breakdown (System prompt, User/Agent/Tool cells), Checkpoints count, and System files list.
-- **The Context Ledger.** A visible, scrollable panel showing *exactly* what enters your next model request — every rule file, goal, checkpoint, and added file as its own row, each one toggleable. You decide what the model sees. `/add` a file of your own.
+- **The Context Ledger.** A visible, scrollable panel showing *exactly* what enters your next model request — every rule file, goal, checkpoint, and added file as its own row, each one toggleable. Type `/context` for a real-time token grid and category breakdown; `/add` to include any file of your own.
 - **Portable continuity.** The active goal (`GOAL.md`) and a lean checkpoint (`ES.md`) survive compaction, session death, and even switching runtimes. Resume a thread exactly, or start a fresh one that already knows your goal, last result, and next action — without replaying history.
 - **Earned memory.** Facts become durable memory only after repeated useful recall across distinct contexts. Everything else stays as searchable evidence. Deleted memories are archived before reset — never silently lost.
 - **Runtime-agnostic.** The shell survives underneath whichever model performs the loop: ChatGPT/Codex subscription login, OpenRouter, native Anthropic and Gemini adapters, Bedrock, Ollama, LM Studio. Put a model into Elpis and it becomes Elpis: your goals, context, memory, and rules.
@@ -23,6 +22,35 @@ ever-growing log:
 The execution foundation (terminal UI, patches, permissions, sandboxing, sessions) is a subtracted fork of OpenAI's Apache-2.0 Codex CLI, hardened by upstream, owned here.
 
 > **Release `v0.1.0`:** Shipped and verified with live acceptance recorded in [TASKS.md](TASKS.md).
+
+## Live Demonstration (Elpis Real-Time Context Pruning)
+
+Side-by-side execution showing **Elpis** vs **Codex** on the exact same task:
+
+### 1. Initial Prompt Submission
+![Starting Elpis](docs/demo/starting-elpis.png)
+![Starting Codex with the same prompt](docs/demo/starting-codex-with-the-same-prompt.png)
+
+### 2. Execution Outcome & Free Context Remaining
+* **Elpis**: **93% Free Context Remaining**  
+  ![Elpis End State](docs/demo/elpis-end-state.png)
+
+* **Codex**: **Only 73% Free Context Remaining**  
+  ![Codex End State](docs/demo/codex-end-state.png)
+
+---
+
+## Context Reduction Architecture
+
+Elpis manages context through a 3-tiered reduction pipeline to ensure high prompt efficiency while preserving evidence durability:
+
+| Level | Component | Trigger Condition | Scope & Operation | Inspection & Evidence |
+| :--- | :--- | :--- | :--- | :--- |
+| **Level 1** | **Deterministic Tool Cleaner** | Real-time tool execution (>1,200 chars) | Replaces oversized tool stdout/stderr with positional head/tail excerpts. | Live header `/status` token count & `rollout://tool-call/<id>` evidence pointers. |
+| **Level 2** | **Ace Model Pruner** | End of turn (`!needs_follow_up`) | Evaluates user and assistant conversation turns, purging transient thinking fluff while retaining core decisions. | `/prune` slash command & clickable markdown report at `file:///home/masih/.elpis/logs/prune_report.md`. |
+| **Level 3** | **Full Session Compaction** | `/compact` or context budget limit | Summarizes multi-turn history into a single `ContextCompactionItem` block, preserving `GOAL.md` & `ES.md`. | Context Ledger, `/usage`, and full disk rollout logs at `~/.elpis/sessions/`. |
+
+---
 
 ## What works today
 
@@ -40,131 +68,27 @@ The execution foundation (terminal UI, patches, permissions, sandboxing, session
 
 Elpis keeps the surrounding control environment stable while the selected runtime performs the model loop. Exact evidence remains durable; only a small, reasoned working set enters the next request.
 
-```mermaid
-flowchart LR
-    user([User request]) --> tui["Elpis TUI"]
-    tui --> control["Elpis control layer"]
-    rag["Read-only RAG"] --> control
-    portable["GOAL.md + ES.md"] --> control
-    memory["Bounded local memory"] --> control
-    control --> runtime{"Select runtime"}
-    runtime --> openai["OpenAI / Codex"]
-    runtime --> router["OpenRouter · Anthropic · Gemini"]
-    runtime --> other["Bedrock / Ollama / LM Studio"]
-    openai --> execution["Tools · edits · commands"]
-    router --> execution
-    other --> execution
-    execution --> evidence[("Workspace + exact evidence")]
-```
+![Elpis Operating Model](Elpis%20Operating%20Model.png)
 
-### Context management
+### Context management & Session continuity
 
 Elpis admits rules, the current request, portable state, and relevant memory into a small working set. The Context Ledger and `/usage` expose why each source is present while full artifacts stay on disk.
 
-The working context is not the transcript. Full conversations, terminal events, and artifacts
-remain available as evidence, but are retrieved only when a later task needs them — by exact
-evidence pointer first, RAG second. Neither makes the full history a default prompt
-attachment. The aim is to make a modest context window sufficient and legible, rather than
-pay to resend an ever-growing one.
+![Elpis Context Management](Elpis%20Context%20Management.png)
 
-```mermaid
-flowchart LR
-    rules["Rules + current request"] --> working["Small admitted working set"]
-    goal["GOAL.md ≤ 6,000 chars"] --> working
-    checkpoint["ES.md ≤ 8,000 chars"] --> working
-    memory["Relevant memory"] --> working
-    status["Context Ledger + /usage"] -.-> working
-    working --> runtime["Selected runtime request"]
-    runtime --> results["Tool and function results"]
-    results --> disk[("Full transcript + artifacts on disk")]
-    results --> large{"Old tool output > 1,200 chars?"}
-    large -->|Yes| marker["Compact receipt + evidence pointer"]
-    large -->|No| keep["Keep in request context"]
-```
-
-### Session continuity
-
-Elpis resumes the useful native thread exactly or starts a lean thread from `GOAL.md` and `ES.md`. Pre-compaction synchronization fails closed instead of risking a broken handoff.
-
-```mermaid
-flowchart LR
-    boundary(["Exit · compaction · runtime change"]) --> sync["Synchronize GOAL.md + ES.md"]
-    sync --> safe{"Files safely synchronized?"}
-    safe -->|No| stop["Stop compaction + show error"]
-    safe -->|Yes| thread{"Native thread still useful?"}
-    thread -->|Yes| exact["Exact resume"]
-    thread -->|No| lean["Lean continuation"]
-    exact --> next["Continue from preserved next action"]
-    lean --> next
-    next --> evidence["Read exact evidence only when needed"]
-    evidence --> verify["Verify result + refresh checkpoint"]
-```
+The working context is not the transcript. Full conversations, terminal events, and artifacts remain available as evidence, but are retrieved only when a later task needs them — by exact evidence pointer first, RAG second. Neither makes the full history a default prompt attachment. The aim is to make a modest context window sufficient and legible, rather than pay to resend an ever-growing one.
 
 ### Memory management
 
 New evidence stays searchable until repeated useful recall makes it eligible for durable memory. Durable artifacts are bounded, and deleted or faded lines are archived before reset.
 
-```mermaid
-flowchart TB
-    subgraph promotion["Promotion"]
-        direction LR
-        work(["Completed work"]) --> raw["Searchable evidence + provenance"]
-        raw --> recall["Track recalls + distinct contexts"]
-        recall --> gate{"3 recalls across 2 contexts?"}
-        gate -->|No| short["Remain searchable evidence"]
-        gate -->|Yes| durable["Eligible for MEMORY.md"]
-        durable --> bounded["MEMORY.md ≤ 30k · summary ≤ 10k"]
-    end
-
-    subgraph retirement["Retirement"]
-        direction LR
-        changed{"Deleted or faded?"}
-        changed -->|No| reset["Reset memory baseline"]
-        changed -->|Yes| archive["Append removed lines to archive.md"]
-        archive --> written{"Archive write succeeded?"}
-        written -->|Yes| reset
-        written -->|No| block["Block reset to prevent evidence loss"]
-    end
-
-    short --> changed
-    bounded --> changed
-```
-
 ### Read-only RAG
 
 The startup path exposes one minimal read-only tool without loading the retrieval stack. Embeddings and indexing load lazily only after an explicit semantic query.
 
-```mermaid
-flowchart LR
-    launch(["Elpis launches"]) --> host["Minimal stdio MCP host"]
-    host --> tool["One tool: query_knowledge_base"]
-    tool --> query{"Explicit RAG query?"}
-    query -->|No| idle["No indexing or model load"]
-    query -->|Yes| search["Lazy-load rag.fetch"]
-    search --> scope{"Workspace or supplied path?"}
-    scope --> workspace["Launch workspace"]
-    scope --> supplied["Normalized supplied path"]
-    workspace --> chunks["Sourced semantic chunks"]
-    supplied --> chunks
-    chunks --> exact["Use exact reads before code changes"]
-```
-
 ### Safe execution and evidence
 
 Consequential actions pass through visible permission and sandbox policy before execution. Elpis records outcomes and evidence, then distinguishes verified success from failure or unresolved gaps.
-
-```mermaid
-flowchart LR
-    action(["Consequential action proposed"]) --> policy["Show permission + sandbox policy"]
-    policy --> approval{"Approval required?"}
-    approval -->|Denied| denied["Do not execute"]
-    approval -->|Allowed| execute["Runtime executes tool · edit · command"]
-    execute --> stream["Stream command · patch · tool events"]
-    stream --> record["Record status · changed paths · evidence pointers"]
-    record --> verify{"Verification passed?"}
-    verify -->|Yes| success["Verified outcome"]
-    verify -->|No| gap["Failure · blocker · unresolved gap"]
-```
 
 ## Install
 
