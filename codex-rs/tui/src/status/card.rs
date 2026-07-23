@@ -438,25 +438,30 @@ impl StatusHistoryCell {
     /// percentage of the context window recovered — so pruning is a number you can
     /// watch, not a claim you have to trust.
     fn context_pruning_spans(&self) -> Option<Vec<Span<'static>>> {
-        let total_saved_chars = self.context_cleaner_saved_chars + self.context_pruner_saved_chars;
-        let saved_tokens = i64::try_from(codex_utils_string::approx_tokens_from_byte_count(
-            total_saved_chars,
+        let det_tokens = i64::try_from(codex_utils_string::approx_tokens_from_byte_count(
+            self.context_cleaner_saved_chars,
         ))
-        .unwrap_or(i64::MAX);
-        let saved_fmt = format_tokens_compact(saved_tokens);
-        let percent = self
-            .token_usage
-            .context_window
-            .as_ref()
-            .filter(|context| context.window > 0)
-            .map(|context| (saved_tokens.saturating_mul(100)) / context.window)
-            .unwrap_or(0);
+        .unwrap_or(0);
+        let agent_tokens = i64::try_from(codex_utils_string::approx_tokens_from_byte_count(
+            self.context_pruner_saved_chars,
+        ))
+        .unwrap_or(0);
+        let total_saved_tokens = det_tokens + agent_tokens;
+        if total_saved_tokens == 0 && self.context_cleaner_evictions == 0 && self.context_pruner_passes == 0 {
+            return Some(vec![
+                Span::from("~0 tokens saved"),
+                Span::from(" (0% of context window) — 0 deterministic, 0 agent-authored").dim(),
+            ]);
+        }
+
+        let det_fmt = format_tokens_compact(det_tokens);
+        let agent_fmt = format_tokens_compact(agent_tokens);
+        let total_fmt = format_tokens_compact(total_saved_tokens);
 
         Some(vec![
-            Span::from(format!("~{saved_fmt} tokens saved")),
-            Span::from(format!(" ({percent}% of context window)")).dim(),
+            Span::from(format!("~{total_fmt} tokens saved")),
             Span::from(format!(
-                " — {} deterministic, {} agent-authored",
+                " — {det_fmt} ({}) deterministic, {agent_fmt} ({}) agent-authored",
                 self.context_cleaner_evictions, self.context_pruner_passes
             ))
             .dim(),
