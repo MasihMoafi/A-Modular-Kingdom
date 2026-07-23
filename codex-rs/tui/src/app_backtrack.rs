@@ -30,7 +30,6 @@ use crate::bottom_pane::LocalImageAttachment;
 use crate::chatwidget::ChatWidget;
 use crate::chatwidget::UserMessage;
 use crate::chatwidget::mention_bindings_from_user_inputs;
-#[cfg(test)]
 use crate::history_cell::AgentMessageCell;
 use crate::history_cell::SessionInfoCell;
 use crate::history_cell::UserHistoryCell;
@@ -610,6 +609,61 @@ fn user_positions_iter(
         .filter_map(move |(idx, cell)| (type_of(cell) == user_type).then_some(idx))
 }
 
+/// Rough transcript composition for the `/context` command's category breakdown.
+///
+/// This counts what is currently rendered in the transcript, not the model's exact
+/// next-request payload: pruned/evicted tool output and the static system prompt/tool
+/// schemas are not part of `transcript_cells`. Treat these as an estimate, the same way
+/// the Context Ledger already labels its own per-source sizes as estimated tokens.
+pub(crate) struct ContextUsageTranscriptTotals {
+    pub(crate) checkpoints: usize,
+    pub(crate) user_message_chars: usize,
+    pub(crate) agent_response_chars: usize,
+    pub(crate) tool_call_chars: usize,
+}
+
+pub(crate) fn context_usage_totals(
+    cells: &[Arc<dyn crate::history_cell::HistoryCell>],
+) -> ContextUsageTranscriptTotals {
+    let session_start_type = TypeId::of::<SessionInfoCell>();
+    let user_type = TypeId::of::<UserHistoryCell>();
+    let agent_type = TypeId::of::<AgentMessageCell>();
+    let type_of = |cell: &Arc<dyn crate::history_cell::HistoryCell>| cell.as_any().type_id();
+
+    let start = cells
+        .iter()
+        .rposition(|cell| type_of(cell) == session_start_type)
+        .map_or(0, |idx| idx + 1);
+
+    let mut totals = ContextUsageTranscriptTotals {
+        checkpoints: user_count(cells),
+        user_message_chars: 0,
+        agent_response_chars: 0,
+        tool_call_chars: 0,
+    };
+
+    for cell in cells.iter().skip(start) {
+        let kind = type_of(cell);
+        if kind == session_start_type {
+            continue;
+        }
+        let chars: usize = cell
+            .raw_lines()
+            .iter()
+            .map(|line| line.spans.iter().map(|span| span.content.chars().count()).sum::<usize>())
+            .sum();
+        if kind == user_type {
+            totals.user_message_chars += chars;
+        } else if kind == agent_type {
+            totals.agent_response_chars += chars;
+        } else {
+            totals.tool_call_chars += chars;
+        }
+    }
+
+    totals
+}
+
 #[cfg(test)]
 fn agent_group_count(cells: &[Arc<dyn crate::history_cell::HistoryCell>]) -> usize {
     agent_group_positions_iter(cells).count()
@@ -1013,5 +1067,32 @@ mod tests {
         let rendered = render_lines(&cell.display_lines(/*width*/ 80)).join("\n");
 
         insta::assert_snapshot!(rendered);
+    }
+
+    #[test]
+    fn context_usage_totals_buckets_by_cell_type() {
+        let cells: Vec<Arc<dyn HistoryCell>> = vec![
+            Arc::new(UserHistoryCell {
+                message: "hi there".to_string(),
+                text_elements: Vec::new(),
+                local_image_paths: Vec::new(),
+                remote_image_urls: Vec::new(),
+            }) as Arc<dyn HistoryCell>,
+            Arc::new(AgentMessageCell::new(
+                vec![Line::from("hello back")],
+                /*is_first_line*/ true,
+            )) as Arc<dyn HistoryCell>,
+            Arc::new(crate::history_cell::new_info_event(
+                "ran a command".to_string(),
+                /*hint*/ None,
+            )) as Arc<dyn HistoryCell>,
+        ];
+
+        let totals = context_usage_totals(&cells);
+
+        assert_eq!(totals.checkpoints, 1);
+        assert!(totals.user_message_chars > 0);
+        assert!(totals.agent_response_chars > 0);
+        assert!(totals.tool_call_chars > 0);
     }
 }

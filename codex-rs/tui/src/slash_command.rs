@@ -53,6 +53,7 @@ pub enum SlashCommand {
     Diff,
     Mention,
     Usage,
+    Context,
     DebugConfig,
     Title,
     Statusline,
@@ -100,6 +101,9 @@ impl SlashCommand {
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Usage => "inspect current context, continuity, and token usage",
+            SlashCommand::Context => {
+                "show context usage as a grid, by category, with checkpoints and system files"
+            }
             SlashCommand::DebugConfig => "show config layers and requirement sources for debugging",
             SlashCommand::Title => "configure which items appear in the terminal title",
             SlashCommand::Statusline => "configure which items appear in the status line",
@@ -174,6 +178,7 @@ impl SlashCommand {
                 | SlashCommand::Diff
                 | SlashCommand::Mention
                 | SlashCommand::Usage
+                | SlashCommand::Context
                 | SlashCommand::Ide
         )
     }
@@ -212,6 +217,7 @@ impl SlashCommand {
             | SlashCommand::Rag
             | SlashCommand::Hooks
             | SlashCommand::Usage
+            | SlashCommand::Context
             | SlashCommand::DebugConfig
             | SlashCommand::Ps
             | SlashCommand::Stop
@@ -250,6 +256,7 @@ impl SlashCommand {
             | SlashCommand::Compact
             | SlashCommand::Diff
             | SlashCommand::Usage
+            | SlashCommand::Context
             | SlashCommand::Mcp
             | SlashCommand::Quit
             | SlashCommand::Memories

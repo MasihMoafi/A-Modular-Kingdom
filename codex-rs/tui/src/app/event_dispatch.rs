@@ -138,6 +138,11 @@ impl App {
                 }
                 tui.frame_requester().schedule_frame();
             }
+            AppEvent::RequestContextUsageReport => {
+                let totals = crate::app_backtrack::context_usage_totals(&self.transcript_cells);
+                self.chat_widget.add_context_usage_output(totals);
+                tui.frame_requester().schedule_frame();
+            }
             AppEvent::ResumeSessionByIdOrName(id_or_name) => {
                 match crate::lookup_session_target_with_app_server(app_server, &id_or_name).await? {
                     Some(target_session) => {
