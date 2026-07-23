@@ -17,15 +17,10 @@
 
 use codex_protocol::models::FunctionCallOutputBody;
 use codex_protocol::models::ResponseItem;
-use codex_utils_output_truncation::approx_bytes_for_tokens;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
-
-/// Trigger threshold: run a pass once uncovered turn-lifetime content reaches this
-/// fraction of the active model's context window.
-const PRUNE_TRIGGER_PERCENT: i64 = 10;
 
 /// Model used for the pruning pass — same model and `Medium` reasoning effort as the
 /// existing memory-consolidation pass (`memories/write/src/lib.rs`'s `stage_two`),
@@ -78,12 +73,10 @@ pub(crate) fn should_prune(
         return false;
     }
     let used_percent = (used_tokens.max(0) * 100) / context_window;
-    if used_percent >= 10 {
+    if used_percent >= 1 {
         return true;
     }
-    let threshold_tokens = (context_window * PRUNE_TRIGGER_PERCENT) / 100;
-    let threshold_chars = approx_bytes_for_tokens(threshold_tokens.max(0) as usize);
-    threshold_chars > 0 && uncovered_chars >= threshold_chars
+    uncovered_chars >= 1_000
 }
 
 /// Fallback prune record applied when a model-assisted prune pass fails or is unparseable.
@@ -270,14 +263,12 @@ mod tests {
     }
 
     #[test]
-    fn should_prune_respects_ten_percent_threshold() {
-        // At <10% used (e.g. 50k tokens out of 1M), only prunes if uncovered content >= 10% context window (~400k chars).
-        assert!(!should_prune(50_000, 399_999, 1_000_000));
-        assert!(should_prune(50_000, 400_000, 1_000_000));
+    fn should_prune_respects_threshold() {
+        assert!(!should_prune(0, 500, 1_000_000));
+        assert!(should_prune(0, 1_000, 1_000_000));
 
-        // At >=10% used (100k tokens out of 1M -> context bar dropped past 90%), any uncovered content triggers prune.
-        assert!(should_prune(100_000, 100, 1_000_000));
-        assert!(!should_prune(100_000, 0, 1_000_000));
+        assert!(should_prune(10_000, 100, 1_000_000));
+        assert!(!should_prune(10_000, 0, 1_000_000));
     }
 
     #[test]
