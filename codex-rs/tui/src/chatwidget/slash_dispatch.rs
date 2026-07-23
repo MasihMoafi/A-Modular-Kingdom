@@ -473,6 +473,9 @@ impl ChatWidget {
                     );
                 }
             }
+            SlashCommand::Context => {
+                self.app_event_tx.send(AppEvent::RequestContextUsageReport);
+            }
             SlashCommand::Ide => {
                 self.handle_ide_command();
             }
@@ -679,6 +682,9 @@ impl ChatWidget {
                 self.add_status_output(
                     /*refreshing_rate_limits*/ false, /*request_id*/ None,
                 );
+            }
+            SlashCommand::Context => {
+                self.app_event_tx.send(AppEvent::RequestContextUsageReport);
             }
             SlashCommand::Ide => {
                 self.handle_ide_command_args(trimmed);
@@ -1088,6 +1094,7 @@ impl ChatWidget {
         match cmd {
             SlashCommand::Ide
             | SlashCommand::Usage
+            | SlashCommand::Context
             | SlashCommand::DebugConfig
             | SlashCommand::Ps
             | SlashCommand::Stop

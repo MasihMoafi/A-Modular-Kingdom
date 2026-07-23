@@ -322,6 +322,7 @@ use crate::tui::FrameRequester;
 mod command_lifecycle;
 mod context_ledger;
 use self::context_ledger::ContextLedgerState;
+mod context_usage;
 mod connectors;
 mod constructor;
 use self::connectors::ConnectorsState;

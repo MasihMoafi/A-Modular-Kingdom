@@ -229,6 +229,10 @@ pub(crate) enum AppEvent {
     /// Open the Claude Code migration picker inside the running TUI session.
     OpenExternalAgentConfigMigration,
 
+    /// Render the `/context` usage report. Requires the App-owned transcript cell list
+    /// (checkpoint count, per-category totals), so it cannot be built inside `ChatWidget`.
+    RequestContextUsageReport,
+
     /// Resume a thread by UUID or thread name inside the running TUI session.
     ResumeSessionByIdOrName(String),
 
