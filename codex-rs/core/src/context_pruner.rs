@@ -93,14 +93,21 @@ pub(crate) fn build_fallback_prune_record(batch: &[(String, String)]) -> PruneRe
 fn prunable_text(item: &ResponseItem) -> Option<(&str, String)> {
     match item {
         ResponseItem::Message { id, content, role, .. } => {
-            // System prompt instructions are durable and must NEVER be pruned or sent
-            if role == "system" {
+            // Only user and assistant conversation turns are prunable; system/developer rules and skills are excluded
+            if role != "user" && role != "assistant" {
                 return None;
             }
             let text = content
                 .iter()
                 .filter_map(|c| match c {
-                    ContentItem::InputText { text } | ContentItem::OutputText { text } => Some(text.as_str()),
+                    ContentItem::InputText { text } | ContentItem::OutputText { text } => {
+                        // Exclude injected skill definitions or system guidance fragments
+                        if text.contains("Skill:") || text.contains("figma") || text.contains("Figma") || text.starts_with("<system") {
+                            None
+                        } else {
+                            Some(text.as_str())
+                        }
+                    }
                     _ => None,
                 })
                 .collect::<Vec<_>>()
