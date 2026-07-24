@@ -48,7 +48,7 @@ This is a reproducible demonstration of one workflow, not a claim that Elpis wil
 ### Initial prompt submission
 
 ![Starting Elpis](docs/demo/starting-elpis.png)
-![Starting Codex with the same prompt](docs/demo/starting-codex-with-the-same-prompt.png)
+![Starting Codex with the same prompt](docs/demo/starting-codex.png)
 
 ### Execution outcome
 
