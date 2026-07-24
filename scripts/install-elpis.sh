@@ -15,9 +15,9 @@ release_url="https://github.com/$repository/releases/latest/download"
 temporary_dir=$(mktemp -d)
 trap 'rm -rf "$temporary_dir"' EXIT
 
-curl --fail --location --silent --show-error \
+curl --fail --location --progress-bar \
   "$release_url/$asset" --output "$temporary_dir/$asset"
-curl --fail --location --silent --show-error \
+curl --fail --location --progress-bar \
   "$release_url/$asset.sha256" --output "$temporary_dir/$asset.sha256"
 
 (

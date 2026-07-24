@@ -11,14 +11,16 @@ Instead of treating the full transcript as the agent's state, Elpis keeps the cu
 
 **Current release:** `v0.1.0` for Linux x86_64. Release acceptance and live development state are tracked in [TASKS.md](TASKS.md).
 
+**One controlled comparison:** same task, same prompt — Elpis finished with **93% free context**, Codex with **73%**. Screenshots: [proof below](#context-pruning-one-controlled-comparison).
+
 ## Install
 
 ### Latest release
 
 ```bash
 mkdir -p "$HOME/.local/bin"
-curl -fsSL https://github.com/MasihMoafi/Elpis/releases/latest/download/elpis-linux-x86_64 \
-  | install -m 755 /dev/stdin "$HOME/.local/bin/elpis"
+curl -fL --progress-bar -o "$HOME/.local/bin/elpis" https://github.com/MasihMoafi/Elpis/releases/latest/download/elpis-linux-x86_64
+chmod 755 "$HOME/.local/bin/elpis"
 elpis
 ```
 
@@ -38,10 +40,8 @@ The installer downloads the latest checksummed Linux x86_64 release and installs
 ### Debian / Ubuntu
 
 ```bash
-curl -fsSL "$(curl -s https://api.github.com/repos/MasihMoafi/Elpis/releases/latest \
-  | grep -oE '"browser_download_url": *"[^"]*\.deb"' \
-  | grep -v sha256 \
-  | cut -d '"' -f4)" -o elpis.deb
+deb_url=$(curl -s https://api.github.com/repos/MasihMoafi/Elpis/releases/latest | grep -oE '"browser_download_url": *"[^"]*\.deb"' | grep -v sha256 | cut -d '"' -f4)
+curl -fL --progress-bar -o elpis.deb "$deb_url"
 sudo dpkg -i elpis.deb
 ```
 
@@ -102,27 +102,14 @@ The execution foundation — terminal UI, patches, permissions, sandboxing, and 
 
 ## Current state
 
-Implemented and verified for the current Linux release:
+`v0.1.0` ships a Linux x86_64 release with a checksummed installer, the Ratatui
+terminal UI, dual-layer pruning (deterministic tool receipts plus Ace message
+pruning), the Context Ledger, portable session continuity, bounded local memory,
+local read-only RAG, and OpenAI/Anthropic/Gemini/OpenRouter provider support.
+macOS, Windows, `/auto` routing, multi-agent control, voice input, and LSP
+integration are not in `v0.1.0`.
 
-- Ratatui terminal interface with streaming commands, patches, permission modes, sandboxing, sessions, and compaction.
-- Deterministic tool-output cleanup plus Ace message pruning.
-- Context Ledger and `/usage` source accounting.
-- Portable `GOAL.md` + `ES.md` continuity and exact session resume.
-- Bounded local memory with provenance, recall tracking, promotion, and archival.
-- Optional local read-only RAG.
-- OpenAI subscription authentication plus supported Anthropic, Gemini, and OpenRouter adapters.
-
-Still under active acceptance and polish. See [TASKS.md](TASKS.md) for the source of truth.
-
-### Planned
-
-- Easier installation and distribution.
-- Apple Silicon macOS build, then Windows.
-- Structured interactive clarification.
-- Multi-agent controls and `/multi-task`.
-- Voice input.
-- LSP-backed code intelligence.
-- `/auto` model routing only if it proves it can reduce total cost without unacceptable mistakes.
+Full status, in-progress work, and the backlog: [TASKS.md](TASKS.md).
 
 ## Optional local RAG
 
