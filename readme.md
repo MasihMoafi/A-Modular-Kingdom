@@ -23,15 +23,21 @@ mkdir -p "$HOME/.local/bin" && curl -fsSL https://github.com/MasihMoafi/Elpis/re
 elpis
 ```
 
-Expected result:
+Or install the `.deb` (Debian/Ubuntu):
 
-```text
-$ elpis
-Welcome to Elpis
-›
+```bash
+curl -fsSL "$(curl -s https://api.github.com/repos/MasihMoafi/Elpis/releases/latest | grep -oE '"browser_download_url": *"[^"]*\.deb"' | grep -v sha256 | cut -d '"' -f4)" -o elpis.deb
+sudo dpkg -i elpis.deb
 ```
 
-This assumes `~/.local/bin` is on your `PATH`. On first launch, choose a provider and complete its sign-in or API-key setup.
+This assumes `~/.local/bin` is on your `PATH`. On first launch, Elpis shows a one-time
+onboarding screen ("Welcome to Elpis, with Codex as the active runtime") to pick a
+provider and complete its sign-in or API-key setup; it does not reappear on later
+launches. Every session after that shows the persistent identity header instead:
+
+```text
+ Elpis · model <model> · location <cwd>
+```
 
 Deeper guides are hosted on GitHub Pages:
 

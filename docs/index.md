@@ -13,9 +13,18 @@ mkdir -p "$HOME/.local/bin" && curl -fsSL https://github.com/MasihMoafi/Elpis/re
 elpis
 ```
 
+Or install the `.deb` (Debian/Ubuntu):
+
+```bash
+curl -fsSL "$(curl -s https://api.github.com/repos/MasihMoafi/Elpis/releases/latest | grep -oE '"browser_download_url": *"[^"]*\.deb"' | grep -v sha256 | cut -d '"' -f4)" -o elpis.deb
+sudo dpkg -i elpis.deb
+```
+
 This Linux x86_64 command assumes `~/.local/bin` is on your `PATH`. On first launch,
-choose a provider and follow its sign-in prompt. Use the sections below when you need
-the implementation and operating model behind the interface.
+Elpis shows a one-time onboarding screen to pick a provider and sign in; it does not
+reappear later, and every session after that shows the persistent identity header
+(`Elpis · model <model> · location <cwd>`) instead. Use the sections below when you
+need the implementation and operating model behind the interface.
 
 - [Context and sessions](context-and-sessions.md) explains what Elpis admits,
   retains, and prunes.
