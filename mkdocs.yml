@@ -15,6 +15,8 @@ nav:
   - Memory: memory.md
   - Providers: providers.md
   - Visual walkthrough: visual-walkthrough.md
+  - Blog:
+      - The one-line sabotage: blog/the-one-line-sabotage.md
 markdown_extensions:
   - admonition
   - attr_list

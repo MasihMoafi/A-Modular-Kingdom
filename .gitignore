@@ -78,4 +78,5 @@ src/fix_cuda.sh
 # Deb packages
 *.deb
 # Local, unrelated writing drafts.
-docs/blog/
+docs/blog/*
+!docs/blog/the-one-line-sabotage.md
