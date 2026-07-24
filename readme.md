@@ -111,16 +111,6 @@ integration are not in `v0.1.0`.
 
 Full status, in-progress work, and the backlog: [TASKS.md](TASKS.md).
 
-## Optional local RAG
-
-From a cloned checkout:
-
-```bash
-./scripts/setup-rag.sh
-```
-
-The sidecar exposes one read-only retrieval tool and loads embeddings/indexing only when semantic retrieval is requested.
-
 ## Documentation
 
 - [Context and sessions](https://masihmoafi.github.io/Elpis/context-and-sessions/)
