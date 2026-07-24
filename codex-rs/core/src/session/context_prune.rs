@@ -52,19 +52,94 @@ pub(super) async fn maybe_run_context_prune(
         return;
     }
 
-    let record = match run_prune_pass(sess, turn_context, client_session, &batch).await {
-        Some(raw) => context_pruner::parse_prune_output(&raw, &batch)
+    let pass = run_prune_pass(sess, turn_context, client_session, &batch).await;
+    let record = match &pass {
+        Some((raw, _)) => context_pruner::parse_prune_output(raw, &batch)
             .unwrap_or_else(|| context_pruner::build_fallback_prune_record(&batch)),
         None => context_pruner::build_fallback_prune_record(&batch),
     };
 
-    let mut state = sess.state.lock().await;
-    let mut items = state.history.raw_items().to_vec();
-    context_pruner::apply_prune_record(&mut items, &record);
-    state.history.replace(items);
-    state
-        .context_prune_covered
-        .extend(record.covered_call_ids.iter().cloned());
+    let saved = {
+        let mut state = sess.state.lock().await;
+        let mut items = state.history.raw_items().to_vec();
+        let saved = context_pruner::apply_prune_record(&mut items, &record);
+        state.history.replace(items);
+        state
+            .context_prune_covered
+            .extend(record.covered_call_ids.iter().cloned());
+        saved
+    };
+
+    write_prune_report(&batch, &record, pass.as_ref(), saved);
+}
+
+/// Writes `~/.elpis/logs/prune_report.md` from what this pass actually did: every
+/// batch item with its real outcome (kept evidence line vs deleted dead end), the
+/// model's raw decision, and chars saved. Overwritten per pass — the durable trail
+/// is `prune_debug.log` plus the untouched rollouts in `~/.elpis/sessions/`.
+fn write_prune_report(
+    batch: &[(String, String)],
+    record: &crate::context_pruner::PruneRecord,
+    pass: Option<&(String, String)>,
+    saved: usize,
+) {
+    let Some(home) = std::env::var_os("HOME") else {
+        return;
+    };
+    let log_dir = std::path::PathBuf::from(home).join(".elpis").join("logs");
+    let _ = std::fs::create_dir_all(&log_dir);
+
+    let ts = chrono::Utc::now().to_rfc3339();
+    let model = match pass {
+        Some((_, slug)) => format!("`{slug}`"),
+        None => "*(model pass failed — deterministic fallback applied)*".to_string(),
+    };
+    let kept_count = record
+        .text
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count();
+    let mut body = format!(
+        "# Elpis Layer 2 Context Pruning Report\n\n\
+         **Timestamp**: `{ts}`  \n**Pruning model**: {model}  \n\
+         **This pass**: {} items reviewed · {} kept as evidence lines · {} deleted as dead ends · ≈{saved} chars removed  \n\
+         **Session totals**: {} passes · ≈{} chars removed\n\n\
+         ---\n\n## What was deleted or kept, item by item\n\n",
+        batch.len(),
+        kept_count,
+        batch.len().saturating_sub(kept_count),
+        crate::context_pruner::pass_count(),
+        crate::context_pruner::saved_chars(),
+    );
+    for (id, text) in batch {
+        let conclusion = record.text.lines().find_map(|line| {
+            line.split_once(':')
+                .filter(|(line_id, _)| line_id.trim() == id)
+                .map(|(_, rest)| rest.trim())
+        });
+        let excerpt: String = text.chars().take(120).collect::<String>().replace('\n', " ");
+        let chars = text.chars().count();
+        match conclusion {
+            Some(kept) => {
+                body.push_str(&format!(
+                    "- `{id}` ({chars} chars) — **KEPT** as: {kept}\n  - was: “{excerpt}…”\n"
+                ));
+            }
+            None => {
+                body.push_str(&format!(
+                    "- `{id}` ({chars} chars) — **DELETED** (dead end, no evidence line earned)\n  - was: “{excerpt}…”\n"
+                ));
+            }
+        }
+    }
+    let raw = pass
+        .map(|(raw, _)| raw.as_str())
+        .unwrap_or("*(no model output — deterministic fallback)*");
+    body.push_str(&format!(
+        "\n---\n\n## Model's raw decision\n\n```text\n{raw}\n```\n\n\
+         Full originals remain in `~/.elpis/sessions/` and `~/.elpis/logs/prune_debug.log`.\n"
+    ));
+    let _ = std::fs::write(log_dir.join("prune_report.md"), body);
 }
 
 async fn run_prune_pass(
@@ -72,7 +147,7 @@ async fn run_prune_pass(
     turn_context: &Arc<TurnContext>,
     client_session: &mut ModelClientSession,
     batch: &[(String, String)],
-) -> Option<String> {
+) -> Option<(String, String)> {
     let primary_slug = if turn_context.config.model_provider_id
         == codex_model_provider_info::OPENAI_PROVIDER_ID
     {
@@ -84,18 +159,14 @@ async fn run_prune_pass(
     if let Some(output) =
         try_stream_prune_pass(sess, turn_context, client_session, batch, primary_slug).await
     {
-        return Some(output);
+        return Some((output, primary_slug.to_string()));
     }
 
-    if primary_slug != turn_context.model_info.slug.as_str() {
-        return try_stream_prune_pass(
-            sess,
-            turn_context,
-            client_session,
-            batch,
-            turn_context.model_info.slug.as_str(),
-        )
-        .await;
+    let fallback_slug = turn_context.model_info.slug.as_str();
+    if primary_slug != fallback_slug {
+        return try_stream_prune_pass(sess, turn_context, client_session, batch, fallback_slug)
+            .await
+            .map(|output| (output, fallback_slug.to_string()));
     }
 
     None
@@ -190,7 +261,8 @@ fn log_prune_debug(model_slug: &str, input_text: &str, output_text: Option<&str>
         let log_dir = std::path::PathBuf::from(home).join(".elpis").join("logs");
         let _ = std::fs::create_dir_all(&log_dir);
         
-        // Write raw debug log
+        // Raw debug log only; the human-readable prune_report.md is written by
+        // `write_prune_report` from the pass's actual outcome, never from canned text.
         let debug_file = log_dir.join("prune_debug.log");
         if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(debug_file) {
             use std::io::Write;
@@ -201,14 +273,5 @@ fn log_prune_debug(model_slug: &str, input_text: &str, output_text: Option<&str>
                 "=== LAYER 2 PRUNING PASS [{ts}] ===\nMODEL: {model_slug}\n--- INPUT BATCH SENT TO LLM ---\n{input_text}\n--- LLM RESPONSE RECEIVED ---\n{out_str}\n=========================================\n"
             );
         }
-
-        // Write human-readable markdown report for TUI inspection
-        let report_file = log_dir.join("prune_report.md");
-        let ts = chrono::Utc::now().to_rfc3339();
-        let out_str = output_text.unwrap_or("*(Pass failed or returned no text)*");
-        let report_md = format!(
-            "# Elpis Layer 2 Context Pruning Report\n\n**Timestamp**: `{ts}`  \n**Pruning Model**: `{model_slug}`  \n\n---\n\n## 1. What the Agent Received (Full Prompt & Input Batch)\n\n```text\n{input_text}\n```\n\n---\n\n## 2. Agent Decision & Response\n\n```text\n{out_str}\n```\n\n---\n\n## 3. Pruning Impact & Deletion Audit\n\n- **Thinking & Transient Tokens**: Deleted all unreferenced transient reasoning lines, dead-end tool outputs, and redundant search steps.\n- **Preserved Core Findings**: Maintained key architectural conclusions, changed file paths, and exact pointers in active memory.\n- **Durable Audit Pointer**: Full original un-truncated history remains preserved in `~/.elpis/sessions/`.\n"
-        );
-        let _ = std::fs::write(report_file, report_md);
     }
 }

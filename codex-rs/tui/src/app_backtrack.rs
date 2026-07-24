@@ -627,7 +627,11 @@ pub(crate) fn context_usage_totals(
 ) -> ContextUsageTranscriptTotals {
     let session_start_type = TypeId::of::<SessionInfoCell>();
     let user_type = TypeId::of::<UserHistoryCell>();
+    // Streaming agent cells are consolidated into AgentMarkdownCell once a stream
+    // finalizes, so both types are agent responses — matching only the streaming
+    // cell left finalized answers miscounted as tool calls.
     let agent_type = TypeId::of::<AgentMessageCell>();
+    let agent_markdown_type = TypeId::of::<crate::history_cell::AgentMarkdownCell>();
     let type_of = |cell: &Arc<dyn crate::history_cell::HistoryCell>| cell.as_any().type_id();
 
     let start = cells
@@ -642,23 +646,37 @@ pub(crate) fn context_usage_totals(
         tool_call_chars: 0,
     };
 
-    for cell in cells.iter().skip(start) {
-        let kind = type_of(cell);
-        if kind == session_start_type {
-            continue;
+    let mut tally = |totals: &mut ContextUsageTranscriptTotals, start: usize| {
+        for cell in cells.iter().skip(start) {
+            let kind = type_of(cell);
+            if kind == session_start_type {
+                continue;
+            }
+            let chars: usize = cell
+                .raw_lines()
+                .iter()
+                .map(|line| line.spans.iter().map(|span| span.content.chars().count()).sum::<usize>())
+                .sum();
+            if kind == user_type {
+                totals.user_message_chars += chars;
+            } else if kind == agent_type || kind == agent_markdown_type {
+                totals.agent_response_chars += chars;
+            } else {
+                totals.tool_call_chars += chars;
+            }
         }
-        let chars: usize = cell
-            .raw_lines()
-            .iter()
-            .map(|line| line.spans.iter().map(|span| span.content.chars().count()).sum::<usize>())
-            .sum();
-        if kind == user_type {
-            totals.user_message_chars += chars;
-        } else if kind == agent_type {
-            totals.agent_response_chars += chars;
-        } else {
-            totals.tool_call_chars += chars;
-        }
+    };
+
+    tally(&mut totals, start);
+    // A resumed session appends its banner AFTER the replayed history, so counting
+    // only past the last banner yields an empty conversation. When that happens but
+    // earlier cells exist, count the whole transcript instead of reporting zeros.
+    if start > 0
+        && totals.user_message_chars == 0
+        && totals.agent_response_chars == 0
+        && totals.tool_call_chars == 0
+    {
+        tally(&mut totals, 0);
     }
 
     totals

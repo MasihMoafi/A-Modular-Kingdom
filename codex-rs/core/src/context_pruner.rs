@@ -92,21 +92,32 @@ pub(crate) fn build_fallback_prune_record(batch: &[(String, String)]) -> PruneRe
 
 fn prunable_text(item: &ResponseItem) -> Option<(&str, String)> {
     match item {
+        ResponseItem::FunctionCallOutput {
+            call_id, output, ..
+        }
+        | ResponseItem::CustomToolCallOutput {
+            call_id, output, ..
+        } => {
+            let text = output.body.to_text()?;
+            if text.trim().is_empty() {
+                None
+            } else {
+                Some((call_id.as_str(), text))
+            }
+        }
+        // Assistant transcript turns with a real id are prunable too; user turns and
+        // id-less messages are not — a receipt could never target them, so batching
+        // them would only produce phantom "deletions" that never happen.
         ResponseItem::Message { id, content, role, .. } => {
-            // Only user and assistant conversation turns are prunable; system/developer rules and skills are excluded
-            if role != "user" && role != "assistant" {
+            if role != "assistant" {
                 return None;
             }
+            let msg_id = id.as_deref()?;
             let text = content
                 .iter()
                 .filter_map(|c| match c {
                     ContentItem::InputText { text } | ContentItem::OutputText { text } => {
-                        // Exclude injected skill definitions or system guidance fragments
-                        if text.contains("Skill:") || text.contains("figma") || text.contains("Figma") || text.starts_with("<system") {
-                            None
-                        } else {
-                            Some(text.as_str())
-                        }
+                        Some(text.as_str())
                     }
                     _ => None,
                 })
@@ -115,11 +126,9 @@ fn prunable_text(item: &ResponseItem) -> Option<(&str, String)> {
             if text.trim().is_empty() {
                 None
             } else {
-                let msg_id = id.as_deref().unwrap_or("msg");
                 Some((msg_id, text))
             }
         }
-        // Tool outputs are handled deterministically by Layer 1
         _ => None,
     }
 }
@@ -214,6 +223,17 @@ fn conclusions_by_call_id(record_text: &str) -> HashMap<&str, &str> {
         .collect()
 }
 
+fn message_receipt(id: &str, original_chars: usize, conclusion: Option<&&str>) -> String {
+    match conclusion {
+        Some(conclusion) => format!(
+            "[ELPIS CONTEXT UPDATE]\nkept={conclusion}\nevidence=rollout://message/{id}\noriginal_chars={original_chars}"
+        ),
+        None => format!(
+            "[ELPIS CONTEXT UPDATE]\nreason=dead end, dropped by agent-authored prune record\nevidence=rollout://message/{id}\noriginal_chars={original_chars}"
+        ),
+    }
+}
+
 /// Replaces every item in `input` covered by `record` with a tiny receipt pointing
 /// at the durable evidence, mirroring `context_cleaner.rs`'s existing style. Returns
 /// chars saved. Safe to call on an already-applied record: items too small to shrink
@@ -239,6 +259,32 @@ pub(crate) fn apply_prune_record(input: &mut [ResponseItem], record: &PruneRecor
             | ResponseItem::CustomToolCallOutput {
                 call_id, output, ..
             } => (call_id.as_str(), &mut output.body),
+            // Covered assistant turns collapse to the same receipt, carried as a
+            // single text content item.
+            ResponseItem::Message { id: Some(id), content, role, .. } => {
+                if role != "assistant" || !covered.contains(id.as_str()) {
+                    continue;
+                }
+                let text = content
+                    .iter()
+                    .filter_map(|c| match c {
+                        ContentItem::InputText { text } | ContentItem::OutputText { text } => {
+                            Some(text.as_str())
+                        }
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let original_chars = text.chars().count();
+                let receipt = message_receipt(id, original_chars, conclusions.get(id.as_str()));
+                let new_chars = receipt.chars().count();
+                if new_chars >= original_chars {
+                    continue;
+                }
+                saved += original_chars - new_chars;
+                *content = vec![ContentItem::OutputText { text: receipt }];
+                continue;
+            }
             _ => continue,
         };
         if !covered.contains(call_id) {
@@ -325,10 +371,11 @@ mod tests {
             tool_output("a", "aaaa"),
             tool_output("b", "bb"),
         ];
+        // The id-less user message is not prunable, so only tool outputs count.
         let mut covered = HashSet::new();
-        assert_eq!(uncovered_transient_chars(&input, &covered), 26);
+        assert_eq!(uncovered_transient_chars(&input, &covered), 6);
         covered.insert("a".to_string());
-        assert_eq!(uncovered_transient_chars(&input, &covered), 22);
+        assert_eq!(uncovered_transient_chars(&input, &covered), 2);
     }
 
     #[test]

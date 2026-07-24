@@ -184,11 +184,11 @@ impl Renderable for ChatWidget {
 
     fn desired_height(&self, width: u16) -> u16 {
         let ledger_width = self.context_ledger_width(width);
-        let chat_height = self
-            .as_renderable()
-            .desired_height(width.saturating_sub(ledger_width));
-        let ledger_height = self.context_ledger_desired_height(ledger_width);
-        chat_height.max(ledger_height)
+        // The ledger renders inside the chat column's height and never inflates the
+        // widget: letting it drive the widget taller is what pushed its content
+        // below the chatbox. A ledger taller than the column clips (focus scrolls).
+        self.as_renderable()
+            .desired_height(width.saturating_sub(ledger_width))
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {

@@ -55,20 +55,21 @@ impl ChatWidget {
             return 0;
         }
         let sources = self.continuity_sources();
-        let mut count: u16 = 3;
+        // Mirrors render_context_ledger exactly: 3 header rows + 4 context-window
+        // rows, then per NON-empty category (empty ones are skipped by the renderer,
+        // counting them anchored the panel too high) a header, a blank, 2 rows per
+        // source, and a trailing blank; the renderer pops the last 2 trailing blanks.
+        let mut count: u16 = 7;
         if sources.is_empty() {
             count += 1;
         }
         for category in crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL {
-            let cat_sources: Vec<_> = sources.iter().filter(|s| s.category == category).collect();
-            count += 2;
-            if cat_sources.is_empty() {
-                count += 2;
-            } else {
-                count += cat_sources.len() as u16 * 2;
+            let cat_len = sources.iter().filter(|s| s.category == category).count() as u16;
+            if cat_len > 0 {
+                count += 3 + cat_len * 2;
             }
         }
-        count
+        count.saturating_sub(2)
     }
 
     pub(super) fn handle_context_ledger_key_event(&mut self, key_event: KeyEvent) -> bool {
@@ -203,6 +204,25 @@ impl ChatWidget {
         let cyan = Style::default().fg(Color::Cyan);
         let amber = Style::default().fg(Color::Rgb(245, 158, 11));
         let muted = Style::default().fg(Color::Rgb(100, 116, 139));
+        let messages_color = Color::Rgb(130, 125, 189);
+        let context_window = self
+            .status_line_context_window_size()
+            .unwrap_or(200_000)
+            .max(1) as u64;
+        // Floor at the admitted portable total: before the first server-reported
+        // usage arrives, the admitted sources are already real next-request cost —
+        // otherwise the headline says "0 used" while the bar shows their segments.
+        let used_tokens = (self
+            .token_info
+            .as_ref()
+            .map(|info| info.last_token_usage.tokens_in_context_window())
+            .unwrap_or(0)
+            .max(0) as u64)
+            .max(total_tokens);
+        // Everything in the window that isn't admitted portable context is the
+        // conversation itself — the biggest consumer, previously invisible here.
+        let conversation_tokens = used_tokens.saturating_sub(total_tokens);
+        let used_percent = (used_tokens * 100 / context_window).min(100);
         let mut lines = vec![
             Line::from(vec![
                 Span::styled("CONTEXT LEDGER", cyan.bold()),
@@ -213,6 +233,51 @@ impl ChatWidget {
                 ),
             ]),
             Line::from(Span::styled("i = select/deselect all", muted)),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("CONTEXT WINDOW", cyan.bold()),
+                Span::raw("  "),
+                Span::styled(
+                    format!(
+                        "≈{} of {} used ({used_percent}%)",
+                        format_tokens(used_tokens),
+                        format_tokens(context_window),
+                    ),
+                    muted,
+                ),
+            ]),
+            usage_bar_line(
+                content_width,
+                context_window,
+                &{
+                    let mut segments = vec![(conversation_tokens, messages_color)];
+                    for category in
+                        crate::legacy_core::elpis_context::ContinuitySourceCategory::ALL
+                    {
+                        let admitted = sources
+                            .iter()
+                            .filter(|s| s.category == category && s.admitted)
+                            .map(|s| s.estimated_tokens)
+                            .sum::<u64>();
+                        segments.push((admitted, category_color(category)));
+                    }
+                    segments
+                },
+            ),
+            {
+                let name = "Conversation (messages)";
+                let right = format!("≈{}", format_tokens(conversation_tokens));
+                let pad = content_width
+                    .saturating_sub(2 + 2 + name.chars().count() + right.chars().count())
+                    .max(1);
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("■ ", Style::default().fg(messages_color)),
+                    Span::raw(name),
+                    Span::raw(" ".repeat(pad)),
+                    Span::styled(right, muted),
+                ])
+            },
             Line::from(""),
         ];
 
@@ -234,8 +299,10 @@ impl ChatWidget {
                 .filter(|(_, source)| source.admitted)
                 .map(|(_, source)| source.estimated_tokens)
                 .sum::<u64>();
+            let cat_style = Style::default().fg(category_color(category));
             lines.push(Line::from(vec![
-                Span::styled(category.display_name(), cyan.bold()),
+                Span::styled("■ ", cat_style),
+                Span::styled(category.display_name(), cat_style.bold()),
                 Span::raw("  "),
                 Span::styled(
                     format!("≈{} tokens admitted", format_tokens(admitted_tokens)),
@@ -257,7 +324,7 @@ impl ChatWidget {
                     "EXCLUDED"
                 };
                 let state_style = if source.admitted { cyan } else { amber };
-                let marker_style = if source.admitted { cyan } else { muted };
+                let marker_style = if source.admitted { cat_style } else { muted };
                 let prefix = if selected { "› " } else { "  " };
                 let right = format!("≈{} {state}", format_tokens(source.estimated_tokens));
                 // "› " + "[x]" + " " ahead of the name; truncate long names from the
@@ -469,6 +536,50 @@ impl ChatWidget {
             }
         }
     }
+}
+
+fn category_color(
+    category: crate::legacy_core::elpis_context::ContinuitySourceCategory,
+) -> Color {
+    use crate::legacy_core::elpis_context::ContinuitySourceCategory as C;
+    match category {
+        C::Files => Color::Rgb(52, 168, 83),
+        C::Memory => Color::Rgb(215, 119, 87),
+        C::Instructions => Color::Rgb(255, 193, 7),
+        C::Evidence => Color::Rgb(177, 185, 249),
+    }
+}
+
+/// One-line horizontal usage bar: a colored segment per (tokens, color) entry,
+/// proportional to the context window; the remainder renders as free space.
+fn usage_bar_line(
+    content_width: usize,
+    context_window: u64,
+    segments: &[(u64, Color)],
+) -> Line<'static> {
+    let bar_width = content_width.saturating_sub(2).max(10);
+    let mut spans = vec![Span::raw("  ")];
+    let mut cells_used = 0usize;
+    for (tokens, color) in segments {
+        if *tokens == 0 || cells_used >= bar_width {
+            continue;
+        }
+        let cells = ((*tokens as usize * bar_width) / context_window.max(1) as usize)
+            .max(1)
+            .min(bar_width - cells_used);
+        spans.push(Span::styled(
+            "█".repeat(cells),
+            Style::default().fg(*color),
+        ));
+        cells_used += cells;
+    }
+    if cells_used < bar_width {
+        spans.push(Span::styled(
+            "░".repeat(bar_width - cells_used),
+            Style::default().fg(Color::Rgb(100, 116, 139)),
+        ));
+    }
+    Line::from(spans)
 }
 
 fn format_tokens(tokens: u64) -> String {
