@@ -80,3 +80,6 @@ src/fix_cuda.sh
 # Local, unrelated writing drafts.
 docs/blog/*
 !docs/blog/the-one-line-sabotage.md
+
+# Personal feedback notes, not for the repo
+docs/feedback-hosein.md
