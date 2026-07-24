@@ -39,6 +39,10 @@ Deeper guides are hosted on GitHub Pages:
 - [Memory](https://masihmoafi.github.io/Elpis/memory/)
 - [Provider configuration](https://masihmoafi.github.io/Elpis/providers/)
 
+## Demo
+
+![Elpis demo](docs/assets/elpis-demo.gif)
+
 ## Proof: one controlled context-pruning comparison
 
 The screenshots below show Elpis and Codex running the same task. In this recorded comparison, Elpis ended with **93% free context** and Codex with **73% free context**.
